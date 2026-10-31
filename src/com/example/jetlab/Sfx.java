@@ -96,6 +96,77 @@ final class Sfx {
         return d;
     }
 
+    /**
+     * The jetpack roar: low-passed noise with a deep rumble under it and a fast random flutter,
+     * like a flame. Made as a seamless loop (the tail is crossfaded into the head).
+     */
+    static short[] jet() {
+        int n = RATE * 1200 / 1000, x = RATE * 80 / 1000;
+        float[] f = new float[n + x];
+        Random r = new Random(11);
+        double a1 = 1 - Math.exp(-2 * Math.PI * 1400 / RATE), a2 = 1 - Math.exp(-2 * Math.PI * 160 / RATE);
+        double l1 = 0, l2 = 0, flut = 1, flutT = 1, peak = 1e-9;
+        for (int i = 0; i < f.length; i++) {
+            double w = r.nextDouble() * 2 - 1;
+            l1 += (w - l1) * a1;
+            l2 += (w - l2) * a2;
+            if (i % (RATE / 30) == 0) flutT = 0.7 + 0.3 * r.nextDouble();   // a new flicker level 30 times a second
+            flut += (flutT - flut) * 0.004;
+            double crackle = r.nextDouble() < 0.0015 ? (r.nextDouble() * 2 - 1) * 0.8 : 0;
+            double v = (l1 * 0.9 + l2 * 3.2 + w * 0.08) * flut + crackle;
+            f[i] = (float) v;
+            peak = Math.max(peak, Math.abs(v));
+        }
+        short[] d = new short[n];
+        for (int i = 0; i < n; i++) {
+            double v = f[i];
+            if (i < x) { double k = i / (double) x; v = v * k + f[n + i] * (1 - k); }
+            d[i] = (short) (v / peak * 32767 * 0.45);
+        }
+        return d;
+    }
+
+    AudioTrack jetTrack;
+    volatile boolean jetWanted, alive = true;
+    Thread jetThread;
+
+    /** turn the jetpack roar on or off; a small thread fades it in and out so it never clicks */
+    void setJet(boolean on) {
+        if (on == jetWanted) return;
+        jetWanted = on;
+        if (on && jetThread == null) {
+            jetThread = new Thread(new Runnable() {
+                @Override
+                public void run() { jetLoop(); }
+            }, "jet");
+            jetThread.setDaemon(true);
+            jetThread.start();
+        }
+    }
+
+    void jetLoop() {
+        float vol = 0;
+        boolean playing = false;
+        try {
+            short[] d = jet();
+            jetTrack = mk(d);
+            jetTrack.setLoopPoints(0, d.length, -1);
+            jetTrack.setVolume(0);
+            while (alive) {
+                float target = jetWanted ? 1f : 0f;
+                if (target > 0 && !playing) { jetTrack.play(); playing = true; }
+                if (vol != target) {
+                    vol = target > vol ? Math.min(target, vol + 0.25f) : Math.max(target, vol - 0.12f);   // in over ~40 ms, out over ~80 ms
+                    jetTrack.setVolume(vol * 0.5f);
+                }
+                if (vol == 0 && playing) { jetTrack.pause(); playing = false; }
+                Thread.sleep(10);
+            }
+        } catch (Throwable t) { }
+        try { if (jetTrack != null) jetTrack.release(); } catch (Throwable t) { }
+        jetTrack = null;
+    }
+
     AudioTrack music;
     boolean musicWanted;
 
@@ -149,6 +220,7 @@ final class Sfx {
     }
 
     void release() {
+        alive = false;   // the jet thread releases its own track
         try {
             io.execute(new Runnable() {
                 @Override

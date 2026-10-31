@@ -974,6 +974,8 @@ final class Game extends View implements Choreographer.FrameCallback {
         lastNanos = nanos;
         if (dt > 0.033f) dt = 0.033f;
         if (w > 0) update(dt);
+        // the jetpack roar plays exactly while the flame is drawn
+        if (sfx != null) sfx.setJet(soundOn && hitstop <= 0 && thrusting && state == PLAY && jumpDelay <= 0 && veh == null);
         invalidate();
         Choreographer.getInstance().postFrameCallback(this);
     }
