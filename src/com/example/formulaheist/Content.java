@@ -8,6 +8,25 @@ final class Content {
 
     static final int NF = 60;                // formulas to recover
 
+    // ---------- card rarity, trading card style ----------
+    // Each formula has a fixed rarity; each pull also rolls a finish: 0 plain, 1 holo foil, 2 secret gold.
+    static final String[] RNAME = {"COMMON", "UNCOMMON", "RARE", "ULTRA RARE"};
+    static final int[] RWEIGHT = {6, 4, 2, 1};              // how often each rarity is pulled
+    static final int[] RHOLO = {10, 8, 4, 2};               // 1 in N pulls of that rarity comes out holo
+    static final int GOLD_ODDS = 40;                        // 1 in 40 pulls is a secret gold card
+    static final int[] RPAY = {10, 15, 25, 50};             // electrons for a duplicate (x2 holo, x5 gold)
+    static final int[] RCOL = {Color.rgb(176, 150, 112), Color.rgb(150, 205, 235), Color.rgb(255, 205, 90), Color.rgb(230, 130, 255)};
+    static final String[] FINNAME = {"", "HOLO", "GOLD"};
+    /** rarity of each formula, same order as FNAME: 0 common, 1 uncommon, 2 rare, 3 ultra rare */
+    static final int[] FRAR = {
+        0, 3, 0, 1, 0, 2, 3, 3, 3, 0,
+        0, 0, 0, 2, 1, 0, 0, 0, 1, 1,
+        0, 0, 1, 0, 0, 0, 1, 1, 1, 1,
+        1, 0, 0, 0, 0, 2, 1, 1, 1, 0,
+        2, 2, 2, 1, 2, 1, 1, 2, 2, 1,
+        1, 1, 0, 1, 3, 2, 2, 2, 1, 2
+    };
+
     // ---------- clothes store: shirts, pants and jetpacks, each bought and worn on its own ----------
 
     static final String[] TABS = {"SHIRTS", "PANTS", "JETPACKS"};

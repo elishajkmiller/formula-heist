@@ -7,6 +7,8 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
+import android.graphics.Shader;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
@@ -146,7 +148,9 @@ final class Game extends View implements Choreographer.FrameCallback {
     // formula archive
     long ownedMask;                              // bit i set: formula i is yours (up to 64 formulas)
     int tickets, pending = -1;                   // scratch tickets in hand, and the formula under a ticket you opened but did not finish
-    int revealKind;                              // 0 viewing, 1 a new formula, 2 a duplicate (paid in electrons)
+    long holoMask, goldMask;                     // bit i set: you have the holo / gold finish of formula i
+    int pendingFin, selFin, lastPay;             // finish under the open ticket, finish of the card on screen, what a duplicate paid
+    int revealKind;                              // 0 viewing, 1 a new formula, 2 a duplicate (paid in electrons), 3 a new finish of one you had
     int tbx, tby, tbw, tbh;                      // the scratch-a-ticket button in the archive
     static final int DUPLICATE_PAY = 10;
     int archFrom, selCard, mcols, mrows, cleared;
@@ -201,6 +205,9 @@ final class Game extends View implements Choreographer.FrameCallback {
             ownedMask = saved instanceof Number ? ((Number) saved).longValue() : 0L;
             tickets = prefs.getInt("tickets", 0);
             pending = prefs.getInt("pending", -1);
+            holoMask = prefs.getLong("holo", 0L);
+            goldMask = prefs.getLong("gold", 0L);
+            pendingFin = prefs.getInt("pendingFin", 0);
         } else {                                    // older saves: recovered cards that were not scratched yet become tickets
             int revealed = prefs.getInt("scratched", 0);
             ownedMask = revealed;
@@ -425,22 +432,35 @@ final class Game extends View implements Choreographer.FrameCallback {
         }
     }
 
-    /** a random formula; ones you do not have yet are three times as likely, so repeats are possible but rarer */
+    /** how likely formula i is to be pulled: rarer cards less often, ones you do not have yet three times as likely */
+    int pullWeight(int i) { return RWEIGHT[FRAR[i]] * ((ownedMask >> i & 1) == 0 ? 3 : 1); }
+
+    /** a random formula, weighted by pullWeight, so repeats are possible but rarer */
     int rollFormula() {
         int total = 0;
-        for (int i = 0; i < NF; i++) total += (ownedMask >> i & 1) == 0 ? 3 : 1;
+        for (int i = 0; i < NF; i++) total += pullWeight(i);
         int r = rnd.nextInt(total);
         for (int i = 0; i < NF; i++) {
-            r -= (ownedMask >> i & 1) == 0 ? 3 : 1;
+            r -= pullWeight(i);
             if (r < 0) return i;
         }
         return 0;
     }
 
+    /** the finish of a pull: 2 secret gold, 1 holo (likelier on rarer cards), else 0 plain */
+    int rollFinish(int i) {
+        if (rnd.nextInt(GOLD_ODDS) == 0) return 2;
+        return rnd.nextInt(RHOLO[FRAR[i]]) == 0 ? 1 : 0;
+    }
+
+    /** the best finish you own of formula i */
+    int bestFinish(int i) { return (goldMask >> i & 1) != 0 ? 2 : (holoMask >> i & 1) != 0 ? 1 : 0; }
+
     boolean ticketReady() { return tickets > 0 || pending >= 0; }
 
     void saveFormulas() {
-        prefs.edit().putLong("formulas", ownedMask).putInt("tickets", tickets).putInt("pending", pending).putInt("bank", bank).apply();
+        prefs.edit().putLong("formulas", ownedMask).putInt("tickets", tickets).putInt("pending", pending).putInt("bank", bank)
+                .putLong("holo", holoMask).putLong("gold", goldMask).putInt("pendingFin", pendingFin).apply();
     }
 
     /** a scroll on the track is a scratch ticket: you find out what is under it when you scratch it */
@@ -520,9 +540,9 @@ final class Game extends View implements Choreographer.FrameCallback {
     /** erase formulas, tickets, clothes, electrons and the best distance; the settings stay */
     void resetProgress() {
         SharedPreferences.Editor e = prefs.edit();
-        for (String k : new String[] {"best", "bank", "inv0", "inv1", "inv2", "worn0", "worn1", "worn2", "formulas", "tickets", "pending", "owned", "scratched", "outfits", "outfit"}) e.remove(k);
+        for (String k : new String[] {"best", "bank", "inv0", "inv1", "inv2", "worn0", "worn1", "worn2", "formulas", "tickets", "pending", "owned", "scratched", "outfits", "outfit", "holo", "gold", "pendingFin"}) e.remove(k);
         e.apply();
-        best = 0; bank = 0; ownedMask = 0; tickets = 0; pending = -1;
+        best = 0; bank = 0; ownedMask = 0; tickets = 0; pending = -1; holoMask = 0; goldMask = 0; pendingFin = 0;
         for (int t = 0; t < 3; t++) { inv[t] = 1; worn[t] = 0; }
         applyOutfit();
     }
@@ -690,7 +710,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         for (int i = 0; i < NF; i++) {
             int[] r = cardRect(i);
             if (gx >= r[0] && gx < r[0] + r[2] && gy >= r[1] && gy < r[1] + r[3] && (ownedMask >> i & 1) != 0) {
-                selCard = i; selScratched = true; revealKind = 0;
+                selCard = i; selFin = bestFinish(i); selScratched = true; revealKind = 0;
                 mcols = scw / 4; mrows = sch / 4;
                 java.util.Arrays.fill(mask, true);
                 cleared = 0; dragging = false;
@@ -706,9 +726,10 @@ final class Game extends View implements Choreographer.FrameCallback {
             if (tickets <= 0) return;
             tickets--;
             pending = rollFormula();      // decided now, so closing the screen cannot re-roll it
+            pendingFin = rollFinish(pending);
             saveFormulas();
         }
-        selCard = pending; selScratched = false; revealKind = 0;
+        selCard = pending; selFin = pendingFin; selScratched = false; revealKind = 0;
         mcols = scw / 4; mrows = sch / 4;
         java.util.Arrays.fill(mask, false);
         cleared = 0; dragging = false;
@@ -753,19 +774,28 @@ final class Game extends View implements Choreographer.FrameCallback {
     void revealCard() {
         java.util.Arrays.fill(mask, true);
         selScratched = true; dragging = false; revealAt = clock;
-        if ((ownedMask >> selCard & 1) != 0) {
-            revealKind = 2;
-            bank += DUPLICATE_PAY;        // a repeat pays out in electrons
-        } else {
+        long bit = 1L << selCard;
+        boolean newFin = selFin == 1 ? (holoMask & bit) == 0 : selFin == 2 && (goldMask & bit) == 0;
+        if ((ownedMask & bit) == 0) {
             revealKind = 1;
-            ownedMask |= 1L << selCard;
+        } else if (newFin) {
+            revealKind = 3;               // a holo or gold version of one you already had
+        } else {
+            revealKind = 2;
+            lastPay = RPAY[FRAR[selCard]] * (selFin == 2 ? 5 : selFin == 1 ? 2 : 1);
+            bank += lastPay;              // a repeat pays out in electrons
         }
-        pending = -1;
+        ownedMask |= bit;
+        if (selFin == 1) holoMask |= bit;
+        if (selFin == 2) goldMask |= bit;
+        pending = -1; pendingFin = 0;
         saveFormulas();
-        flash = 0.2f; shake = 2f;
-        sfx(revealKind == 1 ? S_FANFARE : S_DONE);
-        buzz(25);
-        for (int i = 0; i < (revealKind == 1 ? 40 : 16); i++) confetti(scx + scw / 2f, scy + sch / 2f);
+        boolean big = revealKind != 2;
+        flash = 0.2f + (big ? selFin * 0.1f : 0f); shake = 2f + (big ? FRAR[selCard] : 0);
+        sfx(big ? S_FANFARE : S_DONE);
+        buzz(big && FRAR[selCard] >= 2 ? 45 : 25);
+        int bits = big ? 40 + FRAR[selCard] * 15 + selFin * 20 : 16;
+        for (int i = 0; i < bits; i++) confetti(scx + scw / 2f, scy + sch / 2f);
     }
 
     void closeButton(Canvas c) {
@@ -819,19 +849,96 @@ final class Game extends View implements Choreographer.FrameCallback {
         c.restore();
     }
 
+    // ---------- card rarity and finishes ----------
+    static final int PAPER = Color.rgb(236, 222, 180);
+    static final int[] HOLO_BANDS = {Color.argb(0, 255, 255, 255), Color.argb(110, 255, 90, 120), Color.argb(110, 255, 220, 90),
+            Color.argb(110, 110, 255, 150), Color.argb(110, 90, 200, 255), Color.argb(110, 200, 120, 255), Color.argb(0, 255, 255, 255)};
+    static final int[] GOLD_BANDS = {Color.rgb(196, 146, 46), Color.rgb(255, 226, 130), Color.rgb(214, 168, 62), Color.rgb(255, 240, 175), Color.rgb(196, 146, 46)};
+
+    /** rarity colour; ultra rare slowly cycles through the hues */
+    int rarityCol(int r) {
+        if (r < 3) return RCOL[r];
+        return Color.HSVToColor(new float[] {(clock * 120f) % 360f, 0.5f, 1f});
+    }
+
+    /** card paper for a finish: plain parchment, parchment under sliding rainbow foil bands, or shining gold. Sparkles on foil. */
+    void cardPaper(Canvas c, float x, float y, float cw, float chh, int fin, int seed) {
+        float slide = (clock * 40f) % 80f;
+        if (fin == 2) {
+            p.setShader(new LinearGradient(x - slide, y, x - slide + 40, y + 40, GOLD_BANDS, null, Shader.TileMode.MIRROR));
+            rectPx(c, x, y, cw, chh, Color.WHITE);
+            p.setShader(null);
+        } else {
+            rectPx(c, x, y, cw, chh, PAPER);
+            if (fin == 1) {
+                p.setShader(new LinearGradient(x + slide, y, x + slide + 50, y + 30, HOLO_BANDS, null, Shader.TileMode.MIRROR));
+                rectPx(c, x, y, cw, chh, Color.WHITE);
+                p.setShader(null);
+            }
+        }
+        if (fin == 0) return;
+        // twinkles: a few little crosses that move every half second
+        int tick = (int) (clock * 2f);
+        int n = Math.max(1, (int) (cw * chh / 900f));
+        for (int k = 0; k < n; k++) {
+            int hsh = (seed * 73856093) ^ ((tick + k * 7) * 19349663) ^ (k * 83492791);
+            hsh ^= hsh >>> 13; hsh *= 0x5bd1e995; hsh ^= hsh >>> 15;
+            float sx = x + 1 + ((hsh & 0xFFFF) % Math.max(1, (int) cw - 2));
+            float sy = y + 1 + (((hsh >>> 16) & 0xFFFF) % Math.max(1, (int) chh - 2));
+            float life = (clock * 2f) % 1f;
+            int a = (int) (255 * Math.sin(life * Math.PI));
+            int col = Color.argb(a, 255, 255, 255);
+            rectPx(c, sx, sy, 1, 1, col);
+            if (cw > 40) { rectPx(c, sx - 1, sy, 1, 1, col); rectPx(c, sx + 1, sy, 1, 1, col); rectPx(c, sx, sy - 1, 1, 1, col); rectPx(c, sx, sy + 1, 1, 1, col); }
+        }
+    }
+
+    /** the rarity mark: circle common, diamond uncommon, star rare, two stars ultra rare. (x, y) is its centre. */
+    void raritySymbol(Canvas c, float x, float y, int r) {
+        int col = rarityCol(r), dark = Color.rgb(8, 10, 20);
+        for (int pass = 0; pass < 2; pass++) {
+            float s = pass == 0 ? 1.6f : 0f;              // dark outline first, then the colour
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(pass == 0 ? dark : col);
+            if (r == 0) {
+                c.drawCircle(x, y, 2f + s * 0.7f, p);
+            } else if (r == 1) {
+                path.reset();
+                path.moveTo(x, y - 3 - s); path.lineTo(x + 3 + s, y); path.lineTo(x, y + 3 + s); path.lineTo(x - 3 - s, y); path.close();
+                c.drawPath(path, p);
+            } else {
+                starPath(x - (r == 3 ? 3.5f : 0f), y, 3.6f + s);
+                c.drawPath(path, p);
+                if (r == 3) { starPath(x + 3.5f, y, 3.6f + s); c.drawPath(path, p); }
+            }
+        }
+    }
+
+    void starPath(float x, float y, float ro) {
+        path.reset();
+        for (int k = 0; k < 10; k++) {
+            float a = (float) (-Math.PI / 2 + k * Math.PI / 5), rr = k % 2 == 0 ? ro : ro * 0.45f;
+            float px0 = x + (float) Math.cos(a) * rr, py0 = y + (float) Math.sin(a) * rr;
+            if (k == 0) path.moveTo(px0, py0); else path.lineTo(px0, py0);
+        }
+        path.close();
+    }
+
     void drawArchive(Canvas c) {
         menuBackdrop(c);
         text(c, "FORMULA ARCHIVE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
         int owned = Long.bitCount(ownedMask);
-        text(c, owned == NF ? "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!" : owned + "/" + NF + " RECOVERED", 8, 13, 1, owned == NF ? Color.rgb(120, 255, 160) : Color.rgb(150, 190, 215), 0);
+        String tally = owned + "/" + NF + " RECOVERED   HOLO " + Long.bitCount(holoMask) + "   GOLD " + Long.bitCount(goldMask);
+        text(c, owned == NF ? "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!" : tally, 8, 13, 1, owned == NF ? Color.rgb(120, 255, 160) : Color.rgb(150, 190, 215), 0);
         closeButton(c);
         for (int i = 0; i < NF; i++) {
             int[] r = cardRect(i);
             boolean have = (ownedMask >> i & 1) != 0;
             rectPx(c, r[0], r[1], r[2], r[3], Color.rgb(8, 10, 20));
             if (have) {
-                rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(236, 222, 180));
-                rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, 1, Color.rgb(196, 160, 100));
+                cardPaper(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, bestFinish(i), i);
+                rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, 1, rarityCol(FRAR[i]));
+                if (FRAR[i] > 0) rectPx(c, r[0] + r[2] - 4, r[1] + r[3] - 4, 2, 2, rarityCol(FRAR[i]));
                 float fs = fitSize(FORMD[i], r[2] - 3, 8f);
                 if (fs >= 4.6f) ov(FORMD[i], r[0] + r[2] / 2f, r[1] + r[3] / 2f, fs, Color.rgb(70, 42, 28), false);
                 else text(c, "" + (i + 1), r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 60, 40), 1);
@@ -854,14 +961,16 @@ final class Game extends View implements Choreographer.FrameCallback {
         drawParticles(c);
     }
 
-    /** spinning spotlight rays behind a newly found card: 12 warm wedges turning slowly around (x, y), faded in by k */
-    void spotlight(Canvas c, float x, float y, float k) {
+    /** spinning spotlight rays behind a newly found card: 12 wedges turning slowly around (x, y), faded in by k.
+     *  fin 0 warm, 1 rainbow (holo), 2 bright gold and faster */
+    void spotlight(Canvas c, float x, float y, float k, int fin) {
         float r = w + h;                                   // long enough to reach every corner
-        float spin = clock * 0.6f;                         // radians per second
+        float spin = clock * (fin == 2 ? 1.1f : 0.6f);     // radians per second
         float half = (float) Math.PI / 24;                 // each wedge is 15 degrees wide, with 15 degree gaps
         p.setStyle(Paint.Style.FILL);
-        p.setColor(Color.argb((int) (55 * k), 255, 205, 110));
+        p.setColor(fin == 2 ? Color.argb((int) (80 * k), 255, 220, 90) : Color.argb((int) (55 * k), 255, 205, 110));
         for (int i = 0; i < 12; i++) {
+            if (fin == 1) p.setColor(Color.HSVToColor((int) (60 * k), new float[] {(i * 30f + clock * 60f) % 360f, 0.6f, 1f}));
             float a = spin + i * (float) Math.PI / 6;
             path.reset();
             path.moveTo(x, y);
@@ -874,30 +983,37 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     void drawScratch(Canvas c) {
         rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
-        if (revealKind == 1) spotlight(c, scx + scw / 2f, scy + sch / 2f, Math.min(1f, (clock - revealAt) * 3f));
+        if (revealKind == 1 || revealKind == 3) spotlight(c, scx + scw / 2f, scy + sch / 2f, Math.min(1f, (clock - revealAt) * 3f), selFin);
         closeButton(c);
-        if (revealKind == 1) {
-            text(c, "NEW!", w / 2f, 8, 2, Color.rgb(255, 215, 120), 1);
+        int rar = FRAR[selCard];
+        if (revealKind == 1 || revealKind == 3) {
+            String big = revealKind == 1 ? "NEW!" : FINNAME[selFin] + " UPGRADE!";
+            text(c, big, w / 2f, 8, 2, selFin == 0 ? Color.rgb(255, 215, 120) : selFin == 2 ? Color.rgb(255, 230, 120) : rarityCol(3), 1);
         } else {
-            String head = !selScratched ? "SCRATCH TO REVEAL" : revealKind == 2 ? "DUPLICATE! +" + DUPLICATE_PAY + " E-" : "FORMULA";
+            String head = !selScratched ? "SCRATCH TO REVEAL" : revealKind == 2 ? "DUPLICATE! +" + lastPay + " E-" : "FORMULA";
             text(c, head, 8, 8, 1, revealKind == 2 ? Color.rgb(120, 235, 255) : Color.rgb(255, 215, 120), 0);
         }
-        rectPx(c, scx - 2, scy - 2, scw + 4, sch + 4, Color.rgb(8, 10, 20));
-        int paper = Color.rgb(236, 222, 180);
         if (selScratched) {
-            rectPx(c, scx, scy, scw, sch, paper);
+            // rarity and finish, top right next to the close button
+            String tag = RNAME[rar] + (selFin > 0 ? " " + FINNAME[selFin] : "");
+            if (revealKind == 1 || revealKind == 3) text(c, tag, 8, 8, 1, rarityCol(rar), 0);   // the big header is centred
+            else text(c, tag, cbx - 6, 8, 1, rarityCol(rar), 2);
+        }
+        // the frame: dark until it is revealed, then the rarity colour shows on the inner edge
+        rectPx(c, scx - 2, scy - 2, scw + 4, sch + 4, Color.rgb(8, 10, 20));
+        if (selScratched) {
+            int fc = rarityCol(rar);
+            rectPx(c, scx - 1, scy - 1, scw + 2, 1, fc); rectPx(c, scx - 1, scy + sch, scw + 2, 1, fc);
+            rectPx(c, scx - 1, scy - 1, 1, sch + 2, fc); rectPx(c, scx + scw, scy - 1, 1, sch + 2, fc);
+        }
+        int ink = selFin == 2 ? Color.rgb(84, 50, 12) : Color.rgb(70, 42, 28);
+        boolean clip = !selScratched;
+        if (!clip) {
+            cardPaper(c, scx, scy, scw, sch, selFin, selCard);
+            raritySymbol(c, scx + scw - (rar == 3 ? 10 : 7), scy + 7, rar);
         } else {
             prismScene(c, scx, scy, scw, sch, 1f, 0f, 0f);
-            for (int cy = 0; cy < mrows; cy++) {
-                for (int cx = 0; cx < mcols; cx++) {
-                    if (mask[cy * mcols + cx]) rectPx(c, scx + cx * 4, scy + cy * 4, 4, 4, paper);
-                }
-            }
-        }
-        int ink = Color.rgb(70, 42, 28);
-        boolean clip = !selScratched;
-        if (clip) {
-            // only the scratched-off cells show the card's writing
+            // only the scratched-off cells show the card (its foil shows through as you scratch) and its writing
             clipPath.reset();
             for (int cy = 0; cy < mrows; cy++) {
                 int run = -1;
@@ -912,8 +1028,9 @@ final class Game extends View implements Choreographer.FrameCallback {
             }
             c.save();
             c.clipPath(clipPath);
+            cardPaper(c, scx, scy, scw, sch, selFin, selCard);
         }
-        textOut(c, FNAME[selCard], scx + scw / 2f, scy + 8, 1, Color.rgb(140, 96, 56), 1, false);
+        textOut(c, FNAME[selCard], scx + scw / 2f, scy + 8, 1, selFin == 2 ? Color.rgb(110, 66, 20) : Color.rgb(140, 96, 56), 1, false);
         wrapOut(c, FDESC[selCard], scx + scw / 2f, scy + 58, 1, ink, scw - 16, false);
         if (clip) c.restore();
         ov(FORMD[selCard], scx + scw / 2f, scy + 34, fitSize(FORMD[selCard], scw - 16, 17f), ink, clip);
