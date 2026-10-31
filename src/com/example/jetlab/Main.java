@@ -470,6 +470,8 @@ public class Main extends Activity {
         // DNA helix: where the head has been, so the body can follow it
         final float[] yHist = new float[64];
         int yh;
+        float bustOff, bustV, lastVy;                // the chest spring
+        int lastPh;
         float boltCd, tilt;                          // tilt: degrees, nose up is negative
         static final int[][] RUNG = {{0xDC4646, 0x4678E6}, {0x50DC78, 0xF0C83C}, {0x4678E6, 0xDC4646}, {0xF0C83C, 0x50DC78}};   // A-T, C-G pairs
 
@@ -944,7 +946,9 @@ public class Main extends Activity {
                 c.translate(r[0] + 6, r[1] + 3);
                 c.scale(2f, 2f);
                 outlined(c, LEGS_A, 0, SPR_HEAD.length);
+                drawHairBack(c, 0, 0);
                 outlined(c, SPR_HEAD, 0, 0);
+                drawBust(c, 0, 0);
                 c.restore();
                 worn[tab] = keep;
                 applyOutfit();
@@ -1374,6 +1378,7 @@ public class Main extends Activity {
             clock += rdt;
             stateTime += rdt;
             if (worn[2] == RAINBOW_PACK) applyOutfit();      // the rainbow jetpack cycles colours
+            if (female) stepBust(Math.min(rdt, 0.033f));
             if (flash > 0) flash -= rdt;
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
@@ -1959,18 +1964,73 @@ public class Main extends Activity {
             "...BBbSSPPSSbBB."
         };
 
-        /** the torso rows for the female: hair over the back of the shoulder and a fuller rounded chest, lit on top and shaded underneath */
+        /** the torso rows for the female: hair over the back of the shoulder (the chest is its own sprite so it can jiggle) */
         static String[] femaleBody(String[] body) {
             char[][] r = new char[body.length][];
             for (int i = 0; i < body.length; i++) r[i] = body[i].toCharArray();
             for (int i = 0; i < 4; i++) r[i][4] = 'B';
-            r[1][11] = 'W'; r[1][12] = 'W';
-            r[2][11] = 'W'; r[2][12] = 'W'; r[2][13] = 'W';
-            r[3][11] = 'W'; r[3][12] = 'W'; r[3][13] = 'w';
-            r[4][11] = 'w'; r[4][12] = 'w';
             String[] out = new String[body.length];
             for (int i = 0; i < body.length; i++) out[i] = new String(r[i]);
             return out;
+        }
+
+        /** her long hair hanging down the front, drawn behind the body so the chest sits in front of it */
+        static final String[] HAIR_BACK = {
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "............BBB.",
+            "............BBB.",
+            ".............BBb",
+            ".............BBb",
+            "............BBb.",
+            "...........BBBb.",
+            "............Bb.."
+        };
+
+        static final String[] BUST = {"WW.", "WWW", "WWw", "ww."};
+
+        void drawHairBack(Canvas c, int left, int top) {
+            if (female) outlined(c, HAIR_BACK, left, top);
+        }
+
+        /** the chest sits a little lower or higher than its rest place as it springs after the body */
+        int bustPx() { return Math.max(-1, Math.min(1, Math.round(bustOff))); }
+
+        /** draw the chest at the sprite's top left; only the free edges get an outline so it does not cut into the coat */
+        void drawBust(Canvas c, int left, int top) {
+            if (!female) return;
+            int x = left + 11, y = top + 11 + bustPx();
+            float lp = leanPx;
+            leanPx = 0;
+            outline = true;
+            sprite(c, BUST, x + 1, y);
+            sprite(c, BUST, x, y - 1);
+            sprite(c, BUST, x, y + 1);
+            outline = false;
+            sprite(c, BUST, x, y);
+            leanPx = lp;
+        }
+
+        /** a small spring: it lags the body when you jump, land or step, then settles */
+        void stepBust(float dt) {
+            float dv = vy - lastVy;
+            lastVy = vy;
+            bustV += -dv * 3.3f;
+            int ph = ((int) (runPhase * 0.2f * 4)) & 3;
+            if (ph != lastPh) {
+                lastPh = ph;
+                if (onFloor) bustV += ((ph & 1) == 0 ? 1 : -1) * 16f;
+            }
+            bustV += (-400f * bustOff - 16f * bustV) * dt;
+            bustOff = Math.max(-2f, Math.min(2f, bustOff + bustV * dt));
         }
 
         /** rewrite the shared sprite arrays in place for the chosen character */
@@ -2896,7 +2956,9 @@ public class Main extends Activity {
             leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
             leanPx = lean;
+            drawHairBack(c, left + dx, top + dy);
             outlined(c, body, left + dx, top + dy);
+            drawBust(c, left + dx, top + dy);
             if ((clock % 2.8f) < 0.12f) sprite(c, SPR_BLINK, left + dx, top + dy);
             leanPx = 0;
         }
@@ -2924,7 +2986,9 @@ public class Main extends Activity {
             c.rotate(ang, playerX, y);
             leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
+            drawHairBack(c, left, top);
             outlined(c, flop ? SPR_HEAD_B : SPR_HEAD, left, top);
+            drawBust(c, left, top);
             c.restore();
         }
 
