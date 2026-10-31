@@ -105,7 +105,7 @@ final class Sfx {
 
     /**
      * A short looping chiptune, made here so there is no audio file: A minor, 128 bpm, eight bars
-     * of Am F C G twice. A square-wave arpeggio over a triangle bass and a noise hat.
+     * of Am F C G twice. A square-wave arpeggio and a noise hat, no bass: the jetpack hum plays the roots.
      */
     static final double BEAT = 60.0 / 128.0;
     static final float[] ROOTS = {110.00f, 87.31f, 130.81f, 98.00f};   // A2 F2 C3 G2, one per bar
@@ -114,7 +114,6 @@ final class Sfx {
         double beat = BEAT, step = beat / 4;
         int bars = 8, steps = bars * 16;
         int n = (int) (steps * step * RATE);
-        float[] roots = ROOTS;
         float[][] arp = {{440.00f, 523.25f, 659.25f}, {349.23f, 440.00f, 523.25f}, {523.25f, 659.25f, 783.99f}, {392.00f, 493.88f, 587.33f}};
         int[] pattern = {0, 1, 2, 1, 0, 1, 2, 1, 2, 1, 0, 1, 2, 1, 0, 2};
         short[] d = new short[n];
@@ -127,14 +126,9 @@ final class Sfx {
             // lead: the arpeggio
             double lf = arp[chord][pattern[st % 16] % 3];
             double lead = (((t * lf) % 1.0) < 0.25 ? 1 : -1) * Math.exp(-inStep * 3.2) * 0.12;
-            // bass: a triangle on the root, plucked on every beat
-            double bt = (t % beat) / beat;
-            double bf = roots[chord];
-            double ph = (t * bf) % 1.0;
-            double bass = (ph < 0.5 ? ph * 4 - 1 : 3 - ph * 4) * Math.exp(-bt * 2.2) * 0.3;
             // hat: a tiny noise tick on the off 8ths
             double hat = (st % 2 == 1 ? (noise.nextDouble() * 2 - 1) * Math.exp(-inStep * 12) * 0.05 : 0);
-            double v = lead + bass + hat;
+            double v = lead + hat;
             d[i] = (short) (Math.max(-1, Math.min(1, v)) * 32767 * 0.6);
         }
         return d;
