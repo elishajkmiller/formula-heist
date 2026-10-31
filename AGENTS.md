@@ -10,3 +10,6 @@ Jetpack Joyride style Android game with a physics theme. One file, src/com/examp
 - No em-dashes. Short, plain replies; no headers or bullets unless it really is a list.
 - No real names or addresses in code, tests, comments or commits. Invent stand-ins.
 - No Co-Authored-By lines. Never run sudo.
+
+## Vehicles and feel
+Blueprint crates ("B") appear every 220 to 370 m. Picking one up freezes time to 15% while the vehicle assembles from flying 3x3 pixel blocks (BUILD state), then you ride it: Spring Stomper (bounces on its own, tap in the air to dive) or Gravity Inverter (tap flips gravity). A hit breaks the vehicle instead of ending the run. Feel: screen shake, hit-stop, white flash, vibration (needs VIBRATE) and synthesized sounds (Sfx class, no audio files).

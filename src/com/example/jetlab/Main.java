@@ -4,6 +4,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioTrack;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -16,6 +21,7 @@ import android.view.View;
 import android.view.WindowManager;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Random;
 
 public class Main extends Activity {
@@ -55,6 +61,8 @@ public class Main extends Activity {
 
     static class Coin { float x, y; boolean taken; }
 
+    static class Crate { float x, y; int type; }
+
     static class Zapper {
         float x, y, len, angle, spin;
     }
@@ -64,10 +72,90 @@ public class Main extends Activity {
         boolean flying;
     }
 
+    /** Short synthesized sound effects, no audio files. */
+    static class Sfx {
+        static final int RATE = 22050;
+        final AudioTrack[] tr = new AudioTrack[8];
+
+        Sfx() {
+            try {
+                tr[Game.S_JUMP] = mk(tone(200, 560, 120, 0.5f, 0f, true));
+                tr[Game.S_COIN] = mk(tone(900, 1500, 70, 0.4f, 0f, false));
+                tr[Game.S_HIT] = mk(tone(160, 30, 380, 0.9f, 0.6f, false));
+                tr[Game.S_STOMP] = mk(tone(140, 40, 170, 0.9f, 0.35f, false));
+                tr[Game.S_FLIP] = mk(tone(700, 250, 130, 0.5f, 0f, true));
+                tr[Game.S_WARN] = mk(tone(820, 820, 90, 0.4f, 0f, true));
+                tr[Game.S_DONE] = mk(tone(500, 1400, 260, 0.6f, 0f, true));
+                tr[Game.S_BUILD] = mk(build());
+            } catch (Throwable t) { }
+        }
+
+        static short[] tone(float f0, float f1, int ms, float vol, float noise, boolean square) {
+            int n = RATE * ms / 1000;
+            short[] d = new short[n];
+            Random r = new Random(7);
+            double ph = 0;
+            for (int i = 0; i < n; i++) {
+                float t = i / (float) n;
+                ph += 2 * Math.PI * (f0 + (f1 - f0) * t) / RATE;
+                double v = square ? (Math.sin(ph) >= 0 ? 1 : -1) : Math.sin(ph);
+                v = v * (1 - noise) + (r.nextFloat() * 2 - 1) * noise;
+                float env = (t < 0.05f ? t / 0.05f : 1f) * (1 - t);
+                d[i] = (short) (v * env * vol * 32767 * 0.5);
+            }
+            return d;
+        }
+
+        /** a rising whirr with a wobble, about as long as the build animation */
+        static short[] build() {
+            int n = RATE * 1400 / 1000;
+            short[] d = new short[n];
+            double ph = 0;
+            for (int i = 0; i < n; i++) {
+                float t = i / (float) n;
+                double f = 140 + 800 * t * t + 40 * Math.sin(t * 70);
+                ph += 2 * Math.PI * f / RATE;
+                double v = Math.sin(ph) >= 0 ? 1 : -1;
+                float env = (t < 0.05f ? t / 0.05f : 1f) * (t > 0.9f ? (1 - t) * 10 : 1f);
+                d[i] = (short) (v * env * 32767 * 0.18);
+            }
+            return d;
+        }
+
+        static AudioTrack mk(short[] d) {
+            AudioTrack a = new AudioTrack(AudioManager.STREAM_MUSIC, RATE, AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT, d.length * 2, AudioTrack.MODE_STATIC);
+            a.write(d, 0, d.length);
+            return a;
+        }
+
+        void play(int id) {
+            try {
+                AudioTrack a = tr[id];
+                if (a == null) return;
+                a.stop();
+                a.reloadStaticData();
+                a.play();
+            } catch (Throwable t) { }
+        }
+
+        void release() {
+            for (int i = 0; i < tr.length; i++) {
+                try { if (tr[i] != null) tr[i].release(); } catch (Throwable t) { }
+                tr[i] = null;
+            }
+        }
+    }
+
     /** One game view: physics, drawing and input in one place. */
     static class Game extends View implements Choreographer.FrameCallback {
 
-        static final int START = 0, PLAY = 1, DEAD = 2;
+        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3;
+        static final int STOMPER = 1, INVERTER = 2;
+        static final float BUILD_TIME = 1.5f;
+        static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7;
+        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER"};
+        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY."};
 
         static final float GRAVITY = 22f;       // m/s^2, game gravity (Earth is 9.8)
         static final float THRUST = 38f;        // m/s^2 from the pack, net 16 up
@@ -101,6 +189,14 @@ public class Main extends Activity {
         final ArrayList<Coin> coins = new ArrayList<>();
         final ArrayList<Zapper> zappers = new ArrayList<>();
         final ArrayList<Missile> missiles = new ArrayList<>();
+        final ArrayList<Crate> crates = new ArrayList<>();
+
+        static final int NB = 64;
+        final int[] brow = new int[NB], bcol = new int[NB];
+        final float[] bdelay = new float[NB], bsx = new float[NB], bsy = new float[NB];
+        final boolean[] bland = new boolean[NB];
+        int nb, buildType;
+        float buildT;
 
         static final int NP = 140;
         final float[] px = new float[NP], py = new float[NP], pvx = new float[NP], pvy = new float[NP], pl = new float[NP];
@@ -111,6 +207,11 @@ public class Main extends Activity {
 
         int state = START;
         boolean thrusting, onFloor, running;
+        int vehicle, gravDir = 1;
+        boolean diving;
+        float invuln, squash, flash, shake, hitstop, hintT, nextCrate, lastCoinSfx, unit = 1f;
+        Sfx sfx;
+        Vibrator vib;
         float jumpDelay, y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
         int electrons, best;
         String fact = FACTS[0];
@@ -128,6 +229,8 @@ public class Main extends Activity {
             if (running) return;
             running = true;
             lastNanos = 0;
+            if (sfx == null) sfx = new Sfx();
+            if (vib == null) vib = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
             Choreographer.getInstance().postFrameCallback(this);
         }
 
@@ -135,6 +238,7 @@ public class Main extends Activity {
             running = false;
             Choreographer.getInstance().removeFrameCallback(this);
             thrusting = false;
+            if (sfx != null) { sfx.release(); sfx = null; }
         }
 
         @Override
@@ -146,6 +250,7 @@ public class Main extends Activity {
             buf = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
             bc = new Canvas(buf);
             dst.set(0, 0, nw, nh);
+            unit = nh / 144f;
             floorY = h - 11;
             ceilY = 11;
             playerX = w * 0.22f;
@@ -153,11 +258,27 @@ public class Main extends Activity {
         }
 
         void reset() {
-            coins.clear(); zappers.clear(); missiles.clear();
+            coins.clear(); zappers.clear(); missiles.clear(); crates.clear();
             for (int i = 0; i < NP; i++) pl[i] = 0;
+            vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
+            diving = false; nextCrate = 80;
             y = floorY - 0.62f * ppm;
             vy = 0; dist = 0; electrons = 0; spawnLeft = w * 0.6f;
             state = PLAY; stateTime = 0;
+        }
+
+        float hTop() { return vehicle == 0 ? 0.72f * ppm : hhVeh(vehicle); }
+
+        float hBot() { return vehicle == 0 ? 0.62f * ppm : hhVeh(vehicle); }
+
+        static int hhVeh(int v) { return v == STOMPER ? 10 : 6; }
+
+        void sfx(int id) { if (sfx != null) sfx.play(id); }
+
+        void buzz(int ms) {
+            try {
+                if (vib != null) vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+            } catch (Throwable t) { }
         }
 
         @Override
@@ -165,7 +286,7 @@ public class Main extends Activity {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     if (state == START || (state == DEAD && stateTime > 0.7f)) reset();
-                    if (state == PLAY && onFloor) { vy = -JUMP; jumpDelay = 0.22f; onFloor = false; }
+                    if (state == PLAY) press();
                     thrusting = true;
                     break;
                 case MotionEvent.ACTION_UP:
@@ -174,6 +295,23 @@ public class Main extends Activity {
                     break;
             }
             return true;
+        }
+
+        void press() {
+            if (vehicle == INVERTER) {
+                gravDir = -gravDir;
+                vy *= 0.3f;
+                shake = Math.max(shake, 2f);
+                sfx(S_FLIP);
+                buzz(15);
+                for (int i = 0; i < 10; i++) burst(playerX, y);
+            } else if (vehicle == STOMPER) {
+                if (!onFloor && squash <= 0) { vy = VFALL; diving = true; sfx(S_FLIP); }
+            } else if (onFloor) {
+                vy = -JUMP; jumpDelay = 0.22f; onFloor = false;
+                sfx(S_JUMP);
+                for (int i = 0; i < 4; i++) burst(playerX - 3, y + 10);
+            }
         }
 
         @Override
@@ -189,23 +327,69 @@ public class Main extends Activity {
 
         // ---------- physics ----------
 
-        void update(float dt) {
-            clock += dt;
-            stateTime += dt;
-            float r = 0.3f * ppm;
+        void update(float rdt) {
+            clock += rdt;
+            stateTime += rdt;
+            if (flash > 0) flash -= rdt;
+            if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
+            if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
 
-            // vertical motion: gravity down, thrust up, speed limited
+            float dt = rdt;
+            if (state == BUILD) {
+                buildT += rdt;
+                dt = rdt * 0.15f;                           // time slows while the vehicle assembles
+                if (buildT >= BUILD_TIME) finishBuild();
+            }
+            if (invuln > 0) invuln -= rdt;
+            if (hintT > 0) hintT -= rdt;
+            if (squash > 0) squash -= rdt;
+            boolean playing = state == PLAY || state == BUILD;
+            float r = vehicle == 0 ? 0.3f * ppm : (vehicle == STOMPER ? 8f : 7f);
+
+            // vertical motion: gravity, thrust (on foot only), speed limited
             if (jumpDelay > 0) jumpDelay -= dt;
-            boolean fire = thrusting && state == PLAY && jumpDelay <= 0;
-            ay = GRAVITY - (fire ? THRUST : 0);
+            boolean fire = thrusting && state == PLAY && vehicle == 0 && jumpDelay <= 0;
+            ay = GRAVITY * gravDir - (fire ? THRUST : 0);
             vy += ay * dt;
+            float vmin = vehicle == INVERTER ? -VFALL : -VMAX;
             if (vy > VFALL) vy = VFALL;
-            if (vy < -VMAX) vy = -VMAX;
+            if (vy < vmin) vy = vmin;
             y += vy * ppm * dt;
             onFloor = false;
-            float lo = ceilY + 0.72f * ppm, hi = floorY - 0.62f * ppm;
-            if (y < lo) { y = lo; if (vy < 0) vy = 0; }
-            if (y > hi) { y = hi; if (vy > 0) vy = 0; onFloor = true; }
+            float lo = ceilY + hTop(), hi = floorY - hBot();
+            if (y < lo) {
+                y = lo;
+                if (vy < 0) {
+                    if (vehicle == INVERTER && vy < -6f) { shake = Math.max(shake, 2f); sfx(S_STOMP); for (int i = 0; i < 6; i++) burst(playerX, y - 6); }
+                    vy = 0;
+                }
+                if (vehicle == INVERTER) onFloor = true;
+            }
+            if (y > hi) {
+                y = hi;
+                if (vy > 0) {
+                    if (vehicle == STOMPER && playing) {
+                        float impact = vy;
+                        squash = 0.14f;
+                        if (diving) {
+                            diving = false; vy = -11f; shake = 5f;
+                            sfx(S_STOMP); buzz(20);
+                            for (int i = 0; i < 14; i++) burst(playerX, y + 8);
+                        } else {
+                            vy = -(thrusting ? 12.5f : 9.5f);
+                            if (impact > 6f) { shake = Math.max(shake, 1.5f); sfx(S_STOMP); }
+                        }
+                    } else {
+                        if (vehicle == 0 && vy > 9f) {
+                            shake = Math.max(shake, 1.5f);
+                            for (int i = 0; i < 5; i++) burst(playerX - 3, y + 10);
+                        }
+                        vy = 0;
+                    }
+                }
+                if (vehicle != STOMPER) onFloor = true;
+            }
+            if (vehicle == STOMPER && y >= hi - 0.5f) onFloor = true;
 
             if (fire) emitExhaust();
             for (int i = 0; i < NP; i++) {
@@ -230,10 +414,22 @@ public class Main extends Activity {
             float scroll = speed * ppm * dt;
             dist += speed * dt;
             bgOff += scroll * 0.25f;
-            if (onFloor) runPhase += speed * dt * 2.2f;
+            if (onFloor && vehicle == 0) runPhase += speed * dt * 2.2f;
 
             spawnLeft -= scroll;
             if (spawnLeft <= 0) spawn();
+
+            for (int i = crates.size() - 1; i >= 0; i--) {
+                Crate k = crates.get(i);
+                k.x -= scroll;
+                float dx = k.x - playerX, dy = k.y - y;
+                if (state == PLAY && vehicle == 0 && dx * dx + dy * dy < (r + 8) * (r + 8)) {
+                    startBuild(k.type);
+                    crates.remove(i);
+                    continue;
+                }
+                if (k.x < -20) crates.remove(i);
+            }
 
             for (int i = coins.size() - 1; i >= 0; i--) {
                 Coin c = coins.get(i);
@@ -241,6 +437,7 @@ public class Main extends Activity {
                 float dx = c.x - playerX, dy = c.y - y;
                 if (!c.taken && dx * dx + dy * dy < (r + 0.22f * ppm) * (r + 0.22f * ppm)) {
                     c.taken = true; electrons++;
+                    if (clock - lastCoinSfx > 0.06f) { sfx(S_COIN); lastCoinSfx = clock; }
                 }
                 if (c.x < -ppm || c.taken) coins.remove(i);
             }
@@ -251,7 +448,7 @@ public class Main extends Activity {
                 z.angle += z.spin * dt;
                 if (z.x < -2.5f * ppm) { zappers.remove(i); continue; }
                 float hx = (float) Math.cos(z.angle) * z.len / 2, hy = (float) Math.sin(z.angle) * z.len / 2;
-                if (segDist(playerX, y, z.x - hx, z.y - hy, z.x + hx, z.y + hy) < r + 0.06f * ppm) die();
+                if (state == PLAY && invuln <= 0 && segDist(playerX, y, z.x - hx, z.y - hy, z.x + hx, z.y + hy) < r + 0.06f * ppm) hit();
             }
 
             for (int i = missiles.size() - 1; i >= 0; i--) {
@@ -263,15 +460,78 @@ public class Main extends Activity {
                 } else {
                     m.x -= (speed + 9f) * ppm * dt;
                     float dx = m.x - playerX, dy = m.y - y;
-                    if (dx * dx + dy * dy < (r + 0.22f * ppm) * (r + 0.22f * ppm)) die();
+                    if (state == PLAY && invuln <= 0 && dx * dx + dy * dy < (r + 0.22f * ppm) * (r + 0.22f * ppm)) {
+                        hit();
+                        missiles.remove(i);
+                        continue;
+                    }
                     if (m.x < -ppm) missiles.remove(i);
                 }
             }
         }
 
+        // ---------- vehicles ----------
+
+        void startBuild(int type) {
+            buildType = type;
+            state = BUILD;
+            buildT = 0;
+            invuln = BUILD_TIME + 1f;
+            flash = 0.12f;
+            sfx(S_BUILD);
+            String[] rows = vehRows(type, false);
+            nb = 0;
+            for (int r0 = 0; r0 < rows.length; r0 += 3) {
+                for (int c0 = 0; c0 < rows[0].length(); c0 += 3) {
+                    boolean any = false;
+                    for (int rr = 0; rr < 3 && r0 + rr < rows.length; rr++)
+                        for (int cc = 0; cc < 3 && c0 + cc < rows[0].length(); cc++)
+                            if (rows[r0 + rr].charAt(c0 + cc) != '.') any = true;
+                    if (!any || nb >= NB) continue;
+                    brow[nb] = r0; bcol[nb] = c0;
+                    bdelay[nb] = 0.1f + rnd.nextFloat() * 0.7f;
+                    bsx[nb] = rnd.nextBoolean() ? -20 - rnd.nextFloat() * 60 : w + 20 + rnd.nextFloat() * 60;
+                    bsy[nb] = rnd.nextFloat() * h;
+                    bland[nb] = false;
+                    nb++;
+                }
+            }
+        }
+
+        void finishBuild() {
+            vehicle = buildType;
+            state = PLAY;
+            gravDir = 1;
+            vy = 0;
+            diving = false;
+            flash = 0.3f;
+            shake = 4f;
+            hintT = 2.8f;
+            sfx(S_DONE);
+            buzz(40);
+            for (int i = 0; i < 24; i++) burst(playerX, y);
+        }
+
+        void hit() {
+            if (state != PLAY || invuln > 0) return;
+            if (vehicle != 0) breakVehicle(); else die();
+        }
+
+        void breakVehicle() {
+            for (int i = 0; i < 40; i++) burst(playerX, y);
+            vehicle = 0; gravDir = 1; diving = false;
+            invuln = 1.6f; hitstop = 0.08f; shake = 7f; flash = 0.12f;
+            vy = -5f;
+            sfx(S_HIT);
+            buzz(60);
+        }
+
         void die() {
             if (state != PLAY) return;
             state = DEAD; stateTime = 0;
+            hitstop = 0.1f; shake = 8f; flash = 0.15f;
+            sfx(S_HIT);
+            buzz(120);
             fact = FACTS[rnd.nextInt(FACTS.length)];
             int score = (int) dist;
             if (score > best) {
@@ -315,6 +575,18 @@ public class Main extends Activity {
 
         void spawn() {
             float x0 = w + 0.6f * ppm;
+            if (dist >= nextCrate) {
+                if (vehicle == 0) {
+                    Crate k = new Crate();
+                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(2);
+                    crates.add(k);
+                    spawnLeft = 4f * ppm;
+                    nextCrate = dist + 220 + rnd.nextInt(150);
+                } else {
+                    nextCrate = dist + 100;
+                }
+                return;
+            }
             int roll = rnd.nextInt(10);
             float gap = (3.5f - Math.min(dist / 400f, 1.5f) + rnd.nextFloat() * 2f) * ppm;
             if (roll < 4) {
@@ -345,6 +617,7 @@ public class Main extends Activity {
             } else {
                 Missile m = new Missile();
                 m.warn = 1.4f; m.y = y;
+                sfx(S_WARN);
                 missiles.add(m);
                 spawnLeft = 4f * ppm;
             }
@@ -382,8 +655,8 @@ public class Main extends Activity {
             "........SSSS....",
             ".OOOOWWWWWWWW...",
             ".OoooWWWWWWWw...",
-            ".OoooWWWWWWwws..",
-            ".OoooWWWWWWwws..",
+            ".OoooWWWWWWWw...",
+            ".OoooWWWWWWWw...",
             ".OOOOWWWWWWWw...",
             ".OoooWWWWWWWw...",
             ".NNNNWWWWWWWw...",
@@ -393,6 +666,10 @@ public class Main extends Activity {
             "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...",
             "....KKKK.KKKKK..", "...KKKKK.KKKKKK."
         };
+        static final String[] LEGS_M = {
+            "....DDDDDDDD....", "....DDDDDDDD....", "....DDDDDDDD....", "....DDDDDDDD....", "....DDDDDDDD....",
+            "....KKKKKKKK....", "...KKKKKKKKKK..."
+        };
         static final String[] LEGS_B = {
             "....DDDDDDDD....", "...DDD....DDD...", "..DDD......DDD..", "..DDD......DDD..", "..DDD......DDD..",
             "..KKKK.....KKKK.", ".KKKKK.....KKKKK"
@@ -401,6 +678,53 @@ public class Main extends Activity {
             "....DDDD.DDDD...", "...DDD...DDDD...", "..DDD....DDDD...", ".DDD.....DDDD...", ".KKK.....KKKK...",
             "................", "................"
         };
+
+        static final String[] HEAD_ONLY = Arrays.copyOfRange(SPR_HEAD, 0, 6);
+
+        static final String[] BODY_STOMP = {
+            "......mmmmmmmm......",
+            ".....mMMMMMMMMm.....",
+            "....mMggggggggMm....",
+            "....mMggggggggMm....",
+            "....mMggggggggMm....",
+            "....mMggggggggMm....",
+            "....mMggggggggMm....",
+            "....mMggggggggMm....",
+            "....mMMMMMMMMMMm....",
+            "...mRRRRRRRRRRRRm...",
+            "...mRYRRRRRRRRYRm...",
+            "...mRRRRRRRRRRRRm...",
+            "....mmmmmmmmmmmm...."
+        };
+        static final String[] LEGS_STOMP = {
+            "......MM......MM....", ".....MM......MM.....", "......MM......MM....", ".....MM......MM.....",
+            "......MM......MM....", "....KKKK....KKKK....", "...KKKKK....KKKKK..."
+        };
+        static final String[] LEGS_STOMP_C = {
+            "....MMMM....MMMM....", "...KKKKK....KKKKK...", "...KKKKK....KKKKK...", "...KKKKKK..KKKKKK..."
+        };
+        static final String[] POD = {
+            "......RRRRRRRR......",
+            ".....RRRRRRRRRR.....",
+            "....mmmmmmmmmmmm....",
+            "...mMggggggggggMm...",
+            "...mMggggggggggMm...",
+            "...mMggggggggggMm...",
+            "...mMggggggggggMm...",
+            "...mMggggggggggMm...",
+            "...mMggggggggggMm...",
+            "....mmmmmmmmmmmm....",
+            ".....UUUUUUUUUU.....",
+            "......UUUUUUUU......"
+        };
+
+        static String[] vehRows(int type, boolean compressed) {
+            if (type == INVERTER) return POD;
+            String[] legs = compressed ? LEGS_STOMP_C : LEGS_STOMP;
+            String[] out = Arrays.copyOf(BODY_STOMP, BODY_STOMP.length + legs.length);
+            System.arraycopy(legs, 0, out, BODY_STOMP.length, legs.length);
+            return out;
+        }
 
         void rectPx(Canvas c, float x, float yy, float rw, float rh, int col) {
             p.setStyle(Paint.Style.FILL);
@@ -468,6 +792,12 @@ public class Main extends Activity {
                 case 'W': return Color.rgb(240, 244, 250);
                 case 'w': return Color.rgb(180, 190, 210);
                 case 'D': return Color.rgb(50, 60, 100);
+                case 'R': return Color.rgb(220, 70, 70);
+                case 'U': return Color.rgb(70, 110, 230);
+                case 'Y': return Color.rgb(255, 200, 80);
+                case 'M': return Color.rgb(170, 178, 195);
+                case 'm': return Color.rgb(100, 108, 128);
+                case 'g': return Color.rgb(140, 215, 235);
                 case 'K': return Color.rgb(30, 30, 40);
                 default: return 0;
             }
@@ -493,14 +823,20 @@ public class Main extends Activity {
             drawBackground(c);
             drawFloor(c);
             drawCoins(c);
+            drawCrates(c);
             drawZappers(c);
             drawMissiles(c);
             drawParticles(c);
             drawPlayer(c);
+            if (state == BUILD) drawBuild(c);
             drawHud(c);
+            if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
+            out.save();
+            if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);
+            out.restore();
         }
 
         void drawBackground(Canvas c) {
@@ -616,17 +952,119 @@ public class Main extends Activity {
             }
         }
 
+        void arm(Canvas c, float sx, float sy, float ang, int col) {
+            float cs = (float) Math.cos(ang), sn = (float) Math.sin(ang);
+            for (int i = 0; i <= 5; i++) rectPx(c, sx + cs * i, sy + sn * i, 2, 2, col);
+            rectPx(c, sx + cs * 6, sy + sn * 6, 2, 2, Color.rgb(240, 200, 160));
+        }
+
         void drawPlayer(Canvas c) {
             if (state == DEAD && stateTime < 0.2f) return;
-            int left = Math.round(playerX) - 8, top = Math.round(y) - 11;
-            if (thrusting && state == PLAY && jumpDelay <= 0) {
+            if (state == PLAY && invuln > 0 && ((int) (clock * 14) & 1) == 0) return;
+            if (vehicle != 0 && state == PLAY) { drawVehicle(c); return; }
+            if (state == BUILD && buildT > BUILD_TIME * 0.9f) return;
+
+            float cyc = runPhase * 0.28f;
+            int ph = ((int) (cyc * 4)) & 3;
+            boolean thr = thrusting && state == PLAY && jumpDelay <= 0;
+            int bob = (onFloor && state == PLAY && (ph & 1) == 1) ? -1 : 0;
+            int left = Math.round(playerX) - 8, top = Math.round(y) - 11 + bob;
+
+            float nearA, farA;
+            if (state != PLAY) {
+                float sw = (float) Math.sin(clock * 3) * 0.15f;
+                nearA = 1.57f - sw; farA = 1.57f + sw;
+            } else if (thr) {
+                nearA = -0.6f + (float) Math.sin(clock * 25) * 0.08f; farA = -1.0f;
+            } else if (!onFloor) {
+                if (vy < 0) { nearA = -1.0f; farA = -1.6f; }
+                else {
+                    nearA = -1.3f + (float) Math.sin(clock * 20) * 0.5f;
+                    farA = -1.7f + (float) Math.sin(clock * 20 + 2) * 0.5f;
+                }
+            } else {
+                float sw = (float) Math.sin(cyc * 6.2832f);
+                nearA = 1.57f - sw; farA = 1.57f + sw;
+            }
+
+            if (thr) {
                 int fl = 4 + rnd.nextInt(5);
                 rectPx(c, left + 1, top + 14, 4, fl, Color.rgb(255, 170, 40));
                 rectPx(c, left + 2, top + 14, 2, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
             }
+            arm(c, left + 7, top + 8, farA, Color.rgb(150, 160, 185));
             sprite(c, SPR_HEAD, left, top);
-            String[] legs = !onFloor ? LEGS_AIR : (((int) (runPhase * 2) & 1) == 0 ? LEGS_A : LEGS_B);
+            String[] legs = !onFloor ? LEGS_AIR : (ph == 0 ? LEGS_A : ph == 2 ? LEGS_B : LEGS_M);
             sprite(c, legs, left, top + SPR_HEAD.length);
+            arm(c, left + 10, top + 8, nearA, Color.rgb(225, 230, 240));
+        }
+
+        void drawVehicle(Canvas c) {
+            int left = Math.round(playerX) - 10;
+            int hh = hhVeh(vehicle);
+            int cy = Math.round(y);
+            int top = cy - hh;
+            boolean flip = gravDir < 0;
+            if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
+            if (vehicle == STOMPER) {
+                boolean comp = squash > 0;
+                int off = comp ? 3 : 0;
+                sprite(c, BODY_STOMP, left, top + off);
+                sprite(c, comp ? LEGS_STOMP_C : LEGS_STOMP, left, top + BODY_STOMP.length + off);
+                sprite(c, HEAD_ONLY, left, top + 2 + off);
+            } else {
+                sprite(c, POD, left, top);
+                sprite(c, HEAD_ONLY, left, top + 3);
+                // field sparks at both magnet caps
+                rectPx(c, left + 6 + rnd.nextInt(8), top - 1 - rnd.nextInt(2), 1, 1, Color.rgb(255, 150, 150));
+                rectPx(c, left + 6 + rnd.nextInt(8), top + 12 + rnd.nextInt(2), 1, 1, Color.rgb(150, 190, 255));
+            }
+            if (flip) c.restore();
+        }
+
+        void drawBuild(Canvas c) {
+            String[] rows = vehRows(buildType, false);
+            int hh = hhVeh(buildType);
+            int left = Math.round(playerX) - 10, top = Math.round(y) - hh;
+            for (int i = 0; i < nb; i++) {
+                float t = Math.max(0f, Math.min(1f, (buildT - bdelay[i]) / 0.5f));
+                float e = 1f - (1f - t) * (1f - t) * (1f - t);
+                float tx = left + bcol[i], ty = top + brow[i];
+                float cx = bsx[i] + (tx - bsx[i]) * e, cy = bsy[i] + (ty - bsy[i]) * e;
+                if (t >= 1f && !bland[i]) {
+                    bland[i] = true;
+                    burst(tx + 1, ty + 1);
+                }
+                if (t < 1f) rectPx(c, cx - 1, cy - 1, 5, 5, Color.argb(70, 120, 220, 255));
+                for (int rr = 0; rr < 3 && brow[i] + rr < rows.length; rr++) {
+                    for (int cc = 0; cc < 3 && bcol[i] + cc < rows[0].length(); cc++) {
+                        int col = pal(rows[brow[i] + rr].charAt(bcol[i] + cc));
+                        if (col != 0) rectPx(c, cx + cc, cy + rr, 1, 1, col);
+                    }
+                }
+            }
+            if (buildT > BUILD_TIME * 0.9f) {
+                int headTop = top + (buildType == STOMPER ? 2 : 3);
+                sprite(c, HEAD_ONLY, left, headTop);
+            }
+            text(c, "BUILDING", w / 2f, ceilY + 28, 1, Color.rgb(255, 200, 80), 1);
+            text(c, VNAME[buildType], w / 2f, ceilY + 38, 1, Color.WHITE, 1);
+            int bw = 60;
+            rectPx(c, w / 2f - bw / 2f - 1, ceilY + 48, bw + 2, 5, Color.rgb(20, 30, 50));
+            rectPx(c, w / 2f - bw / 2f, ceilY + 49, bw * Math.min(1f, buildT / BUILD_TIME), 3, Color.rgb(120, 235, 255));
+        }
+
+        void drawCrates(Canvas c) {
+            for (Crate k : crates) {
+                int cx = Math.round(k.x), cy = Math.round(k.y + (float) Math.sin(clock * 4 + k.x * 0.05f) * 2);
+                int g = 30 + (int) (30 * Math.sin(clock * 6));
+                rectPx(c, cx - 10, cy - 10, 20, 20, Color.argb(g, 120, 220, 255));
+                rectPx(c, cx - 7, cy - 7, 14, 14, Color.rgb(30, 70, 140));
+                rectPx(c, cx - 6, cy - 6, 12, 12, Color.rgb(60, 130, 210));
+                rectPx(c, cx - 6, cy, 12, 1, Color.argb(120, 255, 255, 255));
+                rectPx(c, cx, cy - 6, 1, 12, Color.argb(120, 255, 255, 255));
+                text(c, "B", cx - 1, cy - 2, 1, Color.WHITE, 1);
+            }
         }
 
         void drawHud(Canvas c) {
@@ -638,8 +1076,16 @@ public class Main extends Activity {
             text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, Color_, 2);
             text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 8, 1, Color_, 2);
             text(c, "BEST " + best + " M", rx, top + 16, 1, Color_, 2);
+            drawHint(c);
         }
         int Color_;
+
+        void drawHint(Canvas c) {
+            if (hintT > 0 && state == PLAY && vehicle != 0) {
+                text(c, VNAME[vehicle], w / 2f, ceilY + 28, 1, Color.WHITE, 1);
+                text(c, VHINT[vehicle], w / 2f, ceilY + 38, 1, Color.rgb(120, 235, 255), 1);
+            }
+        }
 
         void drawTitle(Canvas c) {
             text(c, "THRUST LAB", w / 2f, h * 0.26f, 4, Color.WHITE, 1);
