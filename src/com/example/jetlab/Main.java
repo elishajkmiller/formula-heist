@@ -1468,7 +1468,7 @@ public class Main extends Activity {
             if (helix) {
                 yh = (yh + 1) & 63; yHist[yh] = y;
                 // nose up when rising, nose down when sinking, eased so it does not snap
-                float target = Math.max(-26f, Math.min(34f, vy * 3.6f));
+                float target = Math.max(-34f, Math.min(44f, vy * 5f));
                 tilt += (target - tilt) * Math.min(1f, 9f * dt);
             }
             for (int i = 0; i < NP; i++) {
@@ -1892,8 +1892,8 @@ public class Main extends Activity {
             "................",
             "................",
             "................",
-            "........SSSSS...",
             "................",
+            "......SS..SS....",
             "................",
             "................",
             "................",
@@ -1909,54 +1909,54 @@ public class Main extends Activity {
         static final String[][] MALE = {SPR_HEAD.clone(), SPR_HEAD_B.clone(), SPR_RUN2.clone(), SPR_RUN3.clone()};   // the originals
 
         // The two characters. The male has tousled brown hair, browline glasses and a moustache; the female has long
-        // wavy copper hair that falls over her shoulders, lashes, freckles and blush, a gold necklace and a rounded chest.
+        // wavy copper hair that falls over her shoulders, big eyes, blush, a gold necklace and a rounded chest.
         static final String[] HEAD_M = {
-            "......b.bb......",
-            ".....bBbBBbb....",
+            "................",
+            "................",
+            ".....bBBBBBBb...",
             "....bBBBBBBBBb..",
-            "....BBBBBBSSSS..",
-            "....BsSFFFFFFFS.",
-            "....BsFEeFFEeFS.",
-            "....BsFEESSEEFs.",
-            "..P.BsSaBBBBSSS.",
-            "..P.BsaaSeeeSaa.",
-            "..P..saaaaaaaa.."
+            "...BBBBBBSSSSBB.",
+            "...BSFFFFFFFFSB.",
+            "...BSFEeSSEeFSB.",
+            "...BSFEESSEEFSB.",
+            "...BsSSBBBBSSsB.",
+            "....ssSSeeSSss.."
         };
         static final String[] HEAD_M_B = {
-            "......b.bb......",
-            ".....bBbBBbb....",
+            "................",
+            "................",
+            ".....bBBBBBBb...",
             "....bBBBBBBBBb..",
-            "....BBBBBBSSSS..",
-            "....BsSFFFFFFFS.",
-            "....BsFEeFFEeFS.",
-            "....BsFEESSEEFs.",
-            "..P.BsSaBBBBSSS.",
-            "..P.BsaaSeeeSaa.",
-            "..P..saaannaaa.."
+            "...BBBBBBSSSSBB.",
+            "...BSFFFFFFFFSB.",
+            "...BSFEeSSEeFSB.",
+            "...BSFEESSEEFSB.",
+            "...BsSSBBBBSSsB.",
+            "....ssSSnnSSss.."
         };
         static final String[] HEAD_F = {
-            "......bBBBb.....",
-            ".....BBbBBBbb...",
-            "....BBBbBBBBBBb.",
-            "...BBBBBSSSBBBB.",
-            "...BBBsSsSsSsBB.",
-            "...BBBsEEeSEeEBB",
-            "...BBBsSEESEESBB",
-            "...BBBsSpSSpSBB.",
-            "...BBBsSSnnSSBb.",
-            ".BBBB.sSPPSSBb.."
+            "................",
+            "................",
+            ".....bBBBBBBb...",
+            "....bBBbBBBBBb..",
+            "...BBBBSSSSBBBB.",
+            "...BBSsSSSSsSBB.",
+            "...BBSEeSSEeSBB.",
+            "...BBSEESSEESBB.",
+            "...BBSpSnnSpSBB.",
+            "...BBbSSPPSSbBB."
         };
         static final String[] HEAD_F_B = {
-            "......bBBBb.....",
-            ".....BBbBBBbb...",
-            "....BBBbBBBBBBb.",
-            "...BBBBBSSSBBBB.",
-            "...BBBsSsSsSsBB.",
-            "...BBBsEEeSEeEBB",
-            "...BBBsSEESEESBB",
-            "...BBBsSpSSpSBB.",
-            "...BBBsSSeeSSBb.",
-            ".BBBB.sSPPSSBb.."
+            "................",
+            "................",
+            ".....bBBBBBBb...",
+            "....bBBbBBBBBb..",
+            "...BBBBSSSSBBBB.",
+            "...BBSsSSSSsSBB.",
+            "...BBSEeSSEeSBB.",
+            "...BBSEESSEESBB.",
+            "...BBSpSEESpSBB.",
+            "...BBbSSPPSSbBB."
         };
 
         /** the torso rows for the female: hair over the back of the shoulder and down the front, a rounded chest */
