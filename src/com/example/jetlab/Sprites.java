@@ -484,18 +484,6 @@ final class Sprites {
         return out;
     }
 
-    static String[] vehRows(int type, boolean compressed) {
-        if (type == Game.QUANTUM) return QUANT;
-        if (type == Game.INVERTER) return POD;
-        if (type == Game.HELIX) return HELIX_HEAD;
-        if (type == Game.BIRD) return BIRD_ROWS;
-        if (type == Game.SCREW) return SCREW_ROWS;
-        String[] legs = compressed ? LEGS_STOMP_C : LEGS_STOMP;
-        String[] out = Arrays.copyOf(BODY_STOMP, BODY_STOMP.length + legs.length);
-        System.arraycopy(legs, 0, out, BODY_STOMP.length, legs.length);
-        return out;
-    }
-
     static int pal(char ch) {
         int ov = ch < 128 ? OVR[ch] : 0;
         if (ov != 0) return ov;

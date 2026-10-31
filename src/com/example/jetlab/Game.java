@@ -15,7 +15,6 @@ import android.view.Choreographer;
 import android.view.MotionEvent;
 import android.view.View;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Random;
 
 import static com.example.jetlab.Content.*;
@@ -37,13 +36,11 @@ final class Game extends View implements Choreographer.FrameCallback {
     // ---------- constants ----------
 
     static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
-    static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4, BIRD = 5, SCREW = 6;
     static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
     static final float GUARD_RUN = 100f;     // how fast the guards run away, in pixels per second
     static final int GUARD = 4;              // Npc mode of the guards
     static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
     static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
-    static final int ENTANGLER_USES = 5;     // teleports before the Quantum Entangler burns out
     static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9;
 
     static final float GRAVITY = 22f;        // m/s^2, game gravity (Earth is 9.8)
@@ -52,8 +49,6 @@ final class Game extends View implements Choreographer.FrameCallback {
     static final float VMAX = 7f;            // m/s, "terminal" speed going up
     static final float JUMP = 8.5f;          // m/s, jump off the floor
 
-    static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER", "DNA HELIX", "BERNOULLI BIRD", "AERIAL SCREW"};
-    static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES.", "HOLD TO RISE. TAP TO FIRE BASE PAIRS.", "TAP TO FLAP. HOLD TO GLIDE ON LIFT.", "HOLD TO SPIN THE SCREW. IT TAKES A MOMENT TO SPIN UP."};
 
     // ---------- text drawn at screen resolution (the formulas) ----------
 
@@ -122,21 +117,17 @@ final class Game extends View implements Choreographer.FrameCallback {
     float outX, holeY, bonus, tipT;
 
     // vehicles
-    int vehicle, gravDir = 1, charges;       // charges: teleports left on the Entangler
-    boolean diving;
-    float invuln, squash, hintT, teleFromY, telePulse;
+    Vehicle veh, building;                       // the vehicle you ride (null on foot) and the one being assembled
+    int gravDir = 1;
+    float invuln, hintT, teleFromY, telePulse;
     static final int NB = 64;                    // pixel blocks that fly in to build a vehicle
     final int[] brow = new int[NB], bcol = new int[NB];
     final float[] bdelay = new float[NB], bsx = new float[NB], bsy = new float[NB];
     final boolean[] bland = new boolean[NB];
-    int nb, buildType;
+    int nb;
     float buildT;
 
-    // DNA helix: where the head has been, so the body can follow it
-    final float[] yHist = new float[64];
-    int yh;
     float bustOff, bustV, lastVy;                // the chest spring: it only reacts to jumps and landings, not to running
-    float boltCd, tilt, flapT, rotor, rotAng;                          // tilt: degrees, nose up is negative
     static final int[][] RUNG = {{0xDC4646, 0x4678E6}, {0x50DC78, 0xF0C83C}, {0x4678E6, 0xDC4646}, {0xF0C83C, 0x50DC78}};   // A-T, C-G pairs
 
     // death
@@ -340,8 +331,8 @@ final class Game extends View implements Choreographer.FrameCallback {
         coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); hazards.clear();
         nextParch = 70; bannerT = 0;
         for (int i = 0; i < NP; i++) pl[i] = 0;
-        vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
-        diving = false; nextCrate = 80; thrusting = false;
+        veh = null; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; hintT = 0;
+        nextCrate = 80; thrusting = false;
         settled = false; settleT = 0; ang = 0; angV = 0;
         outX = Math.min(playerX + 110f, w - 40f); holeOpen = false;
         bgOff = 20f - (outX + 10f); lastBg = bgOff;     // mission control sits just inside the wall
@@ -355,14 +346,13 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     static final int SH_TOP = 11, SH_BOT = 12;     // scientist sprite rows above and below his centre
 
-    float hTop() { return vehicle == 0 ? SH_TOP : hhVeh(vehicle); }
+    float hTop() { return veh == null ? SH_TOP : veh.hTop(); }
 
-    float hBot() { return vehicle == 0 ? SH_BOT : vehicle == SCREW ? 8 : hhVeh(vehicle); }
+    float hBot() { return veh == null ? SH_BOT : veh.hBot(); }
 
-    static int hhVeh(int v) { return v == STOMPER || v == SCREW ? 12 : v == QUANTUM ? 14 : 8; }
 
     /** vehicles that stick to a surface and switch which one gravity points at */
-    boolean flips() { return vehicle == INVERTER || vehicle == QUANTUM; }
+    boolean flips() { return veh != null && veh.flips(); }
 
     void sfx(int id) { if (soundOn && sfx != null) sfx.play(id); }
 
@@ -927,18 +917,8 @@ final class Game extends View implements Choreographer.FrameCallback {
         }
     }
 
-    void fireBolt() {
-        if (boltCd > 0) return;
-        Bolt b = new Bolt();
-        b.x = playerX + 12; b.y = y; b.kind = bolts.size() & 1;
-        bolts.add(b);
-        boltCd = 0.3f;
-        sfx(S_TELE);
-    }
-
     /** base pairs fly forward and wipe out a zapper or a missile they touch */
     void updateBolts(float dt) {
-        if (boltCd > 0) boltCd -= dt;
         for (int i = bolts.size() - 1; i >= 0; i--) {
             Bolt b = bolts.get(i);
             b.x += 220f * dt;
@@ -979,40 +959,9 @@ final class Game extends View implements Choreographer.FrameCallback {
         }
     }
 
-    /** jump to the mirror position on the opposite surface, gravity follows */
-    void teleport() {
-        teleFromY = y;
-        for (int i = 0; i < 12; i++) burst(playerX, y);
-        y = ceilY + floorY - y;
-        gravDir = -gravDir;
-        vy = 0;
-        telePulse = 0.25f;
-        shake = Math.max(shake, 1.5f);
-        flash = 0.05f;
-        sfx(S_TELE);
-        buzz(15);
-        for (int i = 0; i < 12; i++) burst(playerX, y);
-        if (--charges <= 0) breakVehicle();      // the fifth jump burns it out
-    }
-
     void press() {
-        if (vehicle == INVERTER) {
-            gravDir = -gravDir;
-            vy *= 0.3f;
-            shake = Math.max(shake, 2f);
-            sfx(S_FLIP);
-            buzz(15);
-            for (int i = 0; i < 10; i++) burst(playerX, y);
-        } else if (vehicle == BIRD) {
-            vy = -7f; flapT = 1f;                       // a wingbeat
-            sfx(S_JUMP);
-            for (int i = 0; i < 3; i++) burst(playerX - 6, y + 4);
-        } else if (vehicle == HELIX) {
-            fireBolt();
-        } else if (vehicle == QUANTUM) {
-            teleport();
-        } else if (vehicle == STOMPER) {
-            if (!onFloor && squash <= 0) { vy = VFALL; diving = true; sfx(S_FLIP); }
+        if (veh != null) {
+            veh.press();
         } else if (onFloor) {
             vy = -JUMP; jumpDelay = 0.22f; onFloor = false;
             sfx(S_JUMP);
@@ -1080,24 +1029,16 @@ final class Game extends View implements Choreographer.FrameCallback {
         }
         if (invuln > 0) invuln -= rdt;
         if (hintT > 0) hintT -= rdt;
-        if (squash > 0) squash -= rdt;
+        if (veh != null) veh.tick(rdt);
         if (landT > 0) landT -= rdt;
         if (telePulse > 0) telePulse -= rdt;
-        if (flapT > 0) flapT -= dt * 4f;
         boolean playing = state == PLAY || state == BUILD;
-        float r = vehicle == 0 ? 0.3f * ppm : (vehicle == STOMPER ? 8f : 7f);
+        float r = veh == null ? 0.3f * ppm : veh.radius();
 
         // vertical motion: gravity, thrust (on foot only), speed limited
         if (jumpDelay > 0) jumpDelay -= dt;
-        boolean helix = vehicle == HELIX;
-        boolean fire = thrusting && state == PLAY && ((vehicle == 0 && jumpDelay <= 0) || helix);
-        if (vehicle == SCREW) {
-            // the rotor needs time to spin up, and keeps turning (and holding you up) a while after you let go
-            rotor = Math.max(0f, Math.min(1f, rotor + (thrusting && state == PLAY ? 1.7f : -0.7f) * dt));
-            rotAng += rotor * 30f * dt;
-        }
-        boolean glide = vehicle == BIRD && thrusting && state == PLAY;      // spread wings: lift cancels most of gravity
-        ay = (helix ? 14f : GRAVITY) * gravDir * (glide ? 0.3f : 1f) - (fire ? (helix ? 30f : THRUST) : 0) - (vehicle == SCREW ? rotor * 34f : 0f);
+        boolean fire = thrusting && state == PLAY && veh == null && jumpDelay <= 0;
+        ay = veh != null ? veh.accel(dt) : GRAVITY * gravDir - (fire ? THRUST : 0);
         vy += ay * dt;
         float vmin = flips() ? -VFALL : -VMAX;
         if (vy > VFALL) vy = VFALL;
@@ -1105,10 +1046,11 @@ final class Game extends View implements Choreographer.FrameCallback {
         y += vy * ppm * dt;
         onFloor = false;
         float lo = ceilY + hTop(), hi = floorY - hBot();
+        boolean bouncy = veh != null && veh.bounces();
         if (y < lo) {
             y = lo;
             if (vy < 0) {
-                if (vehicle == INVERTER && vy < -6f) { shake = Math.max(shake, 2f); sfx(S_STOMP); for (int i = 0; i < 6; i++) burst(playerX, y - 6); }
+                if (veh != null) veh.bumpCeiling(vy);
                 vy = 0;
             }
             if (flips()) onFloor = true;
@@ -1116,19 +1058,10 @@ final class Game extends View implements Choreographer.FrameCallback {
         if (y > hi) {
             y = hi;
             if (vy > 0) {
-                if (vehicle == STOMPER && playing) {
-                    float impact = vy;
-                    squash = 0.14f;
-                    if (diving) {
-                        diving = false; vy = -11f; shake = 5f;
-                        sfx(S_STOMP); buzz(20);
-                        for (int i = 0; i < 14; i++) burst(playerX, y + 8);
-                    } else {
-                        vy = -(thrusting ? 12.5f : 9.5f);
-                        if (impact > 6f) { shake = Math.max(shake, 1.5f); sfx(S_STOMP); }
-                    }
+                if (bouncy && playing) {
+                    veh.bounce(vy);
                 } else {
-                    if (vehicle == 0 && vy > 9f) {
+                    if (veh == null && vy > 9f) {
                         shake = Math.max(shake, 1.5f);
                         landT = 0.12f;
                         for (int i = 0; i < 5; i++) burst(playerX - 3, y + 10);
@@ -1136,20 +1069,12 @@ final class Game extends View implements Choreographer.FrameCallback {
                     vy = 0;
                 }
             }
-            if (vehicle != STOMPER) onFloor = true;
+            if (!bouncy) onFloor = true;
         }
-        if (vehicle == STOMPER && y >= hi - 0.5f) onFloor = true;
+        if (bouncy && y >= hi - 0.5f) onFloor = true;
 
-        if (fire && !helix) emitExhaust();
-        if (vehicle == BIRD) {
-            tilt += (Math.max(-25f, Math.min(30f, vy * 3f)) - tilt) * Math.min(1f, 9f * dt);
-        }
-        if (helix) {
-            yh = (yh + 1) & 63; yHist[yh] = y;
-            // nose up when rising, nose down when sinking, eased so it does not snap
-            float target = Math.max(-34f, Math.min(44f, vy * 5f));
-            tilt += (target - tilt) * Math.min(1f, 9f * dt);
-        }
+        if (fire) emitExhaust();
+        if (veh != null) veh.update(dt);
         for (int i = 0; i < NP; i++) {
             if (pl[i] > 0) {
                 pl[i] -= dt;
@@ -1165,7 +1090,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         if (breaking && outX <= playerX + 8f) breach();
         if (!breaking) dist += speed * dt;
         bgOff += scroll * 0.25f;
-        if (onFloor && (vehicle == 0 || vehicle == QUANTUM)) runPhase += dt * 11f;     // steps at a fixed rate, they do not speed up with the world
+        if (onFloor && (veh == null || veh.walks())) runPhase += dt * 11f;     // steps at a fixed rate, they do not speed up with the world
 
         if (!breaking) {
             spawnLeft -= scroll;
@@ -1176,7 +1101,7 @@ final class Game extends View implements Choreographer.FrameCallback {
             Crate k = crates.get(i);
             k.x -= scroll;
             float dx = k.x - playerX, dy = k.y - y;
-            if (state == PLAY && vehicle == 0 && dx * dx + dy * dy < (r + 8) * (r + 8)) {
+            if (state == PLAY && veh == null && dx * dx + dy * dy < (r + 8) * (r + 8)) {
                 startBuild(k.type);
                 crates.remove(i);
                 continue;
@@ -1250,13 +1175,13 @@ final class Game extends View implements Choreographer.FrameCallback {
     // ---------- vehicles ----------
 
     void startBuild(int type) {
-        buildType = type;
+        building = Vehicle.KINDS[type].make(this);
         state = BUILD;
         buildT = 0;
         invuln = BUILD_TIME + 1f;
         flash = 0.12f;
         sfx(S_BUILD);
-        String[] rows = vehRows(type, false);
+        String[] rows = building.rows();
         nb = 0;
         for (int r0 = 0; r0 < rows.length; r0 += 3) {
             for (int c0 = 0; c0 < rows[0].length(); c0 += 3) {
@@ -1276,14 +1201,11 @@ final class Game extends View implements Choreographer.FrameCallback {
     }
 
     void finishBuild() {
-        vehicle = buildType;
-        Arrays.fill(yHist, y);
-        boltCd = 0; tilt = 0; rotor = 0.65f;
-        charges = ENTANGLER_USES;
+        veh = building;
         state = PLAY;
         gravDir = 1;
         vy = 0;
-        diving = false;
+        veh.start();
         flash = 0.3f;
         shake = 4f;
         hintT = 2.8f;
@@ -1294,12 +1216,12 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     void hit() {
         if (state != PLAY || invuln > 0) return;
-        if (vehicle != 0) breakVehicle(); else die();
+        if (veh != null) breakVehicle(); else die();
     }
 
     void breakVehicle() {
         for (int i = 0; i < 40; i++) burst(playerX, y);
-        vehicle = 0; gravDir = 1; diving = false;
+        veh = null; gravDir = 1;
         invuln = 1.6f; hitstop = 0.08f; shake = 7f; flash = 0.12f;
         vy = -5f;
         sfx(S_HIT);
@@ -1322,7 +1244,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         }
         for (int i = 0; i < 30; i++) burst(playerX, y);
         // ragdoll: popped up, tumbling forward
-        vehicle = 0; gravDir = 1; thrusting = false;
+        veh = null; gravDir = 1; thrusting = false;
         vy = -6f; ang = 0; angV = 640f; bounces = 0; settled = false; settleT = 0;
     }
 
@@ -1445,9 +1367,9 @@ final class Game extends View implements Choreographer.FrameCallback {
     void spawn() {
         float x0 = w + 0.6f * ppm;
         if (dist >= nextCrate) {
-            if (vehicle == 0) {
+            if (veh == null) {
                 Crate k = new Crate();
-                k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(6);
+                k.x = x0; k.y = randY(3f, 6f); k.type = rnd.nextInt(Vehicle.KINDS.length);
                 crates.add(k);
                 spawnLeft = 4f * ppm;
                 nextCrate = dist + 220 + rnd.nextInt(150);
@@ -2767,7 +2689,7 @@ final class Game extends View implements Choreographer.FrameCallback {
      * rising he tucks; falling he leans back and his legs dangle and kick.
      */
     void scientist(Canvas c, int left, int top, int ph, boolean run) {
-        boolean thr = thrusting && state == PLAY && jumpDelay <= 0 && vehicle == 0;
+        boolean thr = thrusting && state == PLAY && jumpDelay <= 0 && veh == null;
         String[] legs, body = SPR_HEAD;
         float lean;
         int dy = 0, dx = 0;
@@ -2834,7 +2756,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     void drawPlayer(Canvas c) {
         if (state == DEAD) { drawRagdoll(c); return; }
         if (state == PLAY && invuln > 0 && ((int) (clock * 14) & 1) == 0) return;
-        if (vehicle != 0 && state == PLAY) { drawVehicle(c); return; }
+        if (veh != null && state == PLAY) { veh.draw(c); return; }
         if (state == BUILD && buildT > BUILD_TIME * 0.9f) return;
 
         float cyc = runPhase * 0.2f;
@@ -2863,15 +2785,6 @@ final class Game extends View implements Choreographer.FrameCallback {
         scientist(c, left, top, ph, onFloor && state == PLAY);
     }
 
-    void quantumBody(Canvas c, int cy, boolean flip) {
-        int left = Math.round(playerX) - 10, top = cy - 14;
-        if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
-        int ph = ((int) (runPhase * 0.2f * 4)) & 3;
-        scientist(c, left + 2, top, ph, true);
-        outlined(c, BOARD, left, top + SPR_HEAD.length + LEGS_A.length);
-        if (flip) c.restore();
-    }
-
     void ring(Canvas c, float cx, float cy, float t) {
         int rr = (int) ((1f - t) * 18) + 2;
         int col = Color.argb((int) (t * 4 * 255 > 255 ? 255 : t * 4 * 255), 120, 235, 255);
@@ -2879,119 +2792,6 @@ final class Game extends View implements Choreographer.FrameCallback {
         rectPx(c, cx - rr, cy + rr, rr * 2, 1, col);
         rectPx(c, cx - rr, cy - rr, 1, rr * 2, col);
         rectPx(c, cx + rr, cy - rr, 1, rr * 2 + 1, col);
-    }
-
-    void drawQuantum(Canvas c) {
-        int cy = Math.round(y), gy = Math.round(ceilY + floorY - y);
-        for (int yy = Math.min(cy, gy) + 14; yy < Math.max(cy, gy) - 14; yy += 4) {
-            if (rnd.nextInt(5) > 0) rectPx(c, playerX, yy, 1, 2, Color.argb(120, 120, 235, 255));
-        }
-        ghost = true;
-        quantumBody(c, gy, gravDir > 0);     // the entangled twin on the other side
-        ghost = false;
-        quantumBody(c, cy, gravDir < 0);
-        // one pip per teleport left
-        int py0 = gravDir > 0 ? cy - 20 : cy + 17;
-        for (int i = 0; i < ENTANGLER_USES; i++) {
-            int pxl = Math.round(playerX) - 14 + i * 6;
-            rectPx(c, pxl - 1, py0 - 1, 5, 5, Color.rgb(8, 10, 22));
-            rectPx(c, pxl, py0, 3, 3, i < charges ? Color.rgb(120, 235, 255) : Color.rgb(50, 60, 80));
-        }
-    }
-
-    /** a double helix that trails the head and follows its path, with base pairs for rungs */
-    void drawHelix(Canvas c) {
-        int left = Math.round(playerX) - 10, top = Math.round(y) - 8;
-        int segs = 18;
-        float phase = clock * 7f;
-        float pax = 0, pay = 0, pbx = 0, pby = 0;
-        for (int i = 0; i < segs; i++) {
-            float sx = playerX - 12 - i * 5f;
-            float sy = yHist[(yh - i * 2) & 63] + (float) Math.sin(phase + i * 0.55f) * 2f * Math.min(1f, i / 4f);
-            float tw = (float) Math.sin(phase * 1.3f + i * 0.9f);             // the twist
-            float off = tw * 6f * (1f - i / (segs * 1.4f));                    // narrows toward the tail
-            float ay2 = sy - off, by2 = sy + off;
-            int sz = i < 8 ? 3 : 2;
-            if ((i & 1) == 0) {
-                int[] pr = RUNG[(i / 2) & 3];
-                line(c, sx, ay2, sx, by2, Color.argb(190, 220, 230, 245), 1);
-                rectPx(c, sx - 1, ay2 - 1, 2, 2, 0xFF000000 | pr[0]);
-                rectPx(c, sx - 1, by2 - 1, 2, 2, 0xFF000000 | pr[1]);
-            }
-            if (i > 0) {
-                line(c, pax, pay, sx, ay2, Color.rgb(70, 200, 190), 1);
-                line(c, pbx, pby, sx, by2, Color.rgb(210, 90, 190), 1);
-            }
-            // the strand nearer the viewer is drawn last
-            if (tw > 0) {
-                rectPx(c, sx - 1, by2 - 1, sz, sz, Color.rgb(230, 100, 205));
-                rectPx(c, sx - 1, ay2 - 1, sz, sz, Color.rgb(90, 230, 210));
-            } else {
-                rectPx(c, sx - 1, ay2 - 1, sz, sz, Color.rgb(90, 230, 210));
-                rectPx(c, sx - 1, by2 - 1, sz, sz, Color.rgb(230, 100, 205));
-            }
-            pax = sx; pay = ay2; pbx = sx; pby = by2;
-        }
-        c.save();
-        c.rotate(tilt, playerX, y);
-        outlined(c, HELIX_HEAD, left, top);
-        outlined(c, HEAD_ONLY, left, top + 3);
-        c.restore();
-    }
-
-    /**
-     * The glider bird. Holding spreads the wing and draws the Bernoulli picture: air races over the curved top
-     * (short gaps, fast, low pressure) and drifts under the flat bottom (slow, high pressure), so the wing is pushed up.
-     */
-    void drawBird(Canvas c) {
-        int left = Math.round(playerX) - 10, top = Math.round(y) - 8;
-        boolean glide = thrusting && state == PLAY;
-        float lift = flapT > 0 ? (float) Math.cos(Math.PI * (1 - flapT)) : glide ? 0.35f : -0.3f;   // wing up is positive
-        float sx = playerX - 2, sy = y + 3;
-        c.save();
-        c.rotate(tilt, playerX, y);
-        outlined(c, BIRD_ROWS, left, top);
-        outlined(c, HEAD_ONLY, left, top + 3);
-        for (int k = 0; k < 5; k++) {
-            float len = 15 - k * 2f, ex = sx - 4 - k * 2.5f, ey = sy - lift * len;
-            line(c, sx, sy, ex, ey, k == 0 ? Color.rgb(120, 235, 255) : Color.WHITE, 2);
-        }
-        c.restore();
-        if (glide) {
-            for (int i = 0; i < 3; i++) {
-                float fast = (clock * 90f + i * 13f) % 30f, slow = (clock * 25f + i * 11f) % 30f;
-                float x1 = playerX + 6 - fast;
-                line(c, x1, y - 15 - (i & 1) * 2, x1 - 7, y - 15 - (i & 1) * 2, Color.rgb(160, 240, 255), 1);
-                float x2 = playerX + 6 - slow;
-                line(c, x2, y + 12 + i * 3, x2 - 3, y + 12 + i * 3, Color.argb(150, 255, 190, 120), 1);
-            }
-            if (y - 24 > ceilY) text(c, "P-", playerX - 18, y - 24, 1, Color.rgb(160, 240, 255), 1);
-            text(c, "P+", playerX - 18, y + 25, 1, Color.rgb(255, 190, 120), 1);
-        }
-    }
-
-    /**
-     * Da Vinci's aerial screw. A spiral blade pushes air down and Newton's third law pushes the craft up, so
-     * the downwash streaks and a rotor speed readout are drawn. The blade is seen edge-on, so its width follows cos(angle).
-     */
-    void drawScrew(Canvas c) {
-        int left = Math.round(playerX) - 10, top = Math.round(y) - 12;
-        outlined(c, SCREW_ROWS, left, top);
-        outlined(c, HEAD_ONLY, left, top + 7);
-        float span = 22f * (float) Math.cos(rotAng);
-        float by = top + 1;
-        line(c, playerX - span, by, playerX + span, by, Color.rgb(200, 160, 100), 2);
-        line(c, playerX - span * 0.6f, by + 2, playerX + span * 0.6f, by + 2, Color.rgb(150, 110, 60), 1);
-        rectPx(c, playerX - span - 1, by - 1, 2, 3, Color.rgb(235, 210, 150));
-        rectPx(c, playerX + span - 1, by - 1, 2, 3, Color.rgb(235, 210, 150));
-        if (rotor > 0.15f) {
-            for (int i = 0; i < 4; i++) {
-                float dy = ((clock * 70f + i * 9f) % 36f);
-                float xx = playerX - 9 + (i & 1) * 6 + i;
-                if (y + 9 + dy < floorY) line(c, xx, y + 9 + dy, xx, y + 12 + dy, Color.argb((int) (150 * rotor), 200, 235, 255), 1);
-            }
-            text(c, "RPM " + (int) (rotor * 120), playerX, Math.round(y) + 24, 1, Color.rgb(200, 235, 255), 1);
-        }
     }
 
     void drawBolts(Canvas c) {
@@ -3005,36 +2805,9 @@ final class Game extends View implements Choreographer.FrameCallback {
         }
     }
 
-    void drawVehicle(Canvas c) {
-        if (vehicle == QUANTUM) { drawQuantum(c); return; }
-        if (vehicle == HELIX) { drawHelix(c); return; }
-        if (vehicle == BIRD) { drawBird(c); return; }
-        if (vehicle == SCREW) { drawScrew(c); return; }
-        int left = Math.round(playerX) - 10;
-        int hh = hhVeh(vehicle);
-        int cy = Math.round(y);
-        int top = cy - hh;
-        boolean flip = gravDir < 0;
-        if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
-        if (vehicle == STOMPER) {
-            boolean comp = squash > 0;
-            int off = comp ? 3 : 0;
-            outlined(c, BODY_STOMP, left, top + off);
-            outlined(c, comp ? LEGS_STOMP_C : LEGS_STOMP, left, top + BODY_STOMP.length + off);
-            outlined(c, HEAD_ONLY, left, top + 2 + off);
-        } else {
-            outlined(c, POD, left, top);
-            outlined(c, HEAD_ONLY, left, top + 3);
-            // field sparks at both magnet caps
-            rectPx(c, left + 6 + rnd.nextInt(8), top - 1 - rnd.nextInt(2), 1, 1, Color.rgb(255, 150, 150));
-            rectPx(c, left + 6 + rnd.nextInt(8), top + 16 + rnd.nextInt(2), 1, 1, Color.rgb(150, 190, 255));
-        }
-        if (flip) c.restore();
-    }
-
     void drawBuild(Canvas c) {
-        String[] rows = vehRows(buildType, false);
-        int hh = hhVeh(buildType);
+        String[] rows = building.rows();
+        int hh = building.hTop();
         int left = Math.round(playerX) - 10, top = Math.round(y) - hh;
         for (int i = 0; i < nb; i++) {
             float t = Math.max(0f, Math.min(1f, (buildT - bdelay[i]) / 0.5f));
@@ -3053,12 +2826,12 @@ final class Game extends View implements Choreographer.FrameCallback {
                 }
             }
         }
-        if (buildT > BUILD_TIME * 0.9f && buildType != QUANTUM) {
-            int headTop = top + (buildType == STOMPER ? 2 : buildType == SCREW ? 7 : 3);
+        if (buildT > BUILD_TIME * 0.9f && building.cockpit() >= 0) {
+            int headTop = top + building.cockpit();
             sprite(c, HEAD_ONLY, left, headTop);
         }
         text(c, "BUILDING", w / 2f, ceilY + 28, 1, Color.rgb(255, 200, 80), 1);
-        text(c, VNAME[buildType], w / 2f, ceilY + 38, 1, Color.WHITE, 1);
+        text(c, building.name(), w / 2f, ceilY + 38, 1, Color.WHITE, 1);
         int bw = 60;
         rectPx(c, w / 2f - bw / 2f - 1, ceilY + 48, bw + 2, 5, Color.rgb(20, 30, 50));
         rectPx(c, w / 2f - bw / 2f, ceilY + 49, bw * Math.min(1f, buildT / BUILD_TIME), 3, Color.rgb(120, 235, 255));
@@ -3120,12 +2893,12 @@ final class Game extends View implements Choreographer.FrameCallback {
                 rectPx(c, cx - 4, cy - 10, 8, 2, Color.WHITE);
             }
         }
-        if (tipT > 0 && state == PLAY && vehicle == 0) {
+        if (tipT > 0 && state == PLAY && veh == null) {
             text(c, "TAP TO JUMP, THEN HOLD TO FIRE THE JETPACK", w / 2f, ceilY + 28, 1, Color.WHITE, 1);
         }
-        if (hintT > 0 && state == PLAY && vehicle != 0) {
-            text(c, VNAME[vehicle], w / 2f, ceilY + 28, 1, Color.WHITE, 1);
-            text(c, VHINT[vehicle], w / 2f, ceilY + 38, 1, Color.rgb(120, 235, 255), 1);
+        if (hintT > 0 && state == PLAY && veh != null) {
+            text(c, veh.name(), w / 2f, ceilY + 28, 1, Color.WHITE, 1);
+            text(c, veh.hint(), w / 2f, ceilY + 38, 1, Color.rgb(120, 235, 255), 1);
         }
     }
 
