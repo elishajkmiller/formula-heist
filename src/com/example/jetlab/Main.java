@@ -71,6 +71,9 @@ public class Main extends Activity {
     /** a stolen formula, rolled up */
     static class Scroll { float x, y; int idx; }
 
+    /** a base pair shot forward by the DNA helix */
+    static class Bolt { float x, y; int kind; }
+
     static class Crate { float x, y; int type; }
 
     static class Zapper {
@@ -189,7 +192,7 @@ public class Main extends Activity {
         // ---------- constants ----------
 
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6;
-        static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
+        static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
         static final int NF = 20;                // formulas to recover
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
         static final int ENTANGLER_USES = 5;     // teleports before the Quantum Entangler burns out
@@ -201,8 +204,8 @@ public class Main extends Activity {
         static final float VMAX = 7f;            // m/s, "terminal" speed going up
         static final float JUMP = 8.5f;          // m/s, jump off the floor
 
-        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER"};
-        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES."};
+        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER", "DNA HELIX"};
+        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES.", "HOLD TO RISE. TAP TO FIRE BASE PAIRS."};
 
         static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
         static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
@@ -333,6 +336,7 @@ public class Main extends Activity {
         final ArrayList<Missile> missiles = new ArrayList<>();
         final ArrayList<Crate> crates = new ArrayList<>();
         final ArrayList<Scroll> scrolls = new ArrayList<>();
+        final ArrayList<Bolt> bolts = new ArrayList<>();
         final ArrayList<Npc> npcs = new ArrayList<>();
         float bgOff, lastBg, npcLeft, spawnLeft, nextCrate, nextParch;
 
@@ -366,6 +370,12 @@ public class Main extends Activity {
         final boolean[] bland = new boolean[NB];
         int nb, buildType;
         float buildT;
+
+        // DNA helix: where the head has been, so the body can follow it
+        final float[] yHist = new float[64];
+        int yh;
+        float boltCd;
+        static final int[][] RUNG = {{0xDC4646, 0x4678E6}, {0x50DC78, 0xF0C83C}, {0x4678E6, 0xDC4646}, {0xF0C83C, 0x50DC78}};   // A-T, C-G pairs
 
         // death
         boolean settled;
@@ -494,7 +504,7 @@ public class Main extends Activity {
 
         /** back outside on the grass, in front of NULLCORP's wall */
         void toStart(boolean keepState) {
-            coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear();
+            coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear();
             nextParch = 70; bannerT = 0;
             for (int i = 0; i < NP; i++) pl[i] = 0;
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
@@ -987,6 +997,47 @@ public class Main extends Activity {
             }
         }
 
+        void fireBolt() {
+            if (boltCd > 0) return;
+            Bolt b = new Bolt();
+            b.x = playerX + 12; b.y = y; b.kind = bolts.size() & 1;
+            bolts.add(b);
+            boltCd = 0.3f;
+            sfx(S_TELE);
+        }
+
+        /** base pairs fly forward and wipe out a zapper or a missile they touch */
+        void updateBolts(float dt) {
+            if (boltCd > 0) boltCd -= dt;
+            for (int i = bolts.size() - 1; i >= 0; i--) {
+                Bolt b = bolts.get(i);
+                b.x += 220f * dt;
+                boolean gone = b.x > w + 10;
+                for (int j = zappers.size() - 1; j >= 0 && !gone; j--) {
+                    Zapper z = zappers.get(j);
+                    float hx = (float) Math.cos(z.angle) * z.len / 2, hy = (float) Math.sin(z.angle) * z.len / 2;
+                    if (segDist(b.x, b.y, z.x - hx, z.y - hy, z.x + hx, z.y + hy) < 7f) {
+                        zappers.remove(j);
+                        for (int k = 0; k < 14; k++) burst(b.x, b.y);
+                        sfx(S_HIT);
+                        gone = true;
+                    }
+                }
+                for (int j = missiles.size() - 1; j >= 0 && !gone; j--) {
+                    Missile m = missiles.get(j);
+                    if (!m.flying) continue;
+                    float dx = m.x - b.x, dy = m.y - b.y;
+                    if (dx * dx + dy * dy < 100f) {
+                        missiles.remove(j);
+                        for (int k = 0; k < 10; k++) burst(b.x, b.y);
+                        sfx(S_HIT);
+                        gone = true;
+                    }
+                }
+                if (gone) bolts.remove(i);
+            }
+        }
+
         /** jump to the mirror position on the opposite surface, gravity follows */
         void teleport() {
             teleFromY = y;
@@ -1011,6 +1062,8 @@ public class Main extends Activity {
                 sfx(S_FLIP);
                 buzz(15);
                 for (int i = 0; i < 10; i++) burst(playerX, y);
+            } else if (vehicle == HELIX) {
+                fireBolt();
             } else if (vehicle == QUANTUM) {
                 teleport();
             } else if (vehicle == STOMPER) {
@@ -1083,8 +1136,9 @@ public class Main extends Activity {
 
             // vertical motion: gravity, thrust (on foot only), speed limited
             if (jumpDelay > 0) jumpDelay -= dt;
-            boolean fire = thrusting && state == PLAY && vehicle == 0 && jumpDelay <= 0;
-            ay = GRAVITY * gravDir - (fire ? THRUST : 0);
+            boolean helix = vehicle == HELIX;
+            boolean fire = thrusting && state == PLAY && ((vehicle == 0 && jumpDelay <= 0) || helix);
+            ay = (helix ? 14f : GRAVITY) * gravDir - (fire ? (helix ? 30f : THRUST) : 0);
             vy += ay * dt;
             float vmin = flips() ? -VFALL : -VMAX;
             if (vy > VFALL) vy = VFALL;
@@ -1127,7 +1181,8 @@ public class Main extends Activity {
             }
             if (vehicle == STOMPER && y >= hi - 0.5f) onFloor = true;
 
-            if (fire) emitExhaust();
+            if (fire && !helix) emitExhaust();
+            if (helix) { yh = (yh + 1) & 63; yHist[yh] = y; }
             for (int i = 0; i < NP; i++) {
                 if (pl[i] > 0) {
                     pl[i] -= dt;
@@ -1163,6 +1218,7 @@ public class Main extends Activity {
             }
 
             if (bannerT > 0) bannerT -= rdt;
+            updateBolts(dt);
             for (int i = scrolls.size() - 1; i >= 0; i--) {
                 Scroll k = scrolls.get(i);
                 k.x -= scroll;
@@ -1246,6 +1302,8 @@ public class Main extends Activity {
 
         void finishBuild() {
             vehicle = buildType;
+            Arrays.fill(yHist, y);
+            boltCd = 0;
             charges = ENTANGLER_USES;
             state = PLAY;
             gravDir = 1;
@@ -1405,7 +1463,7 @@ public class Main extends Activity {
             if (dist >= nextCrate) {
                 if (vehicle == 0) {
                     Crate k = new Crate();
-                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(3);
+                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(4);
                     crates.add(k);
                     spawnLeft = 4f * ppm;
                     nextCrate = dist + 220 + rnd.nextInt(150);
@@ -1707,6 +1765,15 @@ public class Main extends Activity {
             ".....UUUUUUUUUU.....",
             "......UUUUUUUU......"
         };
+        /** the helix's head: the pod with green and magenta caps, the two ends of a base pair */
+        static final String[] HELIX_HEAD = recolor(POD, 'R', 'Q', 'U', 'q');
+
+        static String[] recolor(String[] rows, char a, char a2, char b, char b2) {
+            String[] out = new String[rows.length];
+            for (int i = 0; i < rows.length; i++) out[i] = rows[i].replace(a, a2).replace(b, b2);
+            return out;
+        }
+
         static final String[] BOARD = {
             "..mMMMMMMMMMMMMMMm..",
             "...mmmmmmmmmmmmmm...",
@@ -1728,6 +1795,7 @@ public class Main extends Activity {
         static String[] vehRows(int type, boolean compressed) {
             if (type == QUANTUM) return QUANT;
             if (type == INVERTER) return POD;
+            if (type == HELIX) return HELIX_HEAD;
             String[] legs = compressed ? LEGS_STOMP_C : LEGS_STOMP;
             String[] out = Arrays.copyOf(BODY_STOMP, BODY_STOMP.length + legs.length);
             System.arraycopy(legs, 0, out, BODY_STOMP.length, legs.length);
@@ -1835,6 +1903,8 @@ public class Main extends Activity {
             int ov = ch < 128 ? OVR[ch] : 0;
             if (ov != 0) return ov;
             switch (ch) {
+                case 'Q': return Color.rgb(80, 220, 130);
+                case 'q': return Color.rgb(230, 90, 200);
                 case 'B': return Color.rgb(80, 50, 30);
                 case 'b': return Color.rgb(135, 90, 55);
                 case 'E': return Color.rgb(30, 30, 45);
@@ -1955,6 +2025,7 @@ public class Main extends Activity {
             drawScrolls(c);
             drawZappers(c);
             drawMissiles(c);
+            drawBolts(c);
             drawParticles(c);
             drawPlayer(c);
             if (telePulse > 0) {
@@ -2545,8 +2616,57 @@ public class Main extends Activity {
             }
         }
 
+        /** a double helix that trails the head and follows its path, with base pairs for rungs */
+        void drawHelix(Canvas c) {
+            int left = Math.round(playerX) - 10, top = Math.round(y) - 8;
+            int segs = 18;
+            float phase = clock * 7f;
+            float pax = 0, pay = 0, pbx = 0, pby = 0;
+            for (int i = 0; i < segs; i++) {
+                float sx = playerX - 12 - i * 5f;
+                float sy = yHist[(yh - i * 2) & 63] + (float) Math.sin(phase + i * 0.55f) * 2f * Math.min(1f, i / 4f);
+                float tw = (float) Math.sin(phase * 1.3f + i * 0.9f);             // the twist
+                float off = tw * 6f * (1f - i / (segs * 1.4f));                    // narrows toward the tail
+                float ay2 = sy - off, by2 = sy + off;
+                int sz = i < 8 ? 3 : 2;
+                if ((i & 1) == 0) {
+                    int[] pr = RUNG[(i / 2) & 3];
+                    line(c, sx, ay2, sx, by2, Color.argb(190, 220, 230, 245), 1);
+                    rectPx(c, sx - 1, ay2 - 1, 2, 2, 0xFF000000 | pr[0]);
+                    rectPx(c, sx - 1, by2 - 1, 2, 2, 0xFF000000 | pr[1]);
+                }
+                if (i > 0) {
+                    line(c, pax, pay, sx, ay2, Color.rgb(70, 200, 190), 1);
+                    line(c, pbx, pby, sx, by2, Color.rgb(210, 90, 190), 1);
+                }
+                // the strand nearer the viewer is drawn last
+                if (tw > 0) {
+                    rectPx(c, sx - 1, by2 - 1, sz, sz, Color.rgb(230, 100, 205));
+                    rectPx(c, sx - 1, ay2 - 1, sz, sz, Color.rgb(90, 230, 210));
+                } else {
+                    rectPx(c, sx - 1, ay2 - 1, sz, sz, Color.rgb(90, 230, 210));
+                    rectPx(c, sx - 1, by2 - 1, sz, sz, Color.rgb(230, 100, 205));
+                }
+                pax = sx; pay = ay2; pbx = sx; pby = by2;
+            }
+            outlined(c, HELIX_HEAD, left, top);
+            outlined(c, HEAD_ONLY, left, top + 3);
+        }
+
+        void drawBolts(Canvas c) {
+            for (Bolt b : bolts) {
+                int[] pr = RUNG[b.kind * 1];
+                float len = 1f + 6f * Math.abs((float) Math.cos(clock * 12 + b.x * 0.15f));
+                for (int t = 1; t <= 3; t++) rectPx(c, b.x - t * 5, b.y, 3, 1, Color.argb(120 - t * 30, 220, 240, 255));
+                line(c, b.x, b.y - len / 2, b.x, b.y + len / 2, Color.WHITE, 1);
+                rectPx(c, b.x - 1, b.y - len / 2 - 1, 3, 3, 0xFF000000 | pr[0]);
+                rectPx(c, b.x - 1, b.y + len / 2 - 1, 3, 3, 0xFF000000 | pr[1]);
+            }
+        }
+
         void drawVehicle(Canvas c) {
             if (vehicle == QUANTUM) { drawQuantum(c); return; }
+            if (vehicle == HELIX) { drawHelix(c); return; }
             int left = Math.round(playerX) - 10;
             int hh = hhVeh(vehicle);
             int cy = Math.round(y);

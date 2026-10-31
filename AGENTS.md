@@ -12,7 +12,7 @@ Jetpack Joyride style Android game with a physics theme. One file, src/com/examp
 - No Co-Authored-By lines. Never run sudo.
 
 ## Vehicles and feel
-Blueprint crates ("B") appear every 220 to 370 m. Picking one up freezes time to 15% while the vehicle assembles from flying 3x3 pixel blocks (BUILD state), then you ride it: Spring Stomper (bounces on its own, tap in the air to dive), Gravity Inverter (tap flips gravity) or Quantum Entangler (run on the floor or ceiling, tap teleports to the mirror spot on the other side where an entangled twin waits; five uses then it burns out). A hit breaks the vehicle instead of ending the run. Feel: screen shake, hit-stop, white flash, vibration (needs VIBRATE) and synthesized sounds (Sfx class, no audio files).
+Blueprint crates ("B") appear every 220 to 370 m. Picking one up freezes time to 15% while the vehicle assembles from flying 3x3 pixel blocks (BUILD state), then you ride it: Spring Stomper (bounces on its own, tap in the air to dive), Gravity Inverter (tap flips gravity) Quantum Entangler (run on the floor or ceiling, tap teleports to the mirror spot on the other side where an entangled twin waits; five uses then it burns out). A hit breaks the vehicle instead of ending the run. Feel: screen shake, hit-stop, white flash, vibration (needs VIBRATE) and synthesized sounds (Sfx class, no audio files).
 
 ## Story and launch
 NULLCORP, an evil science company, stole every theory and formula; the mission is to steal them back and share them with the world. A run starts outside on the grass in front of NULLCORP's brick wall. Stretch the coil-spring catapult (drag back, release): stretch sets speed and angle, shown with energy (1/2 m v^2). He flies in a real arc (game gravity) and smashes through the wall, then the run begins inside the lab (rooms: mission control, chemistry lab, computer room, observatory). Too weak and he tumbles on the grass and you try again. States: START, LAUNCH, FLY, MISS, PLAY, BUILD, DEAD, ARCHIVE, SCRATCH. The scenery holds still until he moves.
@@ -28,3 +28,6 @@ Main (Activity, fullscreen, pause/resume) and Game (the View). Game is organised
 
 ## Outfit store
 Electrons you collect are banked across runs (prefs "bank"). The OUTFITS button (bottom left on the title and death screens) opens the store: 8 outfits (ONAME/OCOST/OPAL), each recolours the scientist's sprite letters W w x (coat), D d (pants), O o h (jetpack), t (tie), V (collar) through the OVR table that pal() checks first. Tap a card to buy it or wear it; owned outfits and the worn one are saved. The archive button (bottom right) blinks "NEW CARD WAITING" when there is an unscratched card, and the death screen says "TAP TO CONTINUE".
+
+## DNA Helix vehicle
+A fourth crate vehicle (HELIX): hold to rise (light gravity 14, thrust 30), release to sink, tap to fire base pairs (A-T and C-G rungs) that destroy a zapper or missile they touch (0.3 s cooldown). Its body is a double helix that trails the head by following a 64 sample history of the head's height (yHist), twisting as it goes.
