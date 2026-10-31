@@ -69,8 +69,9 @@ public class Main extends Activity {
 
         static final int START = 0, PLAY = 1, DEAD = 2;
 
-        static final float GRAVITY = 9.8f;      // m/s^2, the real one
-        static final float THRUST = 26f;        // m/s^2 from the pack
+        static final float GRAVITY = 15f;       // m/s^2, game gravity (Earth is 9.8)
+        static final float THRUST = 31f;        // m/s^2 from the pack, net 16 up
+        static final float VFALL = 10f;         // m/s, falling top speed
         static final float VMAX = 7f;           // m/s, "terminal" speed up or down
 
         static final String[] SYM = {"H", "He", "Li", "C", "N", "O", "Ne", "Na", "Si", "Fe", "Cu", "Ag", "Au", "U"};
@@ -195,7 +196,7 @@ public class Main extends Activity {
             boolean fire = thrusting && state == PLAY;
             ay = GRAVITY - (fire ? THRUST : 0);
             vy += ay * dt;
-            if (vy > VMAX) vy = VMAX;
+            if (vy > VFALL) vy = VFALL;
             if (vy < -VMAX) vy = -VMAX;
             y += vy * ppm * dt;
             onFloor = false;
