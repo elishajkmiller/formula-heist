@@ -398,7 +398,7 @@ public class Main extends Activity {
             floorY = h - 11;
             ceilY = 11;
             playerX = w * 0.22f;
-            abw = 88; abh = 11; abx = w - abw - 4; aby = h - 12;
+            abw = 66; abh = 11; abx = w - abw - 4; aby = h - 12;
             cbw = 36; cbh = 11; cbx = w - cbw - 4; cby = 3;
             scw = Math.min(200, w - 24); sch = 104; scx = (w - scw) / 2; scy = 24;
             if (state == START) toStart(true);
@@ -641,14 +641,14 @@ public class Main extends Activity {
         void closeButton(Canvas c) {
             rectPx(c, cbx, cby, cbw, cbh, Color.rgb(8, 10, 20));
             rectPx(c, cbx + 1, cby + 1, cbw - 2, cbh - 2, Color.rgb(60, 70, 100));
-            text(c, "CLOSE", cbx + cbw / 2f, cby + 2, 1, Color.WHITE, 1);
+            text(c, "CLOSE", cbx + cbw / 2f, cby + 3, 1, Color.WHITE, 1);
         }
 
         void drawArchiveButton(Canvas c) {
             boolean fresh = (ownedMask & ~scratchedMask) != 0;
             rectPx(c, abx, aby, abw, abh, Color.rgb(8, 10, 20));
             rectPx(c, abx + 1, aby + 1, abw - 2, abh - 2, fresh && ((int) (clock * 3) & 1) == 0 ? Color.rgb(130, 100, 30) : Color.rgb(44, 54, 82));
-            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, abx + abw / 2f, aby + 2, 1, Color.WHITE, 1);
+            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, abx + abw / 2f, aby + 3, 1, Color.WHITE, 1);
         }
 
         // ---------- the prism on every scratch card ----------
@@ -762,9 +762,9 @@ public class Main extends Activity {
         void drawArchive(Canvas c) {
             rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
             for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
-            text(c, "FORMULA ARCHIVE", 8, 4, 1, Color.rgb(255, 215, 120), 0);
+            text(c, "FORMULA ARCHIVE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
             int owned = Integer.bitCount(ownedMask), shown = Integer.bitCount(scratchedMask);
-            text(c, owned + "/" + NF + " RECOVERED   " + shown + "/" + NF + " REVEALED", 8, 14, 1, Color.rgb(150, 190, 215), 0);
+            text(c, owned + "/" + NF + " RECOVERED   " + shown + "/" + NF + " REVEALED", 8, 13, 1, Color.rgb(150, 190, 215), 0);
             closeButton(c);
             for (int i = 0; i < NF; i++) {
                 int[] r = cardRect(i);
@@ -831,8 +831,8 @@ public class Main extends Activity {
                 c.save();
                 c.clipPath(clipPath);
             }
-            textOut(c, FNAME[selCard], scx + scw / 2f, scy + 6, 1, Color.rgb(140, 96, 56), 1, false);
-            wrapOut(c, FDESC[selCard], scx + scw / 2f, scy + 56, 1, ink, scw - 16, false);
+            textOut(c, FNAME[selCard], scx + scw / 2f, scy + 8, 1, Color.rgb(140, 96, 56), 1, false);
+            wrapOut(c, FDESC[selCard], scx + scw / 2f, scy + 58, 1, ink, scw - 16, false);
             if (clip) c.restore();
             ov(FORMD[selCard], scx + scw / 2f, scy + 34, fitSize(FORMD[selCard], scw - 16, 17f), ink, clip);
             drawParticles(c);
@@ -1603,59 +1603,19 @@ public class Main extends Activity {
             c.drawRect(ix, iy, ix + Math.round(rw), iy + Math.round(rh), p);
         }
 
-        // 5 x 7 pixel font: A-Z, 0-9 and . , ! - + / : ' ^ = ? ( ). Each glyph is 7 rows of 5 bits.
-        static final String CH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!-+/:'^ =?()";
+        // 3 x 5 pixel font: A-Z, 0-9 and . , ! - + / : ' ^ = ?. Each glyph is 5 rows of 3 bits.
+        static final String CH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!-+/:'^ =?";
         static final String[] GL = {
-            "01110100011000111111100011000110001",
-            "11110100011000111110100011000111110",
-            "01110100011000010000100001000101110",
-            "11110100011000110001100011000111110",
-            "11111100001000011110100001000011111",
-            "11111100001000011110100001000010000",
-            "01110100011000010111100011000101111",
-            "10001100011000111111100011000110001",
-            "01110001000010000100001000010001110",
-            "00111000100001000010000101001001100",
-            "10001100101010011000101001001010001",
-            "10000100001000010000100001000011111",
-            "10001110111010110101100011000110001",
-            "10001110011010110011100011000110001",
-            "01110100011000110001100011000101110",
-            "11110100011000111110100001000010000",
-            "01110100011000110001101011001001101",
-            "11110100011000111110101001001010001",
-            "01111100001000001110000010000111110",
-            "11111001000010000100001000010000100",
-            "10001100011000110001100011000101110",
-            "10001100011000110001100010101000100",
-            "10001100011000110101101011101110001",
-            "10001100010101000100010101000110001",
-            "10001100010101000100001000010000100",
-            "11111000010001000100010001000011111",
-            "01110100011001110101110011000101110",
-            "00100011000010000100001000010001110",
-            "01110100010000100010001000100011111",
-            "11111000100010000010000011000101110",
-            "00010001100101010010111110001000010",
-            "11111100001111000001000011000101110",
-            "00110010001000011110100011000101110",
-            "11111000010001000100010000100001000",
-            "01110100011000101110100011000101110",
-            "01110100011000101111000010001001100",
-            "00000000000000000000000000110001100",
-            "00000000000000000000011000010001000",
-            "00100001000010000100001000000000100",
-            "00000000000000011111000000000000000",
-            "00000001000010011111001000010000000",
-            "00001000010001000100010001000010000",
-            "00000011000110000000011000110000000",
-            "00100001000100000000000000000000000",
-            "00100010101000100000000000000000000",
-            "00000000000000000000000000000000000",
-            "00000000001111100000111110000000000",
-            "01110100010000100010001000000000100",
-            "00010001000100001000010000010000010",
-            "01000001000001000010000100010001000"
+            "010101111101101", "110101110101110", "011100100100011", "110101101101110", "111100110100111",
+            "111100110100100", "011100101101011", "101101111101101", "111010010010111", "001001001101010",
+            "101101110101101", "100100100100111", "101111111101101", "110101101101101", "010101101101010",
+            "110101110100100", "010101101111011", "110101110101101", "011100010001110", "111010010010010",
+            "101101101101111", "101101101101010", "101101111111101", "101101010101101", "101101010010010",
+            "111001010100111",
+            "111101101101111", "010110010010111", "110001010100111", "110001010001110", "101101111001001",
+            "111100110001110", "011100111101111", "111001010010010", "111101111101111", "111101111001110",
+            "000000000000010", "000000000010100", "010010010000010", "000000111000000", "000010111010000",
+            "001001010100100", "000010000010000", "010010000000000", "010101000000000", "000000000000000", "000111000111000", "110001010000010"
         };
         static final int TXT_OUTLINE = Color.rgb(8, 10, 22);
 
@@ -1666,10 +1626,10 @@ public class Main extends Activity {
                 int gi = CH.indexOf(s.charAt(i));
                 if (gi < 0) continue;
                 String bits = GL[gi];
-                for (int r = 0; r < 7; r++) {
-                    for (int k = 0; k < 5; k++) {
-                        if (bits.charAt(r * 5 + k) == '1') {
-                            int gx = ix + (i * 6 + k) * sc, gy = iy + r * sc;
+                for (int r = 0; r < 5; r++) {
+                    for (int k = 0; k < 3; k++) {
+                        if (bits.charAt(r * 3 + k) == '1') {
+                            int gx = ix + (i * 4 + k) * sc, gy = iy + r * sc;
                             c.drawRect(gx, gy, gx + sc, gy + sc, p);
                         }
                     }
@@ -1677,10 +1637,10 @@ public class Main extends Activity {
             }
         }
 
-        static int textWidth(String s, int sc) { return s.length() * 6 * sc - sc; }
+        static int textWidth(String s, int sc) { return s.length() * 4 * sc - sc; }
 
         /**
-         * Pixel text. align: 0 left, 1 centre, 2 right. y is the top of the text, which is 7 * sc tall.
+         * Pixel text. align: 0 left, 1 centre, 2 right. y is the top of the text, which is 5 * sc tall.
          * outline draws a 1 pixel dark edge (not an offset shadow) so it stays readable over the scenery.
          * Centred text that is too wide for the screen splits onto two lines.
          */
@@ -1695,7 +1655,7 @@ public class Main extends Activity {
                 int mid = s.length() / 2, cut = s.lastIndexOf(' ', mid);
                 if (cut <= 0) cut = s.indexOf(' ', mid);
                 textOut(c, s.substring(0, cut), x, yy, sc, col, align, outline);
-                textOut(c, s.substring(cut + 1), x, yy + 9 * sc, sc, col, align, outline);
+                textOut(c, s.substring(cut + 1), x, yy + 7 * sc, sc, col, align, outline);
                 return;
             }
             int tw = textWidth(s, sc);
@@ -1717,14 +1677,14 @@ public class Main extends Activity {
         }
 
         void wrapOut(Canvas c, String s, float cx, float yy, int sc, int col, int maxPx, boolean outline) {
-            int per = Math.max(8, (maxPx + sc) / (6 * sc));
+            int per = Math.max(8, (maxPx + sc) / (4 * sc));
             String[] words = s.split(" ");
             StringBuilder line = new StringBuilder();
             float ly = yy;
             for (String wd : words) {
                 if (line.length() > 0 && line.length() + 1 + wd.length() > per) {
                     textOut(c, line.toString(), cx, ly, sc, col, 1, outline);
-                    ly += 9 * sc;
+                    ly += 7 * sc;
                     line.setLength(0);
                 }
                 if (line.length() > 0) line.append(' ');
@@ -1920,7 +1880,7 @@ public class Main extends Activity {
                 rectPx(c, sgx + 28, fl - 24, 3, 24, Color.rgb(90, 70, 50));
                 rectPx(c, sgx, fl - 46, 60, 22, Color.rgb(24, 26, 36));
                 rectPx(c, sgx + 1, fl - 45, 58, 20, Color.rgb(160, 40, 40));
-                textOut(c, "NULLCORP", sgx + 30, fl - 43, 1, Color.WHITE, 1, false);
+                textOut(c, "NULLCORP", sgx + 30, fl - 42, 1, Color.WHITE, 1, false);
                 textOut(c, "KEEP OUT", sgx + 30, fl - 34, 1, Color.rgb(255, 210, 120), 1, false);
                 c.restore();
             }
@@ -1988,10 +1948,10 @@ public class Main extends Activity {
 
         void drawRoom(Canvas c, int ox, int k) {
             int kind = Math.floorMod(k, 4);
-            int oy = Math.round(ceilY) + 15, oh = Math.round(floorY) - oy;      // down to the floor line
+            int oy = Math.round(ceilY) + 14, oh = Math.round(floorY) - oy;      // down to the floor line
             // name plate
-            rectPx(c, ox + 25, ceilY + 1, RW - 50, 11, Color.rgb(16, 24, 38));
-            textOut(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 3, 1, Color.rgb(255, 200, 80), 1, false);
+            rectPx(c, ox + 25, ceilY + 2, RW - 50, 9, Color.rgb(16, 24, 38));
+            textOut(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 4, 1, Color.rgb(255, 200, 80), 1, false);
             // frame
             rectPx(c, ox - 3, oy - 3, RW + 6, oh + 6, Color.rgb(16, 24, 38));
             rectPx(c, ox - 2, oy - 2, RW + 4, oh + 4, Color.rgb(70, 90, 120));
@@ -2040,7 +2000,7 @@ public class Main extends Activity {
             // flanking data screens
             rectPx(c, ox + 10, oy + 6, 34, 28, Color.rgb(10, 22, 18));
             int di = ((int) (clock * 3)) % 18;
-            for (int i = 0; i < 3; i++) textOut(c, DIG[di + i % 3].substring(0, 5), ox + 12, oy + 8 + i * 8, 1, Color.rgb(90, 230, 120), 0, false);
+            for (int i = 0; i < 4; i++) textOut(c, DIG[di + i % 3], ox + 12, oy + 8 + i * 6, 1, Color.rgb(90, 230, 120), 0, false);
             rectPx(c, ox + ow - 44, oy + 6, 34, 28, Color.rgb(10, 22, 18));
             for (int b = 0; b < 6; b++) {
                 int bh = (int) (Math.abs(Math.sin(clock * 2 + b * 1.7)) * 18) + 2;
@@ -2192,8 +2152,8 @@ public class Main extends Activity {
             for (int m = Math.max(0, m0); m < dist + (w - playerX) / ppm + 1; m++) {
                 float x = playerX + (m - dist) * ppm;
                 boolean ten = m % 10 == 0;
-                if (ten) textOut(c, m + " M", x, floorY + 4, 1, Color.rgb(140, 190, 210), 1, false);
-                else rectPx(c, x, floorY + 4, 1, 3, Color.rgb(90, 150, 175));
+                rectPx(c, x, floorY + 4, 1, ten ? 5 : 3, Color.rgb(90, 150, 175));
+                if (ten) textOut(c, m + " M", x, floorY + 10, 1, Color.rgb(140, 190, 210), 1, false);
             }
         }
 
@@ -2295,7 +2255,7 @@ public class Main extends Activity {
                         float wx = w - 12;
                         rectPx(c, wx - 6, m.y - 6, 12, 12, Color.rgb(255, 90, 60));
                         rectPx(c, wx - 5, m.y - 5, 10, 10, Color.rgb(160, 40, 30));
-                        textOut(c, "!", wx, m.y - 3, 1, Color.WHITE, 1, false);
+                        textOut(c, "!", wx - 1, m.y - 3, 1, Color.WHITE, 1, false);
                     }
                 } else {
                     // alpha particle: two protons and two neutrons
@@ -2518,20 +2478,20 @@ public class Main extends Activity {
                 rectPx(c, cx - 6, cy - 6, 12, 12, Color.rgb(60, 130, 210));
                 rectPx(c, cx - 6, cy, 12, 1, Color.argb(120, 255, 255, 255));
                 rectPx(c, cx, cy - 6, 1, 12, Color.argb(120, 255, 255, 255));
-                textOut(c, "B", cx, cy - 3, 1, Color.WHITE, 1, false);
+                textOut(c, "B", cx - 1, cy - 2, 1, Color.WHITE, 1, false);
             }
         }
 
         void drawHud(Canvas c) {
             int top = Math.round(ceilY) + 4;
             text(c, (int) (state == DEAD ? finalDist : dist) + " M", 6, top, 2, Color.WHITE, 0);
-            text(c, "E- " + electrons, 6, top + 17, 1, Color.rgb(120, 235, 255), 0);
-            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, 6, top + 27, 1, Color.rgb(255, 215, 120), 0);
+            text(c, "E- " + electrons, 6, top + 14, 1, Color.rgb(120, 235, 255), 0);
+            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, 6, top + 22, 1, Color.rgb(255, 215, 120), 0);
             int rx = w - 6;
             Color_ = Color.rgb(170, 200, 220);
             text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, Color_, 2);
-            text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 10, 1, Color_, 2);
-            text(c, "BEST " + best + " M", rx, top + 20, 1, Color_, 2);
+            text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 8, 1, Color_, 2);
+            text(c, "BEST " + best + " M", rx, top + 16, 1, Color_, 2);
             drawHint(c);
         }
         int Color_;
