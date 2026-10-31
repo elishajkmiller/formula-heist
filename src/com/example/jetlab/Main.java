@@ -939,24 +939,243 @@ public class Main extends Activity {
                 int col = Color.rgb((int) (14 + 10 * t), (int) (22 + 18 * t), (int) (40 + 22 * t));
                 rectPx(c, 0, i * h / (float) bands, w, h / (float) bands + 1, col);
             }
-            float step = 2.2f * ppm;
-            int first = (int) Math.floor(bgOff / step);
-            float frac = bgOff - first * step;
-            for (int k = -1; k < w / step + 2; k++) {
-                int idx = first + k;
-                int m = Math.floorMod(idx * 7 + 3, 11);
-                int tx = Math.round(k * step - frac + step / 2), ty = Math.round((1.4f + (m % 5) * 1.2f) * ppm);
-                int half = 12;
-                rectPx(c, tx - half, ty - half, half * 2, half * 2, Color.rgb(36, 62, 96));
-                rectPx(c, tx - half + 1, ty - half + 1, half * 2 - 2, half * 2 - 2, Color.rgb(24, 42, 70));
-                text(c, SYM[Math.floorMod(idx, SYM.length)], tx, ty - 2, 1, Color.rgb(90, 150, 200), 1);
-            }
+            drawWall(c);
             // ceiling pipe with rivets
             rectPx(c, 0, 0, w, ceilY, Color.rgb(36, 50, 72));
             rectPx(c, 0, ceilY - 3, w, 3, Color.rgb(70, 190, 200));
             rectPx(c, 0, ceilY - 4, w, 1, Color.rgb(30, 100, 120));
             float off = (dist * ppm) % 24;
             for (int x = -24; x < w + 24; x += 24) rectPx(c, x - off, 3, 2, 2, Color.rgb(90, 110, 140));
+        }
+
+        // ---------- wall with rooms ----------
+
+        static final int RW = 170, PERIOD = 230;
+        static final String[] ROOM_NAMES = {"MISSION CONTROL", "CHEMISTRY LAB", "COMPUTER ROOM", "OBSERVATORY"};
+        static final String[] DIG = new String[24];
+        static {
+            Random r = new Random(3);
+            for (int i = 0; i < DIG.length; i++) {
+                StringBuilder b = new StringBuilder();
+                for (int k = 0; k < 6; k++) b.append((char) ('0' + r.nextInt(10)));
+                DIG[i] = b.toString();
+            }
+        }
+
+        void drawWall(Canvas c) {
+            int wallTop = Math.round(ceilY), wallH = Math.round(floorY) - wallTop;
+            rectPx(c, 0, wallTop, w, wallH, Color.rgb(30, 44, 66));
+            float so = bgOff % 40;
+            for (float x = -so; x < w; x += 40) rectPx(c, x, wallTop, 1, wallH, Color.rgb(24, 36, 56));
+            // baseboard with hazard dashes
+            rectPx(c, 0, floorY - 5, w, 5, Color.rgb(22, 30, 46));
+            float ho = bgOff % 16;
+            for (float x = -ho; x < w; x += 16) rectPx(c, x, floorY - 4, 8, 2, Color.rgb(200, 160, 40));
+
+            int k0 = (int) Math.floor((bgOff - 20) / PERIOD) - 1;
+            for (int k = k0; k < k0 + w / PERIOD + 3; k++) {
+                float ox = k * PERIOD - bgOff + 20;
+                if (ox > w || ox + RW < 0) continue;
+                drawRoom(c, Math.round(ox), k);
+            }
+        }
+
+        void drawRoom(Canvas c, int ox, int k) {
+            int kind = Math.floorMod(k, 4);
+            int oy = Math.round(ceilY) + 10, oh = Math.round(floorY) - 6 - oy;
+            // name plate
+            rectPx(c, ox + 25, ceilY + 2, RW - 50, 7, Color.rgb(16, 24, 38));
+            text(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 3, 1, Color.rgb(255, 200, 80), 1);
+            // frame
+            rectPx(c, ox - 3, oy - 3, RW + 6, oh + 6, Color.rgb(16, 24, 38));
+            rectPx(c, ox - 2, oy - 2, RW + 4, oh + 4, Color.rgb(70, 90, 120));
+
+            c.save();
+            c.clipRect(ox, oy, ox + RW, oy + oh);
+            switch (kind) {
+                case 0: interiorControl(c, ox, oy, RW, oh, k); break;
+                case 1: interiorLab(c, ox, oy, RW, oh); break;
+                case 2: interiorComputer(c, ox, oy, RW, oh); break;
+                default: interiorObservatory(c, ox, oy, RW, oh); break;
+            }
+            // roll-up shutter: opens as the player gets close
+            float d = Math.abs(ox + RW / 2f - playerX);
+            float open = Math.max(0f, Math.min(1f, 1f - (d - 50f) / 130f));
+            open = open * open * (3f - 2f * open);
+            int closed = Math.round(oh * (1f - open));
+            if (closed > 0) {
+                rectPx(c, ox, oy, RW, closed, Color.rgb(78, 92, 116));
+                for (int yy = oy + 3; yy < oy + closed; yy += 4) rectPx(c, ox, yy, RW, 1, Color.rgb(52, 64, 86));
+                rectPx(c, ox, oy + closed - 3, RW, 3, Color.rgb(200, 160, 40));
+                for (int xx = ox; xx < ox + RW; xx += 8) rectPx(c, xx, oy + closed - 3, 4, 3, Color.rgb(30, 30, 40));
+            }
+            c.restore();
+        }
+
+        void interiorControl(Canvas c, int ox, int oy, int ow, int oh, int k) {
+            int[] skin = {Color.rgb(240, 200, 160), Color.rgb(205, 160, 120), Color.rgb(150, 105, 75)};
+            rectPx(c, ox, oy, ow, oh, Color.rgb(44, 62, 60));
+            rectPx(c, ox, oy + oh - 6, ow, 6, Color.rgb(70, 78, 70));
+            // big world map with a ground track
+            int sx = ox + 52, sy = oy + 6;
+            rectPx(c, sx - 2, sy - 2, 70, 40, Color.rgb(12, 16, 22));
+            rectPx(c, sx, sy, 66, 36, Color.rgb(10, 30, 70));
+            for (int gx = 0; gx < 66; gx += 11) rectPx(c, sx + gx, sy, 1, 36, Color.rgb(20, 50, 100));
+            for (int gy = 0; gy < 36; gy += 9) rectPx(c, sx, sy + gy, 66, 1, Color.rgb(20, 50, 100));
+            int land = Color.rgb(30, 100, 70);
+            rectPx(c, sx + 6, sy + 8, 12, 10, land);
+            rectPx(c, sx + 10, sy + 18, 6, 10, land);
+            rectPx(c, sx + 28, sy + 6, 10, 7, land);
+            rectPx(c, sx + 30, sy + 13, 10, 14, land);
+            rectPx(c, sx + 46, sy + 8, 14, 8, land);
+            for (int i = 0; i < 66; i += 2) rectPx(c, sx + i, sy + 18 + (float) Math.sin(i * 0.18) * 12, 1, 1, Color.rgb(255, 220, 90));
+            int mi = (int) ((clock * 10) % 66);
+            rectPx(c, sx + mi - 1, sy + 17 + (float) Math.sin(mi * 0.18) * 12, 3, 3, Color.WHITE);
+            // flanking data screens
+            rectPx(c, ox + 10, oy + 6, 34, 28, Color.rgb(10, 22, 18));
+            int di = ((int) (clock * 3)) % 18;
+            for (int i = 0; i < 4; i++) text(c, DIG[di + i % 3], ox + 12, oy + 8 + i * 6, 1, Color.rgb(90, 230, 120), 0);
+            rectPx(c, ox + ow - 44, oy + 6, 34, 28, Color.rgb(10, 22, 18));
+            for (int b = 0; b < 6; b++) {
+                int bh = (int) (Math.abs(Math.sin(clock * 2 + b * 1.7)) * 18) + 2;
+                rectPx(c, ox + ow - 42 + b * 5, oy + 32 - bh, 3, bh, Color.rgb(80, 230, 120));
+            }
+            // tiered rows of two-tone green consoles with controllers in white shirts and headsets
+            for (int row = 0; row < 3; row++) {
+                int ry = oy + 56 + row * 15;
+                for (int i = 0; i < 5; i++) {
+                    int cx = ox + 6 + i * 33 + (row == 1 ? 8 : 0);
+                    if (cx + 24 > ox + ow) continue;
+                    int hsh = k * 31 + row * 7 + i * 13;
+                    if ((hsh & 3) != 0) {
+                        int bob = (((int) (clock * 3) + hsh) & 7) == 0 ? 1 : 0;
+                        rectPx(c, cx + 7, ry - 8 + bob, 10, 9, Color.rgb(240, 244, 250));
+                        rectPx(c, cx + 9, ry - 14 + bob, 6, 6, skin[(hsh >> 2) % 3 < 0 ? 0 : (hsh >> 2) % 3]);
+                        rectPx(c, cx + 9, ry - 14 + bob, 6, 2, HAIRS[(hsh >> 1) & 3]);
+                        rectPx(c, cx + 8, ry - 13 + bob, 1, 4, Color.rgb(40, 40, 50));
+                        rectPx(c, cx + 15, ry - 13 + bob, 1, 4, Color.rgb(40, 40, 50));
+                    }
+                    rectPx(c, cx, ry, 24, 4, Color.rgb(60, 120, 85));
+                    rectPx(c, cx, ry + 4, 24, 9, Color.rgb(120, 170, 135));
+                    rectPx(c, cx + 3, ry + 5, 7, 5, Color.rgb(15, 40, 25));
+                    rectPx(c, cx + 3, ry + 5 + ((int) (clock * 8) + hsh) % 5, 7, 1, Color.rgb(90, 220, 120));
+                    for (int b = 0; b < 5; b++) {
+                        boolean on = (((int) (clock * 2) + hsh + b) & 3) == 0;
+                        rectPx(c, cx + 12 + b * 2, ry + 6, 1, 3, on ? Color.rgb(255, 190, 60) : Color.rgb(70, 70, 55));
+                    }
+                }
+            }
+            // rocket-shaped coffee pot in the corner
+            rectPx(c, ox + 4, oy + oh - 18, 3, 10, Color.rgb(235, 235, 240));
+            rectPx(c, ox + 4, oy + oh - 20, 3, 2, Color.rgb(220, 70, 70));
+            rectPx(c, ox + 3, oy + oh - 10, 5, 2, Color.rgb(220, 70, 70));
+            // cigarette haze drifting up
+            for (int i = 0; i < 6; i++) {
+                float hy = oy + oh - ((clock * 6 + i * 17) % 80);
+                float hx = ox + 20 + i * 26 + (float) Math.sin(clock + i) * 4;
+                rectPx(c, hx, hy, 14, 2, Color.argb(28, 200, 200, 190));
+            }
+        }
+
+        void interiorLab(Canvas c, int ox, int oy, int ow, int oh) {
+            int[] liq = {Color.rgb(90, 230, 120), Color.rgb(255, 120, 200), Color.rgb(120, 200, 255), Color.rgb(255, 210, 80), Color.rgb(170, 120, 255)};
+            rectPx(c, ox, oy, ow, oh, Color.rgb(60, 95, 105));
+            for (int gx = 0; gx < ow; gx += 12) rectPx(c, ox + gx, oy, 1, oh, Color.rgb(50, 82, 92));
+            // chart on the wall
+            for (int r = 0; r < 4; r++) for (int q = 0; q < 8; q++)
+                rectPx(c, ox + 12 + q * 6, oy + 8 + r * 6, 5, 5, ((q + r) & 1) == 0 ? Color.rgb(90, 150, 200) : Color.rgb(200, 150, 90));
+            // shelf with jars
+            rectPx(c, ox + 100, oy + 24, 60, 2, Color.rgb(110, 80, 50));
+            for (int i = 0; i < 5; i++) rectPx(c, ox + 104 + i * 11, oy + 14, 7, 10, liq[(i + 2) % 5]);
+            // bench
+            int by = oy + oh - 24;
+            rectPx(c, ox, by, ow, oh - 24, Color.rgb(110, 80, 50));
+            rectPx(c, ox, by, ow, 3, Color.rgb(150, 115, 75));
+            for (int i = 0; i < 6; i++) {
+                int fx = ox + 10 + i * 26;
+                int col = liq[i % 5];
+                rectPx(c, fx + 3, by - 22, 4, 8, Color.rgb(200, 225, 235));
+                rectPx(c, fx + 2, by - 14, 6, 3, Color.rgb(200, 225, 235));
+                rectPx(c, fx, by - 11, 10, 11, Color.rgb(200, 225, 235));
+                rectPx(c, fx + 1, by - 8, 8, 8, col);
+                for (int b = 0; b < 2; b++) {
+                    float yy = by - 4 - ((clock * 8 + i * 5 + b * 7) % 14);
+                    rectPx(c, fx + 3 + b * 3, yy, 1, 1, Color.WHITE);
+                }
+            }
+            // burner flame
+            int fx2 = ox + ow - 14;
+            rectPx(c, fx2, by - 4, 6, 4, Color.rgb(90, 90, 100));
+            int fl = 4 + (int) (clock * 20) % 3;
+            rectPx(c, fx2 + 1, by - 4 - fl, 4, fl, Color.rgb(90, 140, 255));
+            rectPx(c, fx2 + 2, by - 4 - fl + 1, 2, fl - 1, Color.rgb(255, 220, 120));
+        }
+
+        void interiorComputer(Canvas c, int ox, int oy, int ow, int oh) {
+            rectPx(c, ox, oy, ow, oh, Color.rgb(30, 36, 52));
+            rectPx(c, ox, oy + oh - 6, ow, 6, Color.rgb(60, 62, 70));
+            for (int i = 0; i < 4; i++) {
+                int cx = ox + 4 + i * 41, cy = oy + 6, ch = oh - 14;
+                rectPx(c, cx, cy, 38, ch, Color.rgb(150, 155, 168));
+                rectPx(c, cx + 2, cy + 2, 34, ch - 4, Color.rgb(100, 106, 120));
+                // blinking lamp rows
+                for (int r = 0; r < 4; r++) for (int q = 0; q < 8; q++) {
+                    boolean on = (((int) (clock * 5) + r * 3 + q * 5 + i) % 4) == 0;
+                    rectPx(c, cx + 5 + q * 4, cy + ch - 24 + r * 5, 2, 2, on ? Color.rgb(255, 190, 60) : Color.rgb(60, 56, 50));
+                }
+                // two tape reels turning against each other
+                for (int rl = 0; rl < 2; rl++) {
+                    float rx = cx + 10 + rl * 18, ry = cy + 18;
+                    float ang = clock * ((rl == 0) ? 4f : -3.2f) + i;
+                    p.setStyle(Paint.Style.FILL);
+                    p.setColor(Color.rgb(25, 25, 32));
+                    c.drawCircle(rx, ry, 8, p);
+                    p.setColor(Color.rgb(150, 100, 60));
+                    c.drawCircle(rx, ry, 6, p);
+                    p.setStyle(Paint.Style.STROKE);
+                    p.setStrokeWidth(1);
+                    p.setColor(Color.rgb(25, 25, 32));
+                    for (int s = 0; s < 3; s++) {
+                        double a = ang + s * 2.0944;
+                        c.drawLine(rx, ry, rx + (float) Math.cos(a) * 6, ry + (float) Math.sin(a) * 6, p);
+                    }
+                    p.setStyle(Paint.Style.FILL);
+                }
+                rectPx(c, cx + 10, cy + 27, 18, 1, Color.rgb(60, 40, 30));
+            }
+        }
+
+        void interiorObservatory(Canvas c, int ox, int oy, int ow, int oh) {
+            rectPx(c, ox, oy, ow, oh, Color.rgb(8, 10, 28));
+            for (int i = 0; i < 34; i++) {
+                int sx = (i * 37) % ow, sy = (i * 53) % (oh - 16);
+                boolean bright = (((int) (clock * 3) + i) & 3) == 0;
+                rectPx(c, ox + sx, oy + sy, 1, 1, bright ? Color.WHITE : Color.rgb(110, 120, 160));
+            }
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.rgb(225, 225, 205));
+            c.drawCircle(ox + ow - 30, oy + 24, 10, p);
+            p.setColor(Color.rgb(190, 190, 170));
+            c.drawCircle(ox + ow - 33, oy + 21, 3, p);
+            c.drawCircle(ox + ow - 26, oy + 28, 2, p);
+            // dome walls either side of the slit
+            rectPx(c, ox, oy, 22, oh, Color.rgb(52, 56, 70));
+            rectPx(c, ox + ow - 22, oy, 22, oh, Color.rgb(52, 56, 70));
+            rectPx(c, ox + 22, oy, 2, oh, Color.rgb(90, 96, 115));
+            rectPx(c, ox + ow - 24, oy, 2, oh, Color.rgb(90, 96, 115));
+            rectPx(c, ox, oy + oh - 10, ow, 10, Color.rgb(44, 46, 58));
+            // telescope tube and mount
+            float bx = ox + ow / 2f - 10, by = oy + oh - 10;
+            path.reset();
+            path.moveTo(bx - 6, by);
+            path.lineTo(bx + 6, by);
+            path.lineTo(bx + 36, oy + 22);
+            path.lineTo(bx + 22, oy + 18);
+            path.close();
+            p.setColor(Color.rgb(170, 176, 192));
+            c.drawPath(path, p);
+            rectPx(c, bx + 20, oy + 16, 18, 6, Color.rgb(60, 66, 80));
+            rectPx(c, bx - 3, by - 8, 6, 8, Color.rgb(110, 114, 130));
         }
 
         void drawFloor(Canvas c) {
