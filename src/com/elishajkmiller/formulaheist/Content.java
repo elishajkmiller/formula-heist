@@ -24,9 +24,9 @@ final class Content {
         {"ROCKET", "PULSE JET", "STEAM", "ION", "DARK MATTER", "FUSION", "PLASMA", "PHOTON"}
     };
     static final int[][] ICOST = {      // electrons
-        {0, 25, 25, 40, 40, 60, 60, 100},
-        {0, 15, 15, 25, 25, 40, 40, 60},
-        {0, 20, 30, 40, 50, 70, 90, 150}
+        {0, 75, 75, 120, 120, 180, 180, 300},
+        {0, 45, 45, 75, 75, 120, 120, 180},
+        {0, 60, 90, 120, 150, 210, 270, 450}
     };
     /** the sprite letters each kind of item recolours, in the order of its colours */
     static final char[][] IKEYS = {{'W', 'w', 'x', 't', 'V'}, {'D', 'd'}, {'O', 'o', 'h'}};
