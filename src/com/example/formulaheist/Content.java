@@ -69,7 +69,6 @@ final class Content {
     static final String[] FACTS = {
         "Newton's 2nd law: a = F / m. More thrust, more acceleration.",
         "Newton's 3rd law: the exhaust goes down, so you go up.",
-        "Gravity pulls everything at 9.8 m/s², whatever its mass.",
         "Light takes about 1.3 seconds to reach us from the Moon.",
         "An atom is almost entirely empty space.",
         "Sound moves at about 343 m/s in air. You are slower, for now.",
