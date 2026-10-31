@@ -104,16 +104,21 @@ final class Sfx {
         int n = RATE * 1200 / 1000, x = RATE * 80 / 1000;
         float[] f = new float[n + x];
         Random r = new Random(11);
-        double a1 = 1 - Math.exp(-2 * Math.PI * 1400 / RATE), a2 = 1 - Math.exp(-2 * Math.PI * 160 / RATE);
-        double l1 = 0, l2 = 0, flut = 1, flutT = 1, peak = 1e-9;
+        // two low-pass filters on the same noise: a body around 450 Hz and a deep rumble around 80 Hz
+        double a1 = 1 - Math.exp(-2 * Math.PI * 450 / RATE), a2 = 1 - Math.exp(-2 * Math.PI * 80 / RATE);
+        double l1 = 0, l2 = 0, flut = 1, flutT = 1, peak = 1e-9, cr = 0, lastW = 0;
         for (int i = 0; i < f.length; i++) {
             double w = r.nextDouble() * 2 - 1;
             l1 += (w - l1) * a1;
             l2 += (w - l2) * a2;
             if (i % (RATE / 30) == 0) flutT = 0.7 + 0.3 * r.nextDouble();   // a new flicker level 30 times a second
             flut += (flutT - flut) * 0.004;
-            double crackle = r.nextDouble() < 0.0015 ? (r.nextDouble() * 2 - 1) * 0.8 : 0;
-            double v = (l1 * 0.9 + l2 * 3.2 + w * 0.08) * flut + crackle;
+            // quiet crackle: about 40 tiny pops a second, each a few ms of high-passed noise that dies away
+            if (r.nextDouble() < 40.0 / RATE) cr = 0.06 + 0.1 * r.nextDouble();
+            double crackle = (w - lastW) * cr;
+            cr *= 0.93;
+            lastW = w;
+            double v = (l1 * 1.4 + l2 * 5.0) * flut + crackle;
             f[i] = (float) v;
             peak = Math.max(peak, Math.abs(v));
         }
