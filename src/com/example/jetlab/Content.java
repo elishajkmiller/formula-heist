@@ -244,7 +244,4 @@ final class Content {
         "NO ENGINE CAN BEAT THIS LIMIT. A BIGGER HEAT DIFFERENCE GIVES A BETTER ENGINE."
     };
 
-    // ---------- rooms along the wall ----------
-
-    static final String[] ROOM_NAMES = {"MISSION CONTROL", "CHEMISTRY LAB", "COMPUTER ROOM", "OBSERVATORY", "FLEX ROOM", "GYM", "BREAK ROOM", "THE CAT BOX", "POWER ROOM", "ERROR"};
 }
