@@ -780,8 +780,6 @@ public class Main extends Activity {
             pcol[k] = Color.rgb(200 + rnd.nextInt(40), 205 + rnd.nextInt(40), 220);
         }
 
-        // ---------- outfit store: spend electrons on new looks ----------
-
         // ---------- settings: haptics, sounds, music and a guarded reset ----------
 
         boolean settingsButtonHit(float gx, float gy) {
@@ -875,6 +873,8 @@ public class Main extends Activity {
             drawParticles(c);
         }
 
+        // ---------- clothes store: spend electrons on shirts, pants and jetpacks ----------
+
         boolean storeButtonHit(float gx, float gy) {
             if (!(state == START || (state == DEAD && stateTime > CARD_DELAY))) return false;
             return gx >= sbx && gx < sbx + sbw && gy >= sby && gy < sby + sbh;
@@ -947,7 +947,7 @@ public class Main extends Activity {
                 c.scale(2f, 2f);
                 outlined(c, LEGS_A, 0, SPR_HEAD.length);
                 drawHairTail(c, 0, 0);
-                drawHairBack(c, 0, 0);
+                drawHairLock(c, 0, 0);
                 outlined(c, SPR_HEAD, 0, 0);
                 drawBust(c, 0, 0);
                 c.restore();
@@ -1826,6 +1826,8 @@ public class Main extends Activity {
 
         // ---------- drawing (pixel art, drawn small then scaled up) ----------
 
+        // ---------- sprites: the scientist, her legs, vehicles and the pixel font ----------
+
         static final String[] SPR_HEAD = {
             "......b..bb.....",
             ".....bBbBBBb....",
@@ -1977,7 +1979,7 @@ public class Main extends Activity {
          * replaces the collar and tie, and her hair falls over the back shoulder. The chest itself is a separate
          * sprite (BUST) so it can jiggle.
          */
-        static String[] femaleBody(String[] body, int phase) {
+        static String[] femaleBody(String[] body) {
             char[][] r = new char[body.length][];
             for (int i = 0; i < body.length; i++) r[i] = body[i].toCharArray();
             for (int i = 3; i >= 1; i--) {                  // lower the arm by one row
@@ -1994,7 +1996,7 @@ public class Main extends Activity {
         }
 
         /** her long hair hanging down the front, drawn behind the body so the chest sits in front of it */
-        static final String[] HAIR_BACK = {
+        static final String[] HAIR_LOCK = {
             "................",
             "................",
             "................",
@@ -2017,7 +2019,7 @@ public class Main extends Activity {
         static final String[] BUST = {"WW.", "WWw", "ww."};      // small, on the upper chest just under the collar
 
         /** the hanging lock swung backwards a little more or less in four frames, so it streams as she runs */
-        static final String[][] HAIR_FRAMES = hairFrames();
+        static final String[][] LOCK_FRAMES = lockFrames();
 
         static String[] shiftRows(String[] base, int from, int by) {
             String[] out = base.clone();
@@ -2029,10 +2031,10 @@ public class Main extends Activity {
             return out;
         }
 
-        static String[][] hairFrames() {
-            String[] f1 = shiftRows(HAIR_BACK, 13, -1);
-            String[] f2 = shiftRows(shiftRows(HAIR_BACK, 12, -1), 15, -1);
-            return new String[][] {HAIR_BACK, f1, f2, f1};
+        static String[][] lockFrames() {
+            String[] f1 = shiftRows(HAIR_LOCK, 13, -1);
+            String[] f2 = shiftRows(shiftRows(HAIR_LOCK, 12, -1), 15, -1);
+            return new String[][] {HAIR_LOCK, f1, f2, f1};
         }
 
         /** her hair down the back: it runs on from the hair at the back of her head, behind the pack, and ends just below it */
@@ -2070,9 +2072,9 @@ public class Main extends Activity {
             if (female) outlined(c, TAIL_FRAMES[hairFrame()], left, top);
         }
 
-        void drawHairBack(Canvas c, int left, int top) {
+        void drawHairLock(Canvas c, int left, int top) {
             if (!female) return;
-            outlined(c, HAIR_FRAMES[hairFrame()], left, top);
+            outlined(c, LOCK_FRAMES[hairFrame()], left, top);
         }
 
         /** the chest sits a little lower or higher than its rest place as it springs after the body */
@@ -2108,7 +2110,7 @@ public class Main extends Activity {
                 boolean alt = (k & 1) == 1;      // the second and fourth step have the mouth open
                 String[] head = female ? (alt ? HEAD_F_B : HEAD_F) : (alt ? HEAD_M_B : HEAD_M);
                 String[] body = Arrays.copyOfRange(MALE[k], HEAD_ROWS, MALE[k].length);
-                if (female) body = femaleBody(body, k);
+                if (female) body = femaleBody(body);
                 for (int i = 0; i < HEAD_ROWS; i++) SPR_RUN[k][i] = head[i];
                 for (int i = 0; i < body.length; i++) SPR_RUN[k][HEAD_ROWS + i] = body[i];
             }
@@ -3028,7 +3030,7 @@ public class Main extends Activity {
             outlined(c, legs, left, top + SPR_HEAD.length);
             leanPx = lean;
             drawHairTail(c, left + dx, top + dy);
-            drawHairBack(c, left + dx, top + dy);
+            drawHairLock(c, left + dx, top + dy);
             outlined(c, body, left + dx, top + dy);
             drawBust(c, left + dx, top + dy);
             if ((clock % 2.8f) < 0.12f) sprite(c, SPR_BLINK, left + dx, top + dy);
@@ -3059,7 +3061,7 @@ public class Main extends Activity {
             leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
             drawHairTail(c, left, top);
-            drawHairBack(c, left, top);
+            drawHairLock(c, left, top);
             outlined(c, flop ? SPR_HEAD_B : SPR_HEAD, left, top);
             drawBust(c, left, top);
             c.restore();
@@ -3269,6 +3271,8 @@ public class Main extends Activity {
                 textOut(c, "B", cx - 1, cy - 2, 1, Color.WHITE, 1, false);
             }
         }
+
+        // ---------- HUD and screens ----------
 
         void drawHud(Canvas c) {
             int top = Math.round(ceilY) + 4;
