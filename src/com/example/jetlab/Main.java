@@ -1265,7 +1265,7 @@ public class Main extends Activity {
 
         void drawRoom(Canvas c, int ox, int k) {
             int kind = Math.floorMod(k, 4);
-            int oy = Math.round(ceilY) + 10, oh = Math.round(floorY) - 6 - oy;
+            int oy = Math.round(ceilY) + 10, oh = Math.round(floorY) - oy;      // down to the floor line
             // name plate
             rectPx(c, ox + 25, ceilY + 2, RW - 50, 7, Color.rgb(16, 24, 38));
             text(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 3, 1, Color.rgb(255, 200, 80), 1);
@@ -1325,7 +1325,7 @@ public class Main extends Activity {
             }
             // tiered rows of two-tone green consoles with controllers in white shirts and headsets
             for (int row = 0; row < 3; row++) {
-                int ry = oy + 56 + row * 15;
+                int ry = oy + 56 + row * 18;
                 for (int i = 0; i < 5; i++) {
                     int cx = ox + 6 + i * 33 + (row == 1 ? 8 : 0);
                     if (cx + 24 > ox + ow) continue;
