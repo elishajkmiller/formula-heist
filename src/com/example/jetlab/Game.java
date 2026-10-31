@@ -23,11 +23,12 @@ import static com.example.jetlab.Prism.*;
 import static com.example.jetlab.Sprites.*;
 
 /**
- * The whole game in one View: physics, drawing and input.
+ * The game View: state, input, the update loop and drawing. Vehicles, hazards and rooms are their own classes
+ * (Vehicle, Hazard, Room); fixed data is in Content, pixel art in Sprites, prism optics in Prism.
  *
- * Layout of this class, top to bottom: constants and text data, game state, setup and touch input,
- * the formula archive and prism helpers, the update loop (physics, vehicles, spawning), then all
- * drawing (world, the yard and wall, rooms, player, HUD and screens) and the pixel font.
+ * Layout of this class, top to bottom: constants, game state, setup and touch input, settings, store,
+ * archive and the prism card, the update loop (physics, vehicles, spawning), then all drawing (world,
+ * the yard and wall, player, HUD and screens) and the pixel font.
  * Everything is drawn at 144 pixels tall into a small bitmap that is scaled up with no smoothing.
  */
 @SuppressWarnings("deprecation")   // immersive flags and the Vibrator calls still work on every phone we target
@@ -2073,8 +2074,6 @@ final class Game extends View implements Choreographer.FrameCallback {
         }
     }
 
-    static final int[] BOB = {0, 0, 0, 0};     // upper body holds still while running so the pixels stay put
-    static final int[] LEAN = {0, 0, 0, 0};
 
     /**
      * Legs first, then the upper body. On the ground he shuffles (body dips, arm pumps).
@@ -2090,7 +2089,6 @@ final class Game extends View implements Choreographer.FrameCallback {
             legs = ph == 0 ? LEGS_A : ph == 1 ? LEGS_B : ph == 2 ? LEGS_M : LEGS_C;
             lean = 0;
             if (run) {
-                dy = BOB[ph]; dx = LEAN[ph];
                 body = SPR_RUN[ph];
                 if (landT > 0) { dy = 2; legs = LEGS_M; }
             }
