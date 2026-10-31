@@ -63,6 +63,9 @@ public class Main extends Activity {
 
     static class Coin { float x, y; boolean taken; }
 
+    /** a background scientist who watches the player and points */
+    static class Npc { float x, phase; int coat, hair; }
+
     static class Crate { float x, y; int type; }
 
     static class Zapper {
@@ -210,6 +213,10 @@ public class Main extends Activity {
         final ArrayList<Zapper> zappers = new ArrayList<>();
         final ArrayList<Missile> missiles = new ArrayList<>();
         final ArrayList<Crate> crates = new ArrayList<>();
+        final ArrayList<Npc> npcs = new ArrayList<>();
+        static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
+        static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
+        float lastBg, npcLeft;
 
         static final int NB = 64;
         final int[] brow = new int[NB], bcol = new int[NB];
@@ -276,6 +283,15 @@ public class Main extends Activity {
             ceilY = 11;
             playerX = w * 0.22f;
             if (state == START) y = floorY - 0.62f * ppm;
+            npcs.clear();
+            for (float nx = 30; nx < w + 20; nx += 45 + rnd.nextInt(80)) addNpc(nx);
+        }
+
+        void addNpc(float nx) {
+            Npc n = new Npc();
+            n.x = nx; n.phase = rnd.nextFloat() * 6f;
+            n.coat = rnd.nextInt(COATS.length); n.hair = rnd.nextInt(HAIRS.length);
+            npcs.add(n);
         }
 
         void reset() {
@@ -374,6 +390,15 @@ public class Main extends Activity {
             if (flash > 0) flash -= rdt;
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
+
+            float nsc = (bgOff - lastBg) * 2.4f;       // background scientists move at 60% of the floor
+            lastBg = bgOff;
+            npcLeft -= nsc;
+            if (npcLeft <= 0) { addNpc(w + 10); npcLeft = 40 + rnd.nextInt(110); }
+            for (int i = npcs.size() - 1; i >= 0; i--) {
+                npcs.get(i).x -= nsc;
+                if (npcs.get(i).x < -10) npcs.remove(i);
+            }
 
             float dt = rdt;
             if (state == BUILD) {
@@ -885,6 +910,7 @@ public class Main extends Activity {
             Canvas c = bc;
             drawBackground(c);
             drawFloor(c);
+            drawNpcs(c);
             drawCoins(c);
             drawCrates(c);
             drawZappers(c);
@@ -943,6 +969,39 @@ public class Main extends Activity {
                 boolean ten = m % 10 == 0;
                 rectPx(c, x, floorY + 4, 1, ten ? 5 : 3, Color.rgb(90, 150, 175));
                 if (ten) text(c, m + " M", x, floorY + 11, 1, Color.rgb(140, 190, 210), 1);
+            }
+        }
+
+        void drawNpcs(Canvas c) {
+            for (Npc n : npcs) {
+                int nx = Math.round(n.x);
+                boolean hop = ((int) (clock * 5 + n.phase) & 3) == 0;   // little excited hop
+                int base = Math.round(floorY) - (hop ? 1 : 0);
+                int f = playerX >= n.x ? 1 : -1;
+                int coat = COATS[n.coat];
+                rectPx(c, nx - 4, floorY - 1, 8, 1, Color.argb(70, 0, 0, 0));
+                // legs and shoes
+                rectPx(c, nx - 2, base - 4, 2, 4, Color.rgb(50, 60, 100));
+                rectPx(c, nx, base - 4, 2, 4, Color.rgb(50, 60, 100));
+                rectPx(c, nx - 2, base - 1, 2, 1, Color.rgb(30, 30, 40));
+                rectPx(c, nx, base - 1, 2, 1, Color.rgb(30, 30, 40));
+                // coat
+                rectPx(c, nx - 3, base - 10, 6, 6, coat);
+                rectPx(c, nx - 3, base - 10, 1, 6, Color.rgb(170, 180, 200));
+                // arm hanging
+                rectPx(c, nx - f * 3, base - 9, 1, 4, Color.rgb(170, 180, 200));
+                // head, looking up: lenses sit high and the mouth hangs open
+                rectPx(c, nx - 2, base - 15, 5, 5, Color.rgb(240, 200, 160));
+                rectPx(c, nx - 2, base - 15, 5, 2, HAIRS[n.hair]);
+                rectPx(c, nx + (f > 0 ? 0 : -1), base - 14, 1, 1, Color.rgb(120, 235, 255));
+                rectPx(c, nx + (f > 0 ? 1 : 0), base - 14, 1, 1, Color.rgb(120, 235, 255));
+                if (((int) (clock * 3 + n.phase) & 1) == 0) rectPx(c, nx + (f > 0 ? 1 : 0), base - 12, 1, 1, Color.rgb(90, 50, 50));
+                // arm pointing at the player
+                float sx = nx + f * 2, sy = base - 9;
+                float ang = (float) Math.atan2(y - sy, playerX - sx);
+                float cs = (float) Math.cos(ang), sn = (float) Math.sin(ang);
+                for (int i = 0; i <= 4; i++) rectPx(c, sx + cs * i, sy + sn * i, 2, 2, coat);
+                rectPx(c, sx + cs * 5, sy + sn * 5, 2, 2, Color.rgb(240, 200, 160));
             }
         }
 
