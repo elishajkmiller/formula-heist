@@ -277,7 +277,7 @@ public class Main extends Activity {
         static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
         static final float GUARD_RUN = 150f;     // how fast the guards run away, in pixels per second
         static final int GUARD = 4;              // Npc mode of the guards
-        static final int NF = 20;                // formulas to recover
+        static final int NF = 40;                // formulas to recover
         static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
         static final int ENTANGLER_USES = 5;     // teleports before the Quantum Entangler burns out
@@ -365,7 +365,27 @@ public class Main extends Activity {
             "F = ma", "E = mc\u00b2", "V = IR", "PV = nRT", "v = u + at", "F = G m1 m2 / r\u00b2", "E = hf", "S = k ln W",
             "\u0394x \u0394p \u2265 \u0127/2", "F = \u2212kx", "KE = \u00bd m v\u00b2", "PE = m g h", "v = f \u03bb",
             "n1 sin \u03b81 = n2 sin \u03b82", "F = k q1 q2 / r\u00b2", "p = m v", "W = F d", "P = E / t",
-            "T = 2\u03c0 \u221a(L/g)", "a = v\u00b2 / r"
+            "T = 2\u03c0 \u221a(L/g)", "a = v\u00b2 / r",
+            "P = F / A",
+            "\u03c1 = m / V",
+            "F = \u03c1 g V",
+            "Q = m c \u0394T",
+            "I = Q / t",
+            "P = I V",
+            "C = Q / V",
+            "E = \u00bd C V\u00b2",
+            "F = q v B sin \u03b8",
+            "\u03c4 = r F sin \u03b8",
+            "L = I \u03c9",
+            "a = \u0394v / \u0394t",
+            "s = \u00bd a t\u00b2",
+            "v\u00b2 = u\u00b2 + 2 a s",
+            "f = 1 / T",
+            "\u03bb = h / p",
+            "E = \u00bd k x\u00b2",
+            "\u03c9 = 2\u03c0 f",
+            "T = 2\u03c0 \u221a(m/k)",
+            "F = \u03bc N"
         };
         static final String[] FNAME = {
             "NEWTON'S SECOND LAW",
@@ -387,7 +407,27 @@ public class Main extends Activity {
             "WORK",
             "POWER",
             "PENDULUM",
-            "CENTRIPETAL ACCELERATION"
+            "CENTRIPETAL ACCELERATION",
+            "PRESSURE",
+            "DENSITY",
+            "BUOYANCY",
+            "HEAT",
+            "CURRENT",
+            "ELECTRIC POWER",
+            "CAPACITANCE",
+            "CAPACITOR ENERGY",
+            "MAGNETIC FORCE",
+            "TORQUE",
+            "ANGULAR MOMENTUM",
+            "ACCELERATION",
+            "DISTANCE FROM REST",
+            "FINAL SPEED",
+            "FREQUENCY",
+            "DE BROGLIE WAVELENGTH",
+            "SPRING ENERGY",
+            "ANGULAR FREQUENCY",
+            "SPRING PERIOD",
+            "FRICTION"
         };
         static final String[] FDESC = {
             "PUSH HARDER AND A THING SPEEDS UP MORE. HEAVIER THINGS SPEED UP LESS.",
@@ -409,7 +449,27 @@ public class Main extends Activity {
             "WORK IS THE FORCE TIMES THE DISTANCE IT MOVES SOMETHING.",
             "POWER IS HOW FAST ENERGY IS USED: ENERGY DIVIDED BY TIME.",
             "A LONGER PENDULUM SWINGS MORE SLOWLY.",
-            "TO GO IN A CIRCLE YOU MUST ACCELERATE TOWARD THE CENTER."
+            "TO GO IN A CIRCLE YOU MUST ACCELERATE TOWARD THE CENTER.",
+            "FORCE SPREAD OVER AN AREA. A SHARP POINT PUSHES HARD ON A TINY SPOT.",
+            "MASS PACKED INTO A VOLUME. DENSE THINGS SINK IN LIGHTER ONES.",
+            "A THING IN A FLUID IS PUSHED UP BY THE WEIGHT OF THE FLUID IT MOVES OUT OF THE WAY.",
+            "HEAT NEEDED TO WARM SOMETHING DEPENDS ON ITS MASS AND WHAT IT IS MADE OF.",
+            "CURRENT IS CHARGE FLOWING PAST A POINT EVERY SECOND.",
+            "POWER IN A CIRCUIT IS THE CURRENT TIMES THE VOLTAGE.",
+            "HOW MUCH CHARGE A CAPACITOR HOLDS FOR EACH VOLT PUT ACROSS IT.",
+            "A CAPACITOR STORES ENERGY IN ITS ELECTRIC FIELD. DOUBLE THE VOLTAGE, FOUR TIMES THE ENERGY.",
+            "A MOVING CHARGE IN A MAGNETIC FIELD IS PUSHED SIDEWAYS, AT RIGHT ANGLES TO ITS MOTION.",
+            "A TWIST DEPENDS ON THE FORCE AND HOW FAR FROM THE PIVOT YOU PUSH. THAT IS WHY LONG WRENCHES HELP.",
+            "SPINNING THINGS KEEP SPINNING. A BIGGER, FASTER SPIN HAS MORE ANGULAR MOMENTUM.",
+            "ACCELERATION IS HOW QUICKLY YOUR SPEED CHANGES.",
+            "START FROM REST AND DISTANCE GROWS WITH THE SQUARE OF TIME.",
+            "SPEED SQUARED CHANGES BY TWICE THE ACCELERATION TIMES THE DISTANCE. NO TIME NEEDED.",
+            "FREQUENCY IS HOW MANY CYCLES HAPPEN EACH SECOND. IT IS ONE OVER THE PERIOD.",
+            "EVERYTHING MOVING HAS A WAVELENGTH. FOR BIG THINGS IT IS TOO SMALL TO NOTICE.",
+            "A STRETCHED OR SQUASHED SPRING STORES ENERGY. DOUBLE THE STRETCH, FOUR TIMES THE ENERGY.",
+            "HOW FAST SOMETHING TURNS IN RADIANS EACH SECOND. ONE FULL TURN IS TWO PI RADIANS.",
+            "A WEIGHT ON A SPRING BOUNCES SLOWER IF IT IS HEAVIER OR THE SPRING IS SOFTER.",
+            "SLIDING FRICTION PUSHES BACK IN PROPORTION TO HOW HARD THE SURFACES PRESS TOGETHER."
         };
 
         // ---------- text drawn at screen resolution (the formulas) ----------
@@ -508,7 +568,7 @@ public class Main extends Activity {
         String storeMsg = "";
 
         // formula archive
-        int ownedMask;                               // bit i set: formula i is yours
+        long ownedMask;                              // bit i set: formula i is yours (up to 64 formulas)
         int tickets, pending = -1;                   // scratch tickets in hand, and the formula under a ticket you opened but did not finish
         int revealKind;                              // 0 viewing, 1 a new formula, 2 a duplicate (paid in electrons)
         int tbx, tby, tbw, tbh;                      // the scratch-a-ticket button in the archive
@@ -559,7 +619,8 @@ public class Main extends Activity {
             prefs = c.getSharedPreferences("jetlab", Context.MODE_PRIVATE);
             best = prefs.getInt("best", 0);
             if (prefs.contains("formulas")) {
-                ownedMask = prefs.getInt("formulas", 0);
+                Object saved = prefs.getAll().get("formulas");      // older saves stored this as an int
+                ownedMask = saved instanceof Number ? ((Number) saved).longValue() : 0L;
                 tickets = prefs.getInt("tickets", 0);
                 pending = prefs.getInt("pending", -1);
             } else {                                    // older saves: recovered cards that were not scratched yet become tickets
@@ -803,7 +864,7 @@ public class Main extends Activity {
         boolean ticketReady() { return tickets > 0 || pending >= 0; }
 
         void saveFormulas() {
-            prefs.edit().putInt("formulas", ownedMask).putInt("tickets", tickets).putInt("pending", pending).putInt("bank", bank).apply();
+            prefs.edit().putLong("formulas", ownedMask).putInt("tickets", tickets).putInt("pending", pending).putInt("bank", bank).apply();
         }
 
         /** a scroll on the track is a scratch ticket: you find out what is under it when you scratch it */
@@ -1108,7 +1169,7 @@ public class Main extends Activity {
                 bank += DUPLICATE_PAY;        // a repeat pays out in electrons
             } else {
                 revealKind = 1;
-                ownedMask |= 1 << selCard;
+                ownedMask |= 1L << selCard;
             }
             pending = -1;
             saveFormulas();
@@ -1128,7 +1189,7 @@ public class Main extends Activity {
             boolean fresh = ticketReady();
             rectPx(c, abx, aby, abw, abh, Color.rgb(8, 10, 20));
             rectPx(c, abx + 1, aby + 1, abw - 2, abh - 2, fresh && ((int) (clock * 3) & 1) == 0 ? Color.rgb(130, 100, 30) : Color.rgb(44, 54, 82));
-            String label = "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF;
+            String label = "FORMULAS " + Long.bitCount(ownedMask) + "/" + NF;
             if (fresh && ((int) (clock * 1.6f) & 1) == 0) label = "SCRATCH A TICKET";
             text(c, label, abx + abw / 2f, aby + 3, 1, Color.WHITE, 1);
         }
@@ -1244,7 +1305,7 @@ public class Main extends Activity {
             rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
             for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
             text(c, "FORMULA ARCHIVE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
-            int owned = Integer.bitCount(ownedMask);
+            int owned = Long.bitCount(ownedMask);
             text(c, owned == NF ? "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!" : owned + "/" + NF + " RECOVERED", 8, 13, 1, owned == NF ? Color.rgb(120, 255, 160) : Color.rgb(150, 190, 215), 0);
             closeButton(c);
             for (int i = 0; i < NF; i++) {
@@ -3557,7 +3618,7 @@ public class Main extends Activity {
             int top = Math.round(ceilY) + 4;
             text(c, (int) (state == DEAD ? finalDist : dist) + " M", 6, top, 2, Color.WHITE, 0);
             text(c, "E- " + electrons, 6, top + 14, 1, Color.rgb(120, 235, 255), 0);
-            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, 6, top + 22, 1, Color.rgb(255, 215, 120), 0);
+            text(c, "FORMULAS " + Long.bitCount(ownedMask) + "/" + NF, 6, top + 22, 1, Color.rgb(255, 215, 120), 0);
             int rx = w - 6;
             int dim = Color.rgb(170, 200, 220);
             text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, dim, 2);
@@ -3602,7 +3663,7 @@ public class Main extends Activity {
             c.drawRect(0, 0, w, h, p);
             if (stateTime < CARD_DELAY) return;
             text(c, (int) finalDist + " M", w / 2f, h * 0.18f, 4, Color.WHITE, 1);
-            text(c, electrons + " ELECTRONS   " + Integer.bitCount(ownedMask) + "/" + NF + " FORMULAS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
+            text(c, electrons + " ELECTRONS   " + Long.bitCount(ownedMask) + "/" + NF + " FORMULAS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
             wrapText(c, fact, w / 2f, h * 0.18f + 50, 1, Color.rgb(210, 220, 235), (int) (w * 0.7f));
             if (((int) (clock * 2) & 1) == 0) {
                 text(c, "TAP TO CONTINUE", w / 2f, 106, 2, Color.rgb(255, 200, 80), 1);
