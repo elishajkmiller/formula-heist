@@ -69,7 +69,7 @@ public class Main extends Activity {
     static class Npc { float x, phase, pointT, nextPoint, walk; int coat, hair, mode, face; }
 
     /** a stolen formula, rolled up */
-    static class Scroll { float x, y; int idx; }
+    static class Scroll { float x, y; }
 
     /** a base pair shot forward by the DNA helix */
     static class Bolt { float x, y; int kind; }
@@ -388,7 +388,11 @@ public class Main extends Activity {
         String storeMsg = "";
 
         // formula archive
-        int ownedMask, scratchedMask;                // bit i set: formula i recovered / scratched off
+        int ownedMask;                               // bit i set: formula i is yours
+        int tickets, pending = -1;                   // scratch tickets in hand, and the formula under a ticket you opened but did not finish
+        int revealKind;                              // 0 viewing, 1 a new formula, 2 a duplicate (paid in electrons)
+        int tbx, tby, tbw, tbh;                      // the scratch-a-ticket button in the archive
+        static final int DUPLICATE_PAY = 10;
         int archFrom, selCard, mcols, mrows, cleared;
         boolean selScratched, dragging;
         final boolean[] mask = new boolean[2000];    // scratched-off cells of the open card
@@ -415,8 +419,15 @@ public class Main extends Activity {
             super(c);
             prefs = c.getSharedPreferences("jetlab", Context.MODE_PRIVATE);
             best = prefs.getInt("best", 0);
-            ownedMask = prefs.getInt("owned", 0);
-            scratchedMask = prefs.getInt("scratched", 0);
+            if (prefs.contains("formulas")) {
+                ownedMask = prefs.getInt("formulas", 0);
+                tickets = prefs.getInt("tickets", 0);
+                pending = prefs.getInt("pending", -1);
+            } else {                                    // older saves: recovered cards that were not scratched yet become tickets
+                int revealed = prefs.getInt("scratched", 0);
+                ownedMask = revealed;
+                tickets = Integer.bitCount(prefs.getInt("owned", 0) & ~revealed);
+            }
             bank = prefs.getInt("bank", 0);
             outfitsOwned = prefs.getInt("outfits", 1) | 1;
             outfit = prefs.getInt("outfit", 0);
@@ -460,6 +471,7 @@ public class Main extends Activity {
             playerX = w * 0.22f;
             abw = 76; abh = 11; abx = w - abw - 4; aby = h - 12;
             sbw = 62; sbh = 11; sbx = 4; sby = h - 12;
+            tbw = 124; tbh = 12; tbx = 8; tby = h - 14;
             cbw = 36; cbh = 11; cbx = w - cbw - 4; cby = 3;
             scw = Math.min(200, w - 24); sch = 104; scx = (w - scw) / 2; scy = 24;
             if (state == START) toStart(true);
@@ -587,20 +599,27 @@ public class Main extends Activity {
             for (int i = 0; i < 40; i++) debris(playerX + 8, y);
         }
 
-        int randomUnowned() {
-            int n = 0, pick = -1;
+        /** a random formula; ones you do not have yet are three times as likely, so repeats are possible but rarer */
+        int rollFormula() {
+            int total = 0;
+            for (int i = 0; i < NF; i++) total += (ownedMask >> i & 1) == 0 ? 3 : 1;
+            int r = rnd.nextInt(total);
             for (int i = 0; i < NF; i++) {
-                if ((ownedMask >> i & 1) == 0 && rnd.nextInt(++n) == 0) pick = i;
+                r -= (ownedMask >> i & 1) == 0 ? 3 : 1;
+                if (r < 0) return i;
             }
-            return pick;
+            return 0;
         }
+
+        boolean ticketReady() { return tickets > 0 || pending >= 0; }
 
         void saveFormulas() {
-            prefs.edit().putInt("owned", ownedMask).putInt("scratched", scratchedMask).apply();
+            prefs.edit().putInt("formulas", ownedMask).putInt("tickets", tickets).putInt("pending", pending).putInt("bank", bank).apply();
         }
 
-        void collectScroll(int idx) {
-            ownedMask |= 1 << idx;
+        /** a scroll on the track is a scratch ticket: you find out what is under it when you scratch it */
+        void collectScroll() {
+            tickets++;
             saveFormulas();
             bannerT = 1.2f;
             flash = 0.12f;
@@ -720,18 +739,33 @@ public class Main extends Activity {
 
         void archiveTap(float gx, float gy) {
             if (closeHit(gx, gy)) { state = archFrom; return; }
+            if (ticketReady() && gx >= tbx && gx < tbx + tbw && gy >= tby && gy < tby + tbh) { openTicket(); return; }
             for (int i = 0; i < NF; i++) {
                 int[] r = cardRect(i);
                 if (gx >= r[0] && gx < r[0] + r[2] && gy >= r[1] && gy < r[1] + r[3] && (ownedMask >> i & 1) != 0) {
-                    selCard = i;
-                    selScratched = (scratchedMask >> i & 1) != 0;
+                    selCard = i; selScratched = true; revealKind = 0;
                     mcols = scw / 4; mrows = sch / 4;
-                    java.util.Arrays.fill(mask, selScratched);
+                    java.util.Arrays.fill(mask, true);
                     cleared = 0; dragging = false;
                     state = SCRATCH;
                     return;
                 }
             }
+        }
+
+        /** take a ticket from your pile (or pick up the one you left half scratched) and start scratching */
+        void openTicket() {
+            if (pending < 0) {
+                if (tickets <= 0) return;
+                tickets--;
+                pending = rollFormula();      // decided now, so closing the screen cannot re-roll it
+                saveFormulas();
+            }
+            selCard = pending; selScratched = false; revealKind = 0;
+            mcols = scw / 4; mrows = sch / 4;
+            java.util.Arrays.fill(mask, false);
+            cleared = 0; dragging = false;
+            state = SCRATCH;
         }
 
         void scratchDown(float gx, float gy) {
@@ -765,12 +799,19 @@ public class Main extends Activity {
         void revealCard() {
             java.util.Arrays.fill(mask, true);
             selScratched = true; dragging = false;
-            scratchedMask |= 1 << selCard;
+            if ((ownedMask >> selCard & 1) != 0) {
+                revealKind = 2;
+                bank += DUPLICATE_PAY;        // a repeat pays out in electrons
+            } else {
+                revealKind = 1;
+                ownedMask |= 1 << selCard;
+            }
+            pending = -1;
             saveFormulas();
             flash = 0.2f; shake = 2f;
             sfx(S_DONE);
             buzz(25);
-            for (int i = 0; i < 40; i++) confetti(scx + scw / 2f, scy + sch / 2f);
+            for (int i = 0; i < (revealKind == 1 ? 40 : 16); i++) confetti(scx + scw / 2f, scy + sch / 2f);
         }
 
         void closeButton(Canvas c) {
@@ -780,11 +821,11 @@ public class Main extends Activity {
         }
 
         void drawArchiveButton(Canvas c) {
-            boolean fresh = (ownedMask & ~scratchedMask) != 0;
+            boolean fresh = ticketReady();
             rectPx(c, abx, aby, abw, abh, Color.rgb(8, 10, 20));
             rectPx(c, abx + 1, aby + 1, abw - 2, abh - 2, fresh && ((int) (clock * 3) & 1) == 0 ? Color.rgb(130, 100, 30) : Color.rgb(44, 54, 82));
             String label = "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF;
-            if (fresh && ((int) (clock * 1.6f) & 1) == 0) label = "NEW CARD WAITING";
+            if (fresh && ((int) (clock * 1.6f) & 1) == 0) label = "SCRATCH A TICKET";
             text(c, label, abx + abw / 2f, aby + 3, 1, Color.WHITE, 1);
         }
 
@@ -900,34 +941,34 @@ public class Main extends Activity {
             rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
             for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
             text(c, "FORMULA ARCHIVE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
-            int owned = Integer.bitCount(ownedMask), shown = Integer.bitCount(scratchedMask);
-            text(c, owned + "/" + NF + " RECOVERED   " + shown + "/" + NF + " REVEALED", 8, 13, 1, Color.rgb(150, 190, 215), 0);
+            int owned = Integer.bitCount(ownedMask);
+            text(c, owned == NF ? "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!" : owned + "/" + NF + " RECOVERED", 8, 13, 1, owned == NF ? Color.rgb(120, 255, 160) : Color.rgb(150, 190, 215), 0);
             closeButton(c);
             for (int i = 0; i < NF; i++) {
                 int[] r = cardRect(i);
-                boolean have = (ownedMask >> i & 1) != 0, seen = (scratchedMask >> i & 1) != 0;
+                boolean have = (ownedMask >> i & 1) != 0;
                 rectPx(c, r[0], r[1], r[2], r[3], Color.rgb(8, 10, 20));
-                if (seen) {
+                if (have) {
                     rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(236, 222, 180));
                     rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, 1, Color.rgb(196, 160, 100));
                     float fs = fitSize(FORMD[i], r[2] - 3, 8f);
                     if (fs >= 4.6f) ov(FORMD[i], r[0] + r[2] / 2f, r[1] + r[3] / 2f, fs, Color.rgb(70, 42, 28), false);
                     else text(c, "" + (i + 1), r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 60, 40), 1);
-                } else if (have) {
-                    prismScene(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, 0.2f, 0f, r[3] / 2f - 10f);
-                    if (((int) (clock * 3) + i & 3) == 0) rectPx(c, r[0] + r[2] / 2 - 1, r[1] + r[3] / 2 - 3, 2, 6, Color.WHITE);
-                    text(c, "?", r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 96, 112), 1);
                 } else {
                     rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(28, 34, 52));
                     text(c, "" + (i + 1), r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(60, 70, 96), 1);
                 }
             }
-            if (shown == NF) {
-                if (((int) (clock * 2) & 1) == 0) text(c, "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!", w / 2f, h - 11, 1, Color.rgb(120, 255, 160), 1);
-            } else if ((ownedMask & ~scratchedMask) != 0) {
-                text(c, "TAP A PRISM CARD TO SCRATCH IT OFF", w / 2f, h - 11, 1, Color.rgb(255, 200, 80), 1);
+            // the ticket pile
+            if (ticketReady()) {
+                boolean blink = ((int) (clock * 3) & 1) == 0;
+                rectPx(c, tbx, tby, tbw, tbh, Color.rgb(8, 10, 20));
+                rectPx(c, tbx + 1, tby + 1, tbw - 2, tbh - 2, blink ? Color.rgb(130, 100, 30) : Color.rgb(44, 54, 82));
+                prismScene(c, tbx + 3, tby + 2, 14, 8, 0.07f, 0f, 3f);
+                String label = tickets == 0 ? "FINISH YOUR TICKET" : "SCRATCH A TICKET (" + tickets + ")";
+                text(c, label, tbx + tbw / 2f + 8, tby + 4, 1, Color.WHITE, 1);
             } else {
-                text(c, "FIND SCROLLS ON YOUR RUNS TO RECOVER MORE", w / 2f, h - 11, 1, Color.rgb(150, 190, 215), 1);
+                text(c, "FIND SCROLLS ON YOUR RUNS FOR SCRATCH TICKETS", w / 2f, h - 11, 1, Color.rgb(150, 190, 215), 1);
             }
             drawParticles(c);
         }
@@ -935,7 +976,8 @@ public class Main extends Activity {
         void drawScratch(Canvas c) {
             rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
             closeButton(c);
-            text(c, selScratched ? "FORMULA RECOVERED" : "SCRATCH TO REVEAL", 8, 8, 1, Color.rgb(255, 215, 120), 0);
+            String head = !selScratched ? "SCRATCH TO REVEAL" : revealKind == 1 ? "NEW FORMULA RECOVERED!" : revealKind == 2 ? "YOU HAD THIS ONE. +" + DUPLICATE_PAY + " E-" : "FORMULA";
+            text(c, head, 8, 8, 1, revealKind == 2 ? Color.rgb(120, 235, 255) : Color.rgb(255, 215, 120), 0);
             rectPx(c, scx - 2, scy - 2, scw + 4, sch + 4, Color.rgb(8, 10, 20));
             int paper = Color.rgb(236, 222, 180);
             if (selScratched) {
@@ -1224,7 +1266,7 @@ public class Main extends Activity {
                 k.x -= scroll;
                 float dx = k.x - playerX, dy = k.y - y;
                 if (state == PLAY && dx * dx + dy * dy < (r + 9) * (r + 9)) {
-                    collectScroll(k.idx);
+                    collectScroll();
                     scrolls.remove(i);
                     continue;
                 }
@@ -1473,16 +1515,12 @@ public class Main extends Activity {
                 return;
             }
             if (dist >= nextParch) {
-                int idx = randomUnowned();
-                if (idx >= 0) {
-                    Scroll k = new Scroll();
-                    k.x = x0; k.y = randY(3f, 6f); k.idx = idx;
-                    scrolls.add(k);
-                    spawnLeft = 3f * ppm;
-                    nextParch = dist + 140 + rnd.nextInt(120);
-                    return;
-                }
-                nextParch = 1e9f;
+                Scroll k = new Scroll();
+                k.x = x0; k.y = randY(3f, 6f);
+                scrolls.add(k);
+                spawnLeft = 3f * ppm;
+                nextParch = dist + 140 + rnd.nextInt(120);
+                return;
             }
             int roll = rnd.nextInt(10);
             float gap = (3.5f - Math.min(dist / 400f, 1.5f) + rnd.nextFloat() * 2f) * ppm;
