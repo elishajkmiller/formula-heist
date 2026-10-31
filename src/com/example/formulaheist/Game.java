@@ -151,7 +151,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     static final int DUPLICATE_PAY = 10;
     int archFrom, selCard, mcols, mrows, cleared;
     boolean selScratched, dragging;
-    float cardZoom = 1f;                          // the card leans in a little while you scratch it
+    float cardZoom = 1f, revealAt;                          // the card leans in a little while you scratch it
     static final float SCRATCH_ZOOM = 1.08f;
     final boolean[] mask = new boolean[2000];    // scratched-off cells of the open card
     float bannerT;
@@ -752,7 +752,7 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     void revealCard() {
         java.util.Arrays.fill(mask, true);
-        selScratched = true; dragging = false;
+        selScratched = true; dragging = false; revealAt = clock;
         if ((ownedMask >> selCard & 1) != 0) {
             revealKind = 2;
             bank += DUPLICATE_PAY;        // a repeat pays out in electrons
@@ -854,11 +854,34 @@ final class Game extends View implements Choreographer.FrameCallback {
         drawParticles(c);
     }
 
+    /** spinning spotlight rays behind a newly found card: 12 warm wedges turning slowly around (x, y), faded in by k */
+    void spotlight(Canvas c, float x, float y, float k) {
+        float r = w + h;                                   // long enough to reach every corner
+        float spin = clock * 0.6f;                         // radians per second
+        float half = (float) Math.PI / 24;                 // each wedge is 15 degrees wide, with 15 degree gaps
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.argb((int) (55 * k), 255, 205, 110));
+        for (int i = 0; i < 12; i++) {
+            float a = spin + i * (float) Math.PI / 6;
+            path.reset();
+            path.moveTo(x, y);
+            path.lineTo(x + (float) Math.cos(a - half) * r, y + (float) Math.sin(a - half) * r);
+            path.lineTo(x + (float) Math.cos(a + half) * r, y + (float) Math.sin(a + half) * r);
+            path.close();
+            c.drawPath(path, p);
+        }
+    }
+
     void drawScratch(Canvas c) {
         rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
+        if (revealKind == 1) spotlight(c, scx + scw / 2f, scy + sch / 2f, Math.min(1f, (clock - revealAt) * 3f));
         closeButton(c);
-        String head = !selScratched ? "SCRATCH TO REVEAL" : revealKind == 1 ? "NEW FORMULA RECOVERED!" : revealKind == 2 ? "YOU HAD THIS ONE. +" + DUPLICATE_PAY + " E-" : "FORMULA";
-        text(c, head, 8, 8, 1, revealKind == 2 ? Color.rgb(120, 235, 255) : Color.rgb(255, 215, 120), 0);
+        if (revealKind == 1) {
+            text(c, "NEW!", w / 2f, 8, 2, Color.rgb(255, 215, 120), 1);
+        } else {
+            String head = !selScratched ? "SCRATCH TO REVEAL" : revealKind == 2 ? "YOU HAD THIS ONE. +" + DUPLICATE_PAY + " E-" : "FORMULA";
+            text(c, head, 8, 8, 1, revealKind == 2 ? Color.rgb(120, 235, 255) : Color.rgb(255, 215, 120), 0);
+        }
         rectPx(c, scx - 2, scy - 2, scw + 4, sch + 4, Color.rgb(8, 10, 20));
         int paper = Color.rgb(236, 222, 180);
         if (selScratched) {
