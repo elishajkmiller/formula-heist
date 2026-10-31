@@ -95,6 +95,9 @@ public class Main extends Activity {
 
     static class Zapper {
         float x, y, len, angle, spin;
+        /** half the bar's extent along each axis */
+        float hx() { return (float) Math.cos(angle) * len / 2; }
+        float hy() { return (float) Math.sin(angle) * len / 2; }
     }
 
     static class Missile {
@@ -899,7 +902,7 @@ public class Main extends Activity {
         // ---------- settings: haptics, sounds, music and a guarded reset ----------
 
         boolean settingsButtonHit(float gx, float gy) {
-            if (!(state == START || (state == DEAD && stateTime > CARD_DELAY))) return false;
+            if (!menuButtonsShown()) return false;
             return gx >= gbx && gx < gbx + gbw && gy >= gby && gy < gby + gbh;
         }
 
@@ -950,9 +953,19 @@ public class Main extends Activity {
             applyOutfit();
         }
 
-        void drawSettings(Canvas c) {
+        /** dark grid backdrop shared by the settings, store and archive screens */
+        void menuBackdrop(Canvas c) {
             rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
             for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
+        }
+
+        /** the Archive, Store and Settings buttons only show on the title screen and the death card */
+        boolean menuButtonsShown() {
+            return state == START || (state == DEAD && stateTime > CARD_DELAY);
+        }
+
+        void drawSettings(Canvas c) {
+            menuBackdrop(c);
             text(c, "SETTINGS", 8, 5, 1, Color.rgb(255, 215, 120), 0);
             closeButton(c);
             String[] names = {"CHARACTER", "HAPTICS", "SOUNDS", "MUSIC", "RESET PROGRESS"};
@@ -992,7 +1005,7 @@ public class Main extends Activity {
         // ---------- clothes store: spend electrons on shirts, pants and jetpacks ----------
 
         boolean storeButtonHit(float gx, float gy) {
-            if (!(state == START || (state == DEAD && stateTime > CARD_DELAY))) return false;
+            if (!menuButtonsShown()) return false;
             return gx >= sbx && gx < sbx + sbw && gy >= sby && gy < sby + sbh;
         }
 
@@ -1036,8 +1049,7 @@ public class Main extends Activity {
         }
 
         void drawStore(Canvas c) {
-            rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
-            for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
+            menuBackdrop(c);
             text(c, "CLOTHES STORE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
             text(c, "E- " + bank, 110, 5, 1, Color.rgb(120, 235, 255), 0);
             if (storeMsgT > 0) text(c, storeMsg, w / 2f + 40, 5, 1, Color.rgb(255, 120, 100), 1);
@@ -1081,7 +1093,7 @@ public class Main extends Activity {
         // ---------- archive: the recovered formulas, scratch off to reveal ----------
 
         boolean archiveButtonHit(float gx, float gy) {
-            if (!(state == START || (state == DEAD && stateTime > CARD_DELAY))) return false;
+            if (!menuButtonsShown()) return false;
             return gx >= abx && gx < abx + abw && gy >= aby && gy < aby + abh;
         }
 
@@ -1301,8 +1313,7 @@ public class Main extends Activity {
         }
 
         void drawArchive(Canvas c) {
-            rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
-            for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
+            menuBackdrop(c);
             text(c, "FORMULA ARCHIVE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
             int owned = Long.bitCount(ownedMask);
             text(c, owned == NF ? "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!" : owned + "/" + NF + " RECOVERED", 8, 13, 1, owned == NF ? Color.rgb(120, 255, 160) : Color.rgb(150, 190, 215), 0);
@@ -1425,7 +1436,7 @@ public class Main extends Activity {
                 boolean gone = b.x > w + 10;
                 for (int j = zappers.size() - 1; j >= 0 && !gone; j--) {
                     Zapper z = zappers.get(j);
-                    float hx = (float) Math.cos(z.angle) * z.len / 2, hy = (float) Math.sin(z.angle) * z.len / 2;
+                    float hx = z.hx(), hy = z.hy();
                     if (segDist(b.x, b.y, z.x - hx, z.y - hy, z.x + hx, z.y + hy) < 7f) {
                         zappers.remove(j);
                         for (int k = 0; k < 14; k++) burst(b.x, b.y);
@@ -1680,7 +1691,7 @@ public class Main extends Activity {
                 z.x -= scroll;
                 z.angle += z.spin * dt;
                 if (z.x < -2.5f * ppm) { zappers.remove(i); continue; }
-                float hx = (float) Math.cos(z.angle) * z.len / 2, hy = (float) Math.sin(z.angle) * z.len / 2;
+                float hx = z.hx(), hy = z.hy();
                 if (state == PLAY && invuln <= 0 && (segDist(playerX, y, z.x - hx, z.y - hy, z.x + hx, z.y + hy) < r + 0.06f * ppm
                         || circleHitsSquare(playerX, y, r, z.x - hx, z.y - hy, 4f)
                         || circleHitsSquare(playerX, y, r, z.x + hx, z.y + hy, 4f))) hit();
@@ -2696,7 +2707,7 @@ public class Main extends Activity {
             if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
-            if (state == START || (state == DEAD && stateTime > CARD_DELAY)) { drawArchiveButton(c); drawStoreButton(c); drawSettingsButton(c); }
+            if (menuButtonsShown()) { drawArchiveButton(c); drawStoreButton(c); drawSettingsButton(c); }
             out.save();
             if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);
@@ -3606,7 +3617,7 @@ public class Main extends Activity {
 
         void drawZappers(Canvas c) {
             for (Zapper z : zappers) {
-                float hx = (float) Math.cos(z.angle) * z.len / 2, hy = (float) Math.sin(z.angle) * z.len / 2;
+                float hx = z.hx(), hy = z.hy();
                 float ax = z.x - hx, ay2 = z.y - hy, bx = z.x + hx, by = z.y + hy;
                 float nx = -hy / (z.len / 2), ny = hx / (z.len / 2);
                 path.reset();
