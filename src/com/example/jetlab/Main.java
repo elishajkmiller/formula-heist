@@ -76,6 +76,12 @@ public class Main extends Activity {
 
     static class Crate { float x, y; int type; }
 
+    /** floor or ceiling spikes, a moving saw blade, or a laser gate with a gap and a warning */
+    static class Hazard {
+        int kind;
+        float x, y, w, phase, amp;
+    }
+
     static class Zapper {
         float x, y, len, angle, spin;
     }
@@ -257,6 +263,7 @@ public class Main extends Activity {
 
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
+        static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
         static final int NF = 20;                // formulas to recover
         static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
@@ -434,6 +441,7 @@ public class Main extends Activity {
         final ArrayList<Crate> crates = new ArrayList<>();
         final ArrayList<Scroll> scrolls = new ArrayList<>();
         final ArrayList<Bolt> bolts = new ArrayList<>();
+        final ArrayList<Hazard> hazards = new ArrayList<>();
         final ArrayList<Npc> npcs = new ArrayList<>();
         float bgOff, lastBg, npcLeft, spawnLeft, nextCrate, nextParch;
 
@@ -645,7 +653,7 @@ public class Main extends Activity {
 
         /** back outside on the grass, in front of NULLCORP's wall */
         void toStart(boolean keepState) {
-            coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear();
+            coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); hazards.clear();
             nextParch = 70; bannerT = 0;
             for (int i = 0; i < NP; i++) pl[i] = 0;
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
@@ -1317,6 +1325,17 @@ public class Main extends Activity {
                         gone = true;
                     }
                 }
+                for (int j = hazards.size() - 1; j >= 0 && !gone; j--) {
+                    Hazard hz = hazards.get(j);
+                    if (hz.kind != SAW) continue;
+                    float dx = hz.x - b.x, dy = sawY(hz) - b.y;
+                    if (dx * dx + dy * dy < 100f) {
+                        hazards.remove(j);
+                        for (int k = 0; k < 14; k++) burst(b.x, b.y);
+                        sfx(S_HIT);
+                        gone = true;
+                    }
+                }
                 for (int j = missiles.size() - 1; j >= 0 && !gone; j--) {
                     Missile m = missiles.get(j);
                     if (!m.flying) continue;
@@ -1554,6 +1573,14 @@ public class Main extends Activity {
                         || circleHitsSquare(playerX, y, r, z.x + hx, z.y + hy, 4f))) hit();
             }
 
+            for (int i = hazards.size() - 1; i >= 0; i--) {
+                Hazard hz = hazards.get(i);
+                hz.x -= scroll;
+                if (hz.x + hz.w < -40) { hazards.remove(i); continue; }
+                if (hz.kind == LASER && hz.x < w + 10) hz.phase += dt;       // the cycle starts when it comes on screen
+                if (state == PLAY && invuln <= 0 && hazardHits(hz, r)) hit();
+            }
+
             for (int i = missiles.size() - 1; i >= 0; i--) {
                 Missile m = missiles.get(i);
                 if (!m.flying) {
@@ -1704,6 +1731,7 @@ public class Main extends Activity {
             outX -= sc;
             for (Coin k : coins) k.x -= sc;
             for (Zapper z : zappers) z.x -= sc;
+            for (Hazard hz : hazards) hz.x -= sc;
             for (Crate k : crates) k.x -= sc;
             for (Scroll k : scrolls) k.x -= sc;
             for (int i = missiles.size() - 1; i >= 0; i--) {
@@ -1739,6 +1767,34 @@ public class Main extends Activity {
         }
 
         /** does the circle touch the square of the given half size (the zapper's end nodes)? */
+        static final float LASER_GAP = 26f;          // half the opening in a laser gate, in pixels
+
+        float sawY(Hazard hz) { return hz.y + (float) Math.sin(clock * 1.6f + hz.phase) * hz.amp; }
+
+        /** the laser beam is deadly for a second after a second of warning, in a cycle of three */
+        boolean laserOn(Hazard hz) { float t = hz.phase % 3f; return t >= 1f && t < 1.9f; }
+
+        boolean laserWarn(Hazard hz) { float t = hz.phase % 3f; return t > 0f && t < 1f; }
+
+        static boolean circleHitsRect(float cx, float cy, float r, float rx, float ry, float rw, float rh) {
+            float nx = Math.max(rx, Math.min(cx, rx + rw)), ny = Math.max(ry, Math.min(cy, ry + rh));
+            float dx = cx - nx, dy = cy - ny;
+            return dx * dx + dy * dy <= r * r;
+        }
+
+        boolean hazardHits(Hazard hz, float r) {
+            switch (hz.kind) {
+                case SPIKE_FLOOR: return circleHitsRect(playerX, y, r, hz.x, floorY - 8, hz.w, 8);
+                case SPIKE_CEIL: return circleHitsRect(playerX, y, r, hz.x, ceilY, hz.w, 8);
+                case SAW: {
+                    float dx = hz.x - playerX, dy = sawY(hz) - y, rr = r + 7;
+                    return dx * dx + dy * dy < rr * rr;
+                }
+                default:
+                    return laserOn(hz) && Math.abs(hz.x - playerX) < r + 2 && Math.abs(y - hz.y) > LASER_GAP - r;
+            }
+        }
+
         static boolean circleHitsSquare(float cx, float cy, float r, float sx, float sy, float half) {
             float nx = Math.max(sx - half, Math.min(cx, sx + half)), ny = Math.max(sy - half, Math.min(cy, sy + half));
             float dx = cx - nx, dy = cy - ny;
@@ -1781,9 +1837,10 @@ public class Main extends Activity {
                 nextParch = dist + 140 + rnd.nextInt(120);
                 return;
             }
-            int roll = rnd.nextInt(10);
+            int roll = rnd.nextInt(100);
             float gap = (3.5f - Math.min(dist / 400f, 1.5f) + rnd.nextFloat() * 2f) * ppm;
-            if (roll < 4) {
+            // what can appear grows with distance: zappers first, then spikes, missiles, saws and laser gates
+            if (roll < 34) {
                 int kind = rnd.nextInt(3);
                 float cy = randY(2.4f, 6.6f);
                 if (kind == 0) {            // sine wave
@@ -1796,18 +1853,16 @@ public class Main extends Activity {
                     for (int i = 0; i < 9; i++) addCoin(x0 + i * 0.5f * ppm, cy);
                     spawnLeft = 9 * 0.5f * ppm + gap;
                 }
-            } else if (roll < 9 || dist < 100) {
-                int n = (dist > 400 && rnd.nextFloat() < 0.4f) ? 2 : 1;
-                for (int i = 0; i < n; i++) {
-                    Zapper z = new Zapper();
-                    z.x = x0 + i * 3.2f * ppm;
-                    z.len = (2f + rnd.nextFloat() * 1.5f + Math.min(dist / 500f, 1f)) * ppm;
-                    z.y = randY(2.6f + z.len / ppm / 2 - 1f, 6.4f - z.len / ppm / 2 + 1f);
-                    z.angle = (float) (rnd.nextFloat() < 0.6f ? Math.PI / 2 + (rnd.nextFloat() - 0.5f) * 0.8f : rnd.nextFloat() * Math.PI);
-                    z.spin = dist > 250 && rnd.nextFloat() < 0.5f ? (rnd.nextBoolean() ? 1f : -1f) * (0.8f + rnd.nextFloat()) : 0f;
-                    zappers.add(z);
-                }
-                spawnLeft = (n * 3.2f + 1.5f) * ppm + gap;
+            } else if (roll < 58 || dist < 40) {
+                spawnZappers(x0, gap);
+            } else if (roll < 71) {
+                spawnSpikes(x0, gap);
+            } else if (roll < 81) {
+                if (dist < 120) spawnZappers(x0, gap); else spawnSaw(x0, gap);
+            } else if (roll < 90) {
+                if (dist < 200) spawnSpikes(x0, gap); else spawnLaser(x0, gap);
+            } else if (dist < 100) {
+                spawnZappers(x0, gap);
             } else {
                 Missile m = new Missile();
                 m.warn = 1.4f; m.y = y;
@@ -1815,6 +1870,51 @@ public class Main extends Activity {
                 missiles.add(m);
                 spawnLeft = 4f * ppm;
             }
+        }
+
+        void spawnZappers(float x0, float gap) {
+            int n = (dist > 400 && rnd.nextFloat() < 0.4f) ? 2 : 1;
+            for (int i = 0; i < n; i++) {
+                Zapper z = new Zapper();
+                z.x = x0 + i * 3.2f * ppm;
+                z.len = (2f + rnd.nextFloat() * 1.5f + Math.min(dist / 500f, 1f)) * ppm;
+                z.y = randY(2.6f + z.len / ppm / 2 - 1f, 6.4f - z.len / ppm / 2 + 1f);
+                z.angle = (float) (rnd.nextFloat() < 0.6f ? Math.PI / 2 + (rnd.nextFloat() - 0.5f) * 0.8f : rnd.nextFloat() * Math.PI);
+                z.spin = dist > 250 && rnd.nextFloat() < 0.5f ? (rnd.nextBoolean() ? 1f : -1f) * (0.8f + rnd.nextFloat()) : 0f;
+                zappers.add(z);
+            }
+            spawnLeft = (n * 3.2f + 1.5f) * ppm + gap;
+        }
+
+        Hazard addHazard(int kind, float x, float yy, float wd) {
+            Hazard hz = new Hazard();
+            hz.kind = kind; hz.x = x; hz.y = yy; hz.w = wd;
+            hz.phase = rnd.nextFloat() * 6f;
+            hazards.add(hz);
+            return hz;
+        }
+
+        /** a row of spikes on the floor or the ceiling; later a pair that leaves a corridor to fly through */
+        void spawnSpikes(float x0, float gap) {
+            float wd = (3f + rnd.nextFloat() * 3f) * ppm;
+            int mode = rnd.nextInt(dist > 150 ? 3 : 2);          // 0 floor, 1 ceiling, 2 both
+            if (mode != 1) addHazard(SPIKE_FLOOR, x0, floorY, wd);
+            if (mode != 0) addHazard(SPIKE_CEIL, x0, ceilY, wd);
+            spawnLeft = wd + 1.5f * ppm + gap;
+        }
+
+        /** a saw blade sliding up and down a rail */
+        void spawnSaw(float x0, float gap) {
+            Hazard hz = addHazard(SAW, x0 + 24, randY(3.6f, 5.6f), 0);
+            hz.amp = (1.4f + rnd.nextFloat() * 1.1f) * ppm;
+            spawnLeft = 4f * ppm + gap;
+        }
+
+        /** a laser gate: red warning, then a full beam top to bottom with one gap to fly through */
+        void spawnLaser(float x0, float gap) {
+            Hazard hz = addHazard(LASER, x0 + 20, randY(3.2f, 6.0f), 0);   // y is the middle of the gap
+            hz.phase = 0;
+            spawnLeft = 4.5f * ppm + gap;
         }
 
         void addCoin(float x, float yy) {
@@ -2525,6 +2625,7 @@ public class Main extends Activity {
             drawCrates(c);
             drawScrolls(c);
             drawZappers(c);
+            drawHazards(c);
             drawMissiles(c);
             drawBolts(c);
             drawParticles(c);
@@ -2957,6 +3058,87 @@ public class Main extends Activity {
                     rectPx(c, nxp - 4, nyp - 4, 8, 8, Color.rgb(90, 100, 120));
                     rectPx(c, nxp - 3, nyp - 3, 6, 6, Color.rgb(60, 70, 90));
                     rectPx(c, nxp - 2, nyp - 2, 4, 4, Color.rgb(255, 200, 80));
+                }
+            }
+        }
+
+        void drawHazards(Canvas c) {
+            for (Hazard hz : hazards) {
+                if (hz.x > w + 40 || hz.x + hz.w < -40) continue;
+                switch (hz.kind) {
+                    case SPIKE_FLOOR: drawSpikes(c, hz, true); break;
+                    case SPIKE_CEIL: drawSpikes(c, hz, false); break;
+                    case SAW: drawSaw(c, hz); break;
+                    default: drawLaser(c, hz); break;
+                }
+            }
+        }
+
+        /** a metal strip with a row of steel spikes pointing into the room */
+        void drawSpikes(Canvas c, Hazard hz, boolean floor) {
+            int x0 = Math.round(hz.x), wd = Math.round(hz.w);
+            int base = Math.round(floor ? floorY : ceilY), dir = floor ? -1 : 1;
+            rectPx(c, x0, floor ? base - 2 : base, wd, 2, Color.rgb(70, 76, 94));
+            for (int x = x0; x + 6 <= x0 + wd; x += 6) {
+                for (int row = 0; row < 8; row++) {
+                    int half = 3 - row * 3 / 8;                         // the spike narrows to a point
+                    int y = floor ? base - 3 - row : base + 2 + row;
+                    rectPx(c, x + 3 - half, y, half * 2, 1, row < 3 ? Color.rgb(205, 212, 228) : Color.rgb(160, 170, 190));
+                    rectPx(c, x + 3 - half, y, 1, 1, Color.rgb(8, 10, 22));
+                    rectPx(c, x + 2 + half, y, 1, 1, Color.rgb(8, 10, 22));
+                }
+                rectPx(c, x + 2, floor ? base - 11 : base + 10, 2, 1, Color.rgb(8, 10, 22));
+            }
+        }
+
+        void drawSaw(Canvas c, Hazard hz) {
+            float cy = sawY(hz);
+            int cx = Math.round(hz.x);
+            // the rail it slides on
+            rectPx(c, cx - 1, hz.y - hz.amp - 6, 2, hz.amp * 2 + 12, Color.rgb(50, 56, 76));
+            rectPx(c, cx - 3, hz.y - hz.amp - 7, 6, 2, Color.rgb(90, 98, 124));
+            rectPx(c, cx - 3, hz.y + hz.amp + 5, 6, 2, Color.rgb(90, 98, 124));
+            // the blade: sixteen teeth turning
+            float a0 = clock * 9f;
+            path.reset();
+            for (int i = 0; i < 16; i++) {
+                float a = a0 + i * (float) Math.PI / 8f, rr = (i & 1) == 0 ? 9f : 6f;
+                float px0 = cx + (float) Math.cos(a) * rr, py0 = cy + (float) Math.sin(a) * rr;
+                if (i == 0) path.moveTo(Math.round(px0), Math.round(py0)); else path.lineTo(Math.round(px0), Math.round(py0));
+            }
+            path.close();
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.rgb(8, 10, 22));
+            c.save(); c.scale(1.18f, 1.18f, cx, cy); c.drawPath(path, p); c.restore();
+            p.setColor(Color.rgb(196, 204, 222));
+            c.drawPath(path, p);
+            p.setColor(Color.rgb(120, 130, 156));
+            c.drawCircle(cx, cy, 4, p);
+            p.setColor(Color.rgb(60, 66, 88));
+            c.drawCircle(cx, cy, 2, p);
+        }
+
+        void drawLaser(Canvas c, Hazard hz) {
+            int x = Math.round(hz.x), ty = Math.round(ceilY), by = Math.round(floorY);
+            int g0 = Math.round(hz.y - LASER_GAP), g1 = Math.round(hz.y + LASER_GAP);
+            boolean on = laserOn(hz), warn = laserWarn(hz);
+            // the emitters at both ends of the gate and around the gap
+            for (int yy : new int[] {ty, g0 - 2, g1, by - 5}) {
+                rectPx(c, x - 4, yy, 8, 5, Color.rgb(8, 10, 22));
+                rectPx(c, x - 3, yy + 1, 6, 3, Color.rgb(96, 104, 130));
+                rectPx(c, x - 1, yy + 2, 2, 1, on ? Color.rgb(255, 80, 70) : Color.rgb(80, 40, 50));
+            }
+            if (on) {
+                int[][] spans = {{ty + 5, g0 - 2}, {g1 + 5, by - 5}};
+                for (int[] sp : spans) {
+                    rectPx(c, x - 3, sp[0], 7, sp[1] - sp[0], Color.argb(70, 255, 70, 60));
+                    rectPx(c, x - 1, sp[0], 3, sp[1] - sp[0], Color.rgb(255, 90, 80));
+                    rectPx(c, x, sp[0], 1, sp[1] - sp[0], Color.WHITE);
+                }
+            } else if (warn && ((int) (clock * 10) & 1) == 0) {
+                for (int yy = ty + 6; yy < by - 5; yy += 4) {
+                    if (yy > g0 - 2 && yy < g1 + 5) continue;
+                    rectPx(c, x, yy, 1, 2, Color.rgb(255, 120, 110));
                 }
             }
         }
