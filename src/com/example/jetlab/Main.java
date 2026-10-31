@@ -648,18 +648,18 @@ public class Main extends Activity {
 
         static final String[] SPR_HEAD = {
             ".......BBBBB....",
-            "......BBBBBBB...",
-            "......BGGGGGCC..",
-            "......SSSSSSSS..",
+            "......BBBBBBBS..",
+            "......BSSGCCSS..",
+            "......SSSSSSSSs.",
             ".......SSSSSs...",
-            "........SSSS....",
-            ".OOOOWWWWWWWW...",
-            ".OoooWWWWWWWw...",
-            ".OoooWWWWWWWw...",
-            ".OoooWWWWWWWw...",
-            ".OOOOWWWWWWWw...",
-            ".OoooWWWWWWWw...",
-            ".NNNNWWWWWWWw...",
+            "........SSss....",
+            ".OOOOwwWWWVVW...",
+            ".OooOwwWWWVTW...",
+            ".OooOwwwwSSTW...",
+            ".OooOwwwwwWTW...",
+            ".OOOOWWWWWWTW...",
+            ".OooOWWWWWWWW...",
+            ".NNNNWWWWWWWW...",
             "..NN.wwwwwwww..."
         };
         static final String[] LEGS_A = {
@@ -792,6 +792,9 @@ public class Main extends Activity {
                 case 'W': return Color.rgb(240, 244, 250);
                 case 'w': return Color.rgb(180, 190, 210);
                 case 'D': return Color.rgb(50, 60, 100);
+                case 's': return Color.rgb(205, 160, 120);
+                case 'T': return Color.rgb(60, 45, 40);
+                case 'V': return Color.rgb(70, 100, 160);
                 case 'R': return Color.rgb(220, 70, 70);
                 case 'U': return Color.rgb(70, 110, 230);
                 case 'Y': return Color.rgb(255, 200, 80);
@@ -952,12 +955,6 @@ public class Main extends Activity {
             }
         }
 
-        void arm(Canvas c, float sx, float sy, float ang, int col) {
-            float cs = (float) Math.cos(ang), sn = (float) Math.sin(ang);
-            for (int i = 0; i <= 5; i++) rectPx(c, sx + cs * i, sy + sn * i, 2, 2, col);
-            rectPx(c, sx + cs * 6, sy + sn * 6, 2, 2, Color.rgb(240, 200, 160));
-        }
-
         void drawPlayer(Canvas c) {
             if (state == DEAD && stateTime < 0.2f) return;
             if (state == PLAY && invuln > 0 && ((int) (clock * 14) & 1) == 0) return;
@@ -970,33 +967,14 @@ public class Main extends Activity {
             int bob = (onFloor && state == PLAY && (ph & 1) == 1) ? -1 : 0;
             int left = Math.round(playerX) - 8, top = Math.round(y) - 11 + bob;
 
-            float nearA, farA;
-            if (state != PLAY) {
-                float sw = (float) Math.sin(clock * 3) * 0.15f;
-                nearA = 1.57f - sw; farA = 1.57f + sw;
-            } else if (thr) {
-                nearA = -0.6f + (float) Math.sin(clock * 25) * 0.08f; farA = -1.0f;
-            } else if (!onFloor) {
-                if (vy < 0) { nearA = -1.0f; farA = -1.6f; }
-                else {
-                    nearA = -1.3f + (float) Math.sin(clock * 20) * 0.5f;
-                    farA = -1.7f + (float) Math.sin(clock * 20 + 2) * 0.5f;
-                }
-            } else {
-                float sw = (float) Math.sin(cyc * 6.2832f);
-                nearA = 1.57f - sw; farA = 1.57f + sw;
-            }
-
             if (thr) {
                 int fl = 4 + rnd.nextInt(5);
                 rectPx(c, left + 1, top + 14, 4, fl, Color.rgb(255, 170, 40));
                 rectPx(c, left + 2, top + 14, 2, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
             }
-            arm(c, left + 7, top + 8, farA, Color.rgb(150, 160, 185));
             sprite(c, SPR_HEAD, left, top);
             String[] legs = !onFloor ? LEGS_AIR : (ph == 0 ? LEGS_A : ph == 2 ? LEGS_B : LEGS_M);
             sprite(c, legs, left, top + SPR_HEAD.length);
-            arm(c, left + 10, top + 8, nearA, Color.rgb(225, 230, 240));
         }
 
         void drawVehicle(Canvas c) {
