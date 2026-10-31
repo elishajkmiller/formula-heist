@@ -1,12 +1,12 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 
 import java.util.Arrays;
 
-import static com.example.formulaheist.Game.*;
-import static com.example.formulaheist.Sprites.*;
+import static com.elishajkmiller.formulaheist.Game.*;
+import static com.elishajkmiller.formulaheist.Sprites.*;
 
 /** DNA Helix: hold to rise, tap to fire base pairs. Its twisting body follows the path the head took. */
 final class Helix extends Vehicle {

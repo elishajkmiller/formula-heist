@@ -1,4 +1,4 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.graphics.Color;
 

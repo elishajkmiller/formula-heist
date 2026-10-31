@@ -1,4 +1,4 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.media.AudioFormat;
 import android.media.AudioManager;
@@ -11,7 +11,7 @@ import java.util.concurrent.Executors;
 /** Short synthesized sound effects, no audio files. */
 final class Sfx {
     static final int RATE = 22050;
-    final AudioTrack[] tr = new AudioTrack[11];
+    final AudioTrack[] tr = new AudioTrack[12];
     // stop/reload/play can block for a frame, so every call runs off the game thread
     final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -28,6 +28,7 @@ final class Sfx {
             tr[Game.S_SCRATCH] = mk(tone(2600, 1400, 35, 0.22f, 0.85f, false));
             tr[Game.S_BUILD] = mk(build());
             tr[Game.S_FANFARE] = mk(fanfare());
+            tr[Game.S_LAND] = mk(tone(120, 60, 80, 0.2f, 0.3f, false));      // a faint soft thud
         } catch (Throwable t) { }
     }
 
@@ -379,10 +380,9 @@ final class Sfx {
                     b = tri(v1) + 0.6 * tri(v2);
                     break;
                 }
-                case 12: {  // BERNOULLI BIRD: wind over the wings and a breathy A5 flute
-                    a = l1200 * flut * 2;
+                case 12: {  // BERNOULLI BIRD: just a soft A5 flute, the wind noise is gone
                     double breath = 0.8 + 0.2 * Math.sin(P * 2.5);
-                    b = (Math.sin(Q * 880) + 0.15 * Math.sin(Q * 1760)) * breath + 0.08 * w;
+                    b = (Math.sin(Q * 880) + 0.15 * Math.sin(Q * 1760)) * breath;
                     break;
                 }
                 case 13: {  // AERIAL SCREW: a propeller whirr, A2 chopped by the blades 15 times a second

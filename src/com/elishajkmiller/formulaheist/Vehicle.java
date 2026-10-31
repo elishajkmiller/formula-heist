@@ -1,8 +1,8 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.graphics.Canvas;
 
-import static com.example.formulaheist.Game.*;
+import static com.elishajkmiller.formulaheist.Game.*;
 
 /**
  * A vehicle from a blue crate. Game keeps the shared physics (speed limits, the floor and the ceiling);

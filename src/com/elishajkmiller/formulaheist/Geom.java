@@ -1,4 +1,4 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 /** Small collision tests used by every hazard. */
 final class Geom {

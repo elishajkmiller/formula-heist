@@ -1,10 +1,10 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 
-import static com.example.formulaheist.Game.*;
-import static com.example.formulaheist.Sprites.*;
+import static com.elishajkmiller.formulaheist.Game.*;
+import static com.elishajkmiller.formulaheist.Sprites.*;
 
 /**
  * Bernoulli Bird: a tap is a wingbeat, holding spreads the wing to glide. While gliding it draws the Bernoulli
@@ -25,7 +25,7 @@ final class Bird extends Vehicle {
     void press() {
         g.vy = -7f; flapT = 1f;                       // a wingbeat
         g.sfx(S_JUMP);
-        for (int i = 0; i < 3; i++) g.burst(g.playerX - 6, g.y + 4);
+        for (int i = 0; i < 4; i++) g.puff(g.playerX - 6, g.y + 4, -1f - g.rnd.nextFloat() * 2f, 1.5f + g.rnd.nextFloat() * 2f, Color.rgb(205, 225, 245));   // air pushed down and back by the wing
     }
 
     void tick(float dt) {

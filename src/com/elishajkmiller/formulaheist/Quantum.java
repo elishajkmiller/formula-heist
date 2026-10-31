@@ -1,10 +1,10 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 
-import static com.example.formulaheist.Game.*;
-import static com.example.formulaheist.Sprites.*;
+import static com.elishajkmiller.formulaheist.Game.*;
+import static com.elishajkmiller.formulaheist.Sprites.*;
 
 /** Quantum Entangler: you and a twin on the opposite surface; a tap swaps you over. Burns out after USES jumps. */
 final class Quantum extends Vehicle {

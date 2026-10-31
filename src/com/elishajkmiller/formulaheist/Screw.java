@@ -1,10 +1,10 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 
-import static com.example.formulaheist.Game.*;
-import static com.example.formulaheist.Sprites.*;
+import static com.elishajkmiller.formulaheist.Game.*;
+import static com.elishajkmiller.formulaheist.Sprites.*;
 
 /**
  * Da Vinci's aerial screw. Holding spins the rotor up; the spiral blade pushes air down and Newton's third law

@@ -1,4 +1,4 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -20,10 +20,10 @@ import android.view.View;
 import java.util.ArrayList;
 import java.util.Random;
 
-import static com.example.formulaheist.Content.*;
-import static com.example.formulaheist.Geom.*;
-import static com.example.formulaheist.Prism.*;
-import static com.example.formulaheist.Sprites.*;
+import static com.elishajkmiller.formulaheist.Content.*;
+import static com.elishajkmiller.formulaheist.Geom.*;
+import static com.elishajkmiller.formulaheist.Prism.*;
+import static com.elishajkmiller.formulaheist.Sprites.*;
 
 /**
  * The game View: state, input, the update loop and drawing. Vehicles, hazards and rooms are their own classes
@@ -44,7 +44,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     static final int GUARD = 4;              // Npc mode of the guards
     static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
     static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
-    static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9, S_FANFARE = 10;
+    static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9, S_FANFARE = 10, S_LAND = 11;
 
     static final float GRAVITY = 22f;        // m/s^2, game gravity (Earth is 9.8)
     static final float THRUST = 38f;         // m/s^2 from the pack, net 16 up
@@ -1246,10 +1246,12 @@ final class Game extends View implements Choreographer.FrameCallback {
                 if (bouncy && playing) {
                     veh.bounce(vy);
                 } else {
+                    if (veh == null && vy > 2.5f) sfx(S_LAND);     // a faint thud on every landing
                     if (veh == null && vy > 9f) {
                         shake = Math.max(shake, 1.5f);
                         landT = 0.12f;
-                        for (int i = 0; i < 5; i++) burst(playerX - 3, y + 10);
+                        for (int i = 0; i < 6; i++)       // dust kicked out along the floor, not embers
+                            puff(playerX - 3, y + 10, (i % 2 == 0 ? -1f : 1f) * (1.5f + rnd.nextFloat() * 2f) - speed * 0.3f, -0.4f - rnd.nextFloat(), Color.rgb(160, 150, 135));
                     }
                     vy = 0;
                 }
@@ -1499,6 +1501,26 @@ final class Game extends View implements Choreographer.FrameCallback {
                 px[i] += pvx[i] * dt; py[i] += pvy[i] * dt;
             }
         }
+    }
+
+    /** a soft puff of dust or air in the given colour: it spreads along (vx, vy) in metres per second and fades */
+    void puff(float bx, float by, float vx, float vy, int col) {
+        int k = pNext++ % NP;
+        px[k] = bx; py[k] = by;
+        pvx[k] = (vx + (rnd.nextFloat() - 0.5f) * 1.2f) * ppm;
+        pvy[k] = (vy + (rnd.nextFloat() - 0.5f) * 1.2f) * ppm;
+        pl[k] = 0.35f + rnd.nextFloat() * 0.25f;
+        pcol[k] = col | 0xFF000000;
+    }
+
+    /** the colour of an ember: it takes the worn jetpack's exhaust colours (red after a crash) */
+    int emberCol(float a, int i) {
+        int al = (int) (a * 255) << 24;
+        if (state == DEAD) return Color.argb((int) (a * 255), 255, 120, 60);
+        int t = Math.max(0, Math.min(7, worn[2]));
+        if (t == 7) return (Color.HSVToColor(new float[] {(clock * 360f + i * 20f) % 360f, 0.9f, 1f}) & 0xFFFFFF) | al;
+        if (t == 4) return (a > 0.6f ? Color.rgb(170, 90, 230) : Color.rgb(120, 50, 180)) & 0xFFFFFF | al;   // dark matter, kept bright enough to see
+        return (FLAME[t][a > 0.6f ? 1 : 0] & 0xFFFFFF) | al;
     }
 
     void burst(float bx, float by) {
@@ -2312,7 +2334,7 @@ final class Game extends View implements Choreographer.FrameCallback {
             int sz = a > 0.6f ? 3 : 2;
             float py1 = Math.min(py[i], floorY - sz);           // sparks land on the ground, not under it
             if (pcol[i] != 0) rectPx(c, px[i], py1, sz, sz, (pcol[i] & 0xFFFFFF) | ((int) (a * 255) << 24));
-            else rectPx(c, px[i], py1, sz, sz, Color.argb((int) (a * 255), 255, state == DEAD ? 120 : (a > 0.6f ? 230 : 150), 60));
+            else rectPx(c, px[i], py1, sz, sz, emberCol(a, i));
         }
     }
 

@@ -1,0 +1,26 @@
+# Draft recipe for gitlab.com/fdroid/fdroiddata (metadata/com.elishajkmiller.formulaheist.yml).
+# Tag the release (v0.1) before submitting.
+Categories:
+  - Games
+License: GPL-3.0-or-later
+WebSite: https://elishajkmiller.com
+SourceCode: https://github.com/elishajkmiller/formula-heist
+IssueTracker: https://github.com/elishajkmiller/formula-heist/issues
+
+AutoName: Formula Heist
+
+RepoType: git
+Repo: https://github.com/elishajkmiller/formula-heist.git
+
+Builds:
+  - versionName: '0.1'
+    versionCode: 1
+    commit: v0.1
+    subdir: .
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '0.1'
+CurrentVersionCode: 1

@@ -1,10 +1,10 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 
-import static com.example.formulaheist.Geom.*;
+import static com.elishajkmiller.formulaheist.Geom.*;
 
 /**
  * Floor and ceiling spikes, a sliding saw blade and a laser gate. Zappers and missiles live in their own lists.

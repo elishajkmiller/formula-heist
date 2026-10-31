@@ -1,6 +1,6 @@
 # Formula Heist
 
-Jetpack Joyride style Android game with a physics theme. Source in src/com/example/formulaheist/ (see the code map below); Game.java is the View with physics, drawing and touch.
+Jetpack Joyride style Android game with a physics theme. Source in src/com/elishajkmiller/formulaheist/ (see the code map below); Game.java is the View with physics, drawing and touch.
 
 - Build with ./build.sh (no Android SDK or Gradle; fetches its own tools on first run). Output is dist/formula-heist.apk.
 - Tap on the floor to jump, hold in the air to fire the jetpack. Real units on screen: 1 m is a ninth of the screen height, gravity 22 m/s^2 (game value, faster than Earth).
@@ -24,12 +24,12 @@ NULLCORP, an evil science company, stole every theory and formula; the mission i
 No rarity tiers. Every formula is equally likely (x3 if you do not own it yet). Each pull rolls a finish: GOLD 1 in 40 (GOLD_ODDS), HOLO 1 in 8 (HOLO_ODDS), otherwise NORMAL. You can own all three of each formula (prefs "plain", "holo", "gold" bit masks; the open ticket's finish is "pendingFin"). Holo paper has sliding rainbow foil bands and twinkles, gold is a shining gold gradient (cardPaper()). The finishes you own are stacked behind the front card in the archive grid and the big card, peeking out up and right; tap the big card to bring the next finish forward. A new finish of a formula you had is "NEW HOLO!" and so on, with the fanfare and spotlight. A duplicate pays DUP_PAY 10 electrons x2 holo, x5 gold. The 3x5 pixel font only has A-Z, 0-9 and . , ! - + / : ' ^ = ? so strings must stay in those characters.
 
 ## F-Droid
-LICENSE is GPL-3.0-or-later. fastlane/metadata/android/en-US holds the store text and icon. build.gradle and settings.gradle map the repo layout (src/, res/, root manifest) for a Gradle build; they are untested here (no Gradle or SDK on this machine). The app id is still com.example.formulaheist and there are no screenshots yet.
+LICENSE is GPL-3.0-or-later. fastlane/metadata/android/en-US holds the store text and icon. build.gradle and settings.gradle map the repo layout (src/, res/, root manifest) for a Gradle build; they are untested here (no Gradle or SDK on this machine). The app id is still com.elishajkmiller.formulaheist and there are no screenshots yet.
 
 ## Text and the prism
 UI text is a small 3x5 pixel font (CH/GL in Game.java: A-Z, 0-9 and . , ! - + / : ' ^ = ?), drawn with text()/textOut()/wrapText(); y is the top of the text, 5*sc tall (a 5x7 version overlapped everything, do not go bigger), with a 1 pixel dark outline instead of a drop shadow. Centred text that is too wide splits onto two lines. Formulas use a serif italic with real symbols (FORMD) drawn at screen resolution. The scratch cards show a glass prism: a white beam is refracted by Snell's law with a Cauchy fit for BK7 glass, 60 degree apex, 50 degree incidence; the red to violet spread is drawn 6x wider than real glass so the rainbow is visible (preview/prism-card.png). The break-in is part of PLAY (breaking = true): you can jump and use the jetpack on the way to the wall, and the hole opens at the height you hit it.
 
-## Code map (src/com/example/formulaheist/)
+## Code map (src/com/elishajkmiller/formulaheist/)
 - Main.java: the Activity (fullscreen, pause and resume).
 - Game.java: the View. State, touch input, settings, store, archive and scratch card, the update loop (physics, death ragdoll, spawning) and all drawing that is not a vehicle, hazard or room. Labelled sections in that order.
 - Vehicle.java: base class for crate vehicles, with the hooks Game calls (press, tick, accel, update, bounce, draw, sizes). Vehicle.KINDS lists them; a crate's type is an index into it. One file each: Stomper, Inverter, Quantum, Helix, Bird, Screw.

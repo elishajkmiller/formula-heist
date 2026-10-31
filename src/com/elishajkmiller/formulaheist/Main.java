@@ -1,4 +1,4 @@
-package com.example.formulaheist;
+package com.elishajkmiller.formulaheist;
 
 import android.app.Activity;
 import android.app.AlertDialog;

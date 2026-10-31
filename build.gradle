@@ -3,10 +3,10 @@ plugins {
 }
 
 android {
-    namespace 'com.example.formulaheist'
+    namespace 'com.elishajkmiller.formulaheist'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.example.formulaheist'
+        applicationId 'com.elishajkmiller.formulaheist'
         minSdk 26
         targetSdk 35
         versionCode 1
