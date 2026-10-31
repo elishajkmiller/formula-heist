@@ -1971,10 +1971,24 @@ public class Main extends Activity {
             "...BBbSSPPSSbBB."
         };
 
-        /** the torso rows for the female: hair over the back of the shoulder (the chest is its own sprite so it can jiggle) */
+        /**
+         * The torso rows for the female: the arm sits one row lower so the upper chest shows, a small V neckline
+         * replaces the collar and tie, and her hair falls over the back shoulder. The chest itself is a separate
+         * sprite (BUST) so it can jiggle.
+         */
         static String[] femaleBody(String[] body) {
             char[][] r = new char[body.length][];
             for (int i = 0; i < body.length; i++) r[i] = body[i].toCharArray();
+            for (int i = 3; i >= 1; i--) {                  // lower the arm by one row
+                for (int c = 6; c < 12; c++) {
+                    if (r[i][c] == 'x' || r[i][c] == 'S' || r[i][c] == 'N') { r[i + 1][c] = r[i][c]; r[i][c] = 'W'; }
+                }
+            }
+            for (int c = 5; c < 12; c++) {                   // a V neckline where the collar and tie were
+                if (r[0][c] == 'V' || r[0][c] == 't') r[0][c] = 'S';
+                if (r[1][c] == 'V') r[1][c] = 'S';
+                else if (r[1][c] == 't') r[1][c] = 'W';
+            }
             for (int i = 0; i < 4; i++) r[i][4] = 'B';
             String[] out = new String[body.length];
             for (int i = 0; i < body.length; i++) out[i] = new String(r[i]);
