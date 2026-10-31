@@ -470,8 +470,7 @@ public class Main extends Activity {
         // DNA helix: where the head has been, so the body can follow it
         final float[] yHist = new float[64];
         int yh;
-        float bustOff, bustV, lastVy;                // the chest spring
-        int lastPh;
+        float bustOff, bustV, lastVy;                // the chest spring: it only reacts to jumps and landings, not to running
         float boltCd, tilt;                          // tilt: degrees, nose up is negative
         static final int[][] RUNG = {{0xDC4646, 0x4678E6}, {0x50DC78, 0xF0C83C}, {0x4678E6, 0xDC4646}, {0xF0C83C, 0x50DC78}};   // A-T, C-G pairs
 
@@ -2021,17 +2020,33 @@ public class Main extends Activity {
 
         static final String[] BUST = {"WW.", "WWw", "ww."};      // small, on the upper chest just under the collar
 
+        /** the hanging lock swung backwards a little more or less in four frames, so it streams as she runs */
+        static final String[][] HAIR_FRAMES = hairFrames();
+
+        static String[] shiftRows(String[] base, int from, int by) {
+            String[] out = base.clone();
+            for (int i = from; i < out.length; i++) {
+                String r = out[i];
+                String gap = by < 0 ? "........".substring(0, -by) : "........".substring(0, by);
+                out[i] = by < 0 ? r.substring(-by) + gap : gap + r.substring(0, r.length() - by);
+            }
+            return out;
+        }
+
+        static String[][] hairFrames() {
+            String[] f1 = shiftRows(HAIR_BACK, 13, -1);
+            String[] f2 = shiftRows(shiftRows(HAIR_BACK, 12, -1), 15, -1);
+            return new String[][] {HAIR_BACK, f1, f2, f1};
+        }
+
         void drawHairBack(Canvas c, int left, int top) {
-            if (female) outlined(c, HAIR_BACK, left, top);
+            if (!female) return;
+            int f = onFloor && state == PLAY ? ((int) (runPhase * 0.2f * 4)) & 3 : ((int) (clock * 6)) & 3;
+            outlined(c, HAIR_FRAMES[f], left, top);
         }
 
         /** the chest sits a little lower or higher than its rest place as it springs after the body */
-        static final int[] STEP_BUST = {-1, 0, 1, 0};     // the chest rides up and down with the four run frames
-
-        int bustPx() {
-            int step = onFloor && state == PLAY ? STEP_BUST[((int) (runPhase * 0.2f * 4)) & 3] : 0;
-            return Math.max(-1, Math.min(1, Math.round(bustOff) + step));
-        }
+        int bustPx() { return Math.max(-1, Math.min(1, Math.round(bustOff))); }
 
         /** draw the chest at the sprite's top left; only the free edges get an outline so it does not cut into the coat */
         void drawBust(Canvas c, int left, int top) {
@@ -2048,16 +2063,11 @@ public class Main extends Activity {
             leanPx = lp;
         }
 
-        /** a small spring: it lags the body when you jump, land or step, then settles */
+        /** a small spring: it lags the body when you jump or land, then settles; running does not move it */
         void stepBust(float dt) {
             float dv = vy - lastVy;
             lastVy = vy;
             bustV += -dv * 3.3f;
-            int ph = ((int) (runPhase * 0.2f * 4)) & 3;
-            if (ph != lastPh) {
-                lastPh = ph;
-                if (onFloor) bustV += ((ph & 1) == 0 ? 1 : -1) * 30f;
-            }
             bustV += (-400f * bustOff - 16f * bustV) * dt;
             bustOff = Math.max(-2f, Math.min(2f, bustOff + bustV * dt));
         }
