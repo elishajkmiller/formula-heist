@@ -64,7 +64,7 @@ public class Main extends Activity {
     static class Coin { float x, y; boolean taken; }
 
     /** a background scientist who watches the player and points */
-    static class Npc { float x, phase; int coat, hair; }
+    static class Npc { float x, phase, pointT, nextPoint; int coat, hair; }
 
     static class Crate { float x, y; int type; }
 
@@ -290,6 +290,7 @@ public class Main extends Activity {
         void addNpc(float nx) {
             Npc n = new Npc();
             n.x = nx; n.phase = rnd.nextFloat() * 6f;
+            n.nextPoint = 0.5f + rnd.nextFloat() * 6f;
             n.coat = rnd.nextInt(COATS.length); n.hair = rnd.nextInt(HAIRS.length);
             npcs.add(n);
         }
@@ -396,7 +397,10 @@ public class Main extends Activity {
             npcLeft -= nsc;
             if (npcLeft <= 0) { addNpc(w + 10); npcLeft = 40 + rnd.nextInt(110); }
             for (int i = npcs.size() - 1; i >= 0; i--) {
-                npcs.get(i).x -= nsc;
+                Npc n = npcs.get(i);
+                n.x -= nsc;
+                if (n.pointT > 0) n.pointT -= rdt;
+                else if ((n.nextPoint -= rdt) <= 0) { n.pointT = 0.8f + rnd.nextFloat() * 1.2f; n.nextPoint = 2f + rnd.nextFloat() * 7f; }
                 if (npcs.get(i).x < -10) npcs.remove(i);
             }
 
@@ -1214,9 +1218,13 @@ public class Main extends Activity {
                 rectPx(c, nx - 2, base - 15, 5, 2, HAIRS[n.hair]);
                 rectPx(c, nx + (f > 0 ? 0 : -1), base - 14, 1, 1, Color.rgb(120, 235, 255));
                 rectPx(c, nx + (f > 0 ? 1 : 0), base - 14, 1, 1, Color.rgb(120, 235, 255));
-                if (((int) (clock * 3 + n.phase) & 1) == 0) rectPx(c, nx + (f > 0 ? 1 : 0), base - 12, 1, 1, Color.rgb(90, 50, 50));
-                // arm pointing at the player
+                if (n.pointT > 0) rectPx(c, nx + (f > 0 ? 1 : 0), base - 12, 1, 1, Color.rgb(90, 50, 50));
                 float sx = nx + f * 2, sy = base - 9;
+                if (n.pointT <= 0) {
+                    rectPx(c, sx, sy, 1, 4, Color.rgb(170, 180, 200));
+                    continue;
+                }
+                // arm pointing at the player
                 float ang = (float) Math.atan2(y - sy, playerX - sx);
                 float cs = (float) Math.cos(ang), sn = (float) Math.sin(ang);
                 for (int i = 0; i <= 4; i++) rectPx(c, sx + cs * i, sy + sn * i, 2, 2, coat);
