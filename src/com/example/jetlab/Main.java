@@ -66,6 +66,9 @@ public class Main extends Activity {
     /** a background scientist who watches the player and points */
     static class Npc { float x, phase, pointT, nextPoint, walk; int coat, hair, mode, face; }
 
+    /** a stolen formula, rolled up */
+    static class Scroll { float x, y; int idx; }
+
     static class Crate { float x, y; int type; }
 
     static class Zapper {
@@ -80,7 +83,7 @@ public class Main extends Activity {
     /** Short synthesized sound effects, no audio files. */
     static class Sfx {
         static final int RATE = 22050;
-        final AudioTrack[] tr = new AudioTrack[9];
+        final AudioTrack[] tr = new AudioTrack[10];
         // stop/reload/play can block for a frame, so every call runs off the game thread
         final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -94,6 +97,7 @@ public class Main extends Activity {
                 tr[Game.S_WARN] = mk(tone(820, 820, 90, 0.4f, 0f, true));
                 tr[Game.S_DONE] = mk(tone(500, 1400, 260, 0.6f, 0f, true));
                 tr[Game.S_TELE] = mk(tone(1800, 250, 150, 0.5f, 0.15f, true));
+                tr[Game.S_SCRATCH] = mk(tone(2600, 1400, 35, 0.22f, 0.85f, false));
                 tr[Game.S_BUILD] = mk(build());
             } catch (Throwable t) { }
         }
@@ -173,11 +177,12 @@ public class Main extends Activity {
     /** One game view: physics, drawing and input in one place. */
     static class Game extends View implements Choreographer.FrameCallback {
 
-        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, INTRO = 4, FLIP = 5, LAUNCH = 6, FLY = 7, MISS = 8;
+        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, LAUNCH = 4, FLY = 5, MISS = 6, ARCHIVE = 7, SCRATCH = 8;
+        static final int NF = 20;           // formulas to recover
         static final float MAXPULL = 34f;       // longest pull back, in pixels
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
         static final float BUILD_TIME = 1.5f;
-        static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8;
+        static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9;
         static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER"};
         static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN ON THE OTHER SIDE."};
 
@@ -215,6 +220,78 @@ public class Main extends Activity {
         final ArrayList<Missile> missiles = new ArrayList<>();
         final ArrayList<Crate> crates = new ArrayList<>();
         final ArrayList<Npc> npcs = new ArrayList<>();
+        final ArrayList<Scroll> scrolls = new ArrayList<>();
+
+        static final String[] FORM = {
+            "F = MA",
+            "E = MC^2",
+            "V = IR",
+            "PV = NRT",
+            "V = U + AT",
+            "F = GMM/R^2",
+            "E = HF",
+            "S = K LN W",
+            "DX DP = H/4PI",
+            "F = KX",
+            "KE = MV^2/2",
+            "PE = MGH",
+            "V = FL",
+            "N1 SIN A = N2 SIN B",
+            "F = KQQ/R^2",
+            "P = MV",
+            "W = FD",
+            "P = E/T",
+            "T = 2PI SQRT L/G",
+            "A = V^2/R"
+        };
+        static final String[] FNAME = {
+            "NEWTON'S SECOND LAW",
+            "MASS-ENERGY",
+            "OHM'S LAW",
+            "IDEAL GAS LAW",
+            "CONSTANT ACCELERATION",
+            "UNIVERSAL GRAVITATION",
+            "PLANCK RELATION",
+            "ENTROPY",
+            "UNCERTAINTY",
+            "HOOKE'S LAW",
+            "KINETIC ENERGY",
+            "POTENTIAL ENERGY",
+            "WAVE SPEED",
+            "SNELL'S LAW",
+            "COULOMB'S LAW",
+            "MOMENTUM",
+            "WORK",
+            "POWER",
+            "PENDULUM",
+            "CENTRIPETAL ACCELERATION"
+        };
+        static final String[] FDESC = {
+            "PUSH HARDER AND A THING SPEEDS UP MORE. HEAVIER THINGS SPEED UP LESS.",
+            "A TINY BIT OF MASS HOLDS A HUGE AMOUNT OF ENERGY.",
+            "VOLTAGE EQUALS CURRENT TIMES RESISTANCE. IT IS WHY WIRES GET WARM.",
+            "SQUEEZE A GAS AND ITS PRESSURE OR ITS TEMPERATURE GOES UP.",
+            "YOUR SPEED AFTER ACCELERATING FOR A WHILE IS YOUR START SPEED PLUS A TIMES T.",
+            "EVERYTHING PULLS ON EVERYTHING ELSE, WEAKER WITH DISTANCE SQUARED.",
+            "LIGHT COMES IN PACKETS. HIGHER FREQUENCY MEANS MORE ENERGY PER PACKET.",
+            "DISORDER GROWS BECAUSE THERE ARE MORE MESSY WAYS TO BE THAN TIDY ONES.",
+            "YOU CANNOT KNOW EXACTLY WHERE A PARTICLE IS AND HOW FAST IT IS GOING.",
+            "A SPRING PUSHES BACK IN PROPORTION TO HOW FAR YOU STRETCH IT.",
+            "DOUBLE THE SPEED AND YOU QUADRUPLE THE ENERGY.",
+            "LIFT SOMETHING HIGHER AND YOU STORE MORE ENERGY IN IT.",
+            "THE SPEED OF A WAVE IS ITS FREQUENCY TIMES ITS WAVELENGTH.",
+            "THIS IS HOW LIGHT BENDS WHEN IT GOES INTO WATER OR GLASS.",
+            "LIKE CHARGES PUSH APART AND OPPOSITE CHARGES PULL TOGETHER.",
+            "MASS TIMES VELOCITY. IT IS CONSERVED IN EVERY COLLISION.",
+            "WORK IS THE FORCE TIMES THE DISTANCE IT MOVES SOMETHING.",
+            "POWER IS HOW FAST ENERGY IS USED: ENERGY DIVIDED BY TIME.",
+            "A LONGER PENDULUM SWINGS MORE SLOWLY.",
+            "TO GO IN A CIRCLE YOU MUST ACCELERATE TOWARD THE CENTER."
+        };
+        int ownedMask, scratchedMask, archFrom, selCard, mcols, mrows, cleared, bannerIdx, abx, aby, abw, abh, cbx, cby, cbw, cbh, scx, scy, scw, sch;
+        boolean selScratched;
+        final boolean[] mask = new boolean[2000];
+        float nextParch, bannerT, lastScratchSfx;
         static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
         static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
         float lastBg, npcLeft;
@@ -242,8 +319,8 @@ public class Main extends Activity {
         Sfx sfx;
         boolean ghost, outline;
         float leanPx, landT, ang, angV, settleT, finalDist;
-        boolean seenIntro, dragging, moved;
-        float tx0, ty0, pdx, pdy, lastDx = -22f, lastDy = 14f, introT, flipT, bonus, launchT, tipT, outX, slingX, slingY, flyVx, holeY;
+        boolean dragging, moved;
+        float tx0, ty0, pdx, pdy, lastDx = -22f, lastDy = 14f, bonus, launchT, tipT, outX, slingX, slingY, flyVx, holeY;
         boolean holeOpen;
         int bounces;
         boolean settled;
@@ -257,6 +334,8 @@ public class Main extends Activity {
             super(c);
             prefs = c.getSharedPreferences("jetlab", Context.MODE_PRIVATE);
             best = prefs.getInt("best", 0);
+            ownedMask = prefs.getInt("owned", 0);
+            scratchedMask = prefs.getInt("scratched", 0);
             p.setAntiAlias(false);
             blit.setFilterBitmap(false);
         }
@@ -291,6 +370,9 @@ public class Main extends Activity {
             ceilY = 11;
             playerX = w * 0.22f;
             slingY = floorY - 50f;
+            abw = 66; abh = 11; abx = w - abw - 4; aby = h - 12;
+            cbw = 36; cbh = 11; cbx = w - cbw - 4; cby = 3;
+            scw = Math.min(200, w - 24); sch = 104; scx = (w - scw) / 2; scy = 24;
             if (state == START) toLaunch(true);
             populateNpcs();
         }
@@ -331,7 +413,8 @@ public class Main extends Activity {
 
         /** back outside on the ground, in front of the wall, ready to aim */
         void toLaunch(boolean keepState) {
-            coins.clear(); zappers.clear(); missiles.clear(); crates.clear();
+            coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear();
+            nextParch = 70; bannerT = 0;
             for (int i = 0; i < NP; i++) pl[i] = 0;
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
             diving = false; nextCrate = 80; thrusting = false;
@@ -369,11 +452,14 @@ public class Main extends Activity {
             float gx = e.getX() / unit, gy = e.getY() / unit;
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    if (state == START) {
-                        if (!seenIntro) { seenIntro = true; state = INTRO; introT = 0; }
-                        else state = LAUNCH;
-                    } else if (state == INTRO) {
-                        if (introT > 0.4f) { state = FLIP; flipT = 0; sfx(S_FLIP); }
+                    if (archiveButtonHit(gx, gy)) {
+                        archFrom = state; state = ARCHIVE; dragging = false; thrusting = false;
+                    } else if (state == START) {
+                        state = LAUNCH;
+                    } else if (state == ARCHIVE) {
+                        archiveTap(gx, gy);
+                    } else if (state == SCRATCH) {
+                        scratchDown(gx, gy);
                     } else if (state == DEAD) {
                         if (stateTime > 0.7f) reset();
                     } else if (state == LAUNCH) {
@@ -384,7 +470,9 @@ public class Main extends Activity {
                     }
                     break;
                 case MotionEvent.ACTION_MOVE:
-                    if (state == LAUNCH && dragging) {
+                    if (state == SCRATCH && dragging) {
+                        scratchAt(gx, gy);
+                    } else if (state == LAUNCH && dragging) {
                         float dx = gx - tx0, dy = gy - ty0;
                         float len = (float) Math.sqrt(dx * dx + dy * dy);
                         if (len > MAXPULL) { dx *= MAXPULL / len; dy *= MAXPULL / len; len = MAXPULL; }
@@ -397,6 +485,7 @@ public class Main extends Activity {
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     thrusting = false;
+                    if (state == SCRATCH) dragging = false;
                     if (state == LAUNCH && dragging) {
                         dragging = false;
                         if (moved && pdx * pdx + pdy * pdy > 36f) { lastDx = pdx; lastDy = pdy; }
@@ -464,6 +553,211 @@ public class Main extends Activity {
             for (int i = 0; i < 8; i++) dust(playerX, floorY - 2);
         }
 
+        int randomUnowned() {
+            int n = 0, pick = -1;
+            for (int i = 0; i < NF; i++) {
+                if ((ownedMask >> i & 1) == 0 && rnd.nextInt(++n) == 0) pick = i;
+            }
+            return pick;
+        }
+
+        void saveFormulas() {
+            prefs.edit().putInt("owned", ownedMask).putInt("scratched", scratchedMask).apply();
+        }
+
+        void collectScroll(int idx) {
+            ownedMask |= 1 << idx;
+            saveFormulas();
+            bannerIdx = idx; bannerT = 3.2f;
+            flash = 0.12f;
+            sfx(S_DONE);
+            buzz(30);
+            for (int i = 0; i < 18; i++) confetti(playerX, y);
+        }
+
+        void confetti(float bx, float by) {
+            int k = pNext++ % NP;
+            px[k] = bx; py[k] = by;
+            pvx[k] = (rnd.nextFloat() - 0.5f) * 10f * ppm;
+            pvy[k] = (rnd.nextFloat() - 0.8f) * 9f * ppm;
+            pl[k] = 0.9f;
+            int[] cols = {Color.rgb(255, 215, 90), Color.rgb(255, 120, 170), Color.rgb(120, 235, 255), Color.rgb(160, 255, 150)};
+            pcol[k] = cols[rnd.nextInt(cols.length)];
+        }
+
+        void flake(float bx, float by) {
+            int k = pNext++ % NP;
+            px[k] = bx; py[k] = by;
+            pvx[k] = (rnd.nextFloat() - 0.5f) * 5f * ppm;
+            pvy[k] = (rnd.nextFloat() - 0.4f) * 5f * ppm;
+            pl[k] = 0.45f;
+            pcol[k] = Color.rgb(200 + rnd.nextInt(40), 205 + rnd.nextInt(40), 220);
+        }
+
+        // ---------- archive: the recovered formulas, scratch off to reveal ----------
+
+        boolean archiveButtonHit(float gx, float gy) {
+            if (!(state == START || state == LAUNCH || (state == DEAD && stateTime > 0.3f))) return false;
+            return gx >= abx && gx < abx + abw && gy >= aby && gy < aby + abh;
+        }
+
+        boolean closeHit(float gx, float gy) {
+            return gx >= cbx - 6 && gx < cbx + cbw + 6 && gy >= cby - 3 && gy < cby + cbh + 6;
+        }
+
+        int archCols() { return Math.max(5, Math.min(10, (w - 16) / 30)); }
+
+        /** x, y, width, height of card i in the grid */
+        int[] cardRect(int i) {
+            int cols = archCols(), rows = (NF + cols - 1) / cols;
+            int cw = (w - 16) / cols, chh = Math.min(40, (h - 34) / rows);
+            return new int[] {8 + (i % cols) * cw + 2, 22 + (i / cols) * chh + 2, cw - 4, chh - 4};
+        }
+
+        void archiveTap(float gx, float gy) {
+            if (closeHit(gx, gy)) { state = archFrom; return; }
+            for (int i = 0; i < NF; i++) {
+                int[] r = cardRect(i);
+                if (gx >= r[0] && gx < r[0] + r[2] && gy >= r[1] && gy < r[1] + r[3] && (ownedMask >> i & 1) != 0) {
+                    selCard = i;
+                    selScratched = (scratchedMask >> i & 1) != 0;
+                    mcols = scw / 4; mrows = sch / 4;
+                    java.util.Arrays.fill(mask, selScratched);
+                    cleared = 0; dragging = false;
+                    state = SCRATCH;
+                    return;
+                }
+            }
+        }
+
+        void scratchDown(float gx, float gy) {
+            if (closeHit(gx, gy)) { state = ARCHIVE; dragging = false; return; }
+            if (!selScratched && gx >= scx && gx < scx + scw && gy >= scy && gy < scy + sch) {
+                dragging = true;
+                scratchAt(gx, gy);
+            }
+        }
+
+        void scratchAt(float gx, float gy) {
+            if (selScratched) return;
+            int rad = 7;
+            int c0 = (int) ((gx - rad - scx) / 4), c1 = (int) ((gx + rad - scx) / 4);
+            int r0 = (int) ((gy - rad - scy) / 4), r1 = (int) ((gy + rad - scy) / 4);
+            for (int cy = Math.max(0, r0); cy <= Math.min(mrows - 1, r1); cy++) {
+                for (int cx = Math.max(0, c0); cx <= Math.min(mcols - 1, c1); cx++) {
+                    float ccx = scx + cx * 4 + 2, ccy = scy + cy * 4 + 2;
+                    float ddx = ccx - gx, ddy = ccy - gy;
+                    if (ddx * ddx + ddy * ddy <= rad * rad && !mask[cy * mcols + cx]) {
+                        mask[cy * mcols + cx] = true;
+                        cleared++;
+                        if (rnd.nextInt(5) == 0) flake(ccx, ccy);
+                    }
+                }
+            }
+            if (clock - lastScratchSfx > 0.07f) { sfx(S_SCRATCH); lastScratchSfx = clock; }
+            if (cleared >= mcols * mrows * 0.6f) revealCard();
+        }
+
+        void revealCard() {
+            java.util.Arrays.fill(mask, true);
+            selScratched = true; dragging = false;
+            scratchedMask |= 1 << selCard;
+            saveFormulas();
+            flash = 0.2f; shake = 2f;
+            sfx(S_DONE);
+            buzz(25);
+            for (int i = 0; i < 40; i++) confetti(scx + scw / 2f, scy + sch / 2f);
+        }
+
+        void closeButton(Canvas c) {
+            rectPx(c, cbx, cby, cbw, cbh, Color.rgb(8, 10, 20));
+            rectPx(c, cbx + 1, cby + 1, cbw - 2, cbh - 2, Color.rgb(60, 70, 100));
+            text(c, "CLOSE", cbx + cbw / 2f, cby + 3, 1, Color.WHITE, 1);
+        }
+
+        void drawArchiveButton(Canvas c) {
+            boolean fresh = (ownedMask & ~scratchedMask) != 0;
+            rectPx(c, abx, aby, abw, abh, Color.rgb(8, 10, 20));
+            rectPx(c, abx + 1, aby + 1, abw - 2, abh - 2, fresh && ((int) (clock * 3) & 1) == 0 ? Color.rgb(130, 100, 30) : Color.rgb(44, 54, 82));
+            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, abx + abw / 2f, aby + 3, 1, Color.WHITE, 1);
+        }
+
+        void silver(Canvas c, int x, int y, int cw, int chh) {
+            rectPx(c, x, y, cw, chh, Color.rgb(176, 182, 196));
+            for (int yy = 0; yy < chh; yy += 2) {
+                for (int xx = 0; xx < cw; xx += 2) {
+                    int hsh = (xx * 7 + yy * 13 + (xx / 2) * (yy / 2)) % 3;
+                    if (hsh == 1) rectPx(c, x + xx, y + yy, 2, 2, Color.rgb(160, 166, 182));
+                    else if (hsh == 2) rectPx(c, x + xx, y + yy, 2, 2, Color.rgb(192, 198, 210));
+                }
+            }
+        }
+
+        void drawArchive(Canvas c) {
+            rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
+            for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
+            text(c, "FORMULA ARCHIVE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
+            int owned = Integer.bitCount(ownedMask), shown = Integer.bitCount(scratchedMask);
+            text(c, owned + "/" + NF + " RECOVERED   " + shown + "/" + NF + " REVEALED", 8, 13, 1, Color.rgb(150, 190, 215), 0);
+            closeButton(c);
+            for (int i = 0; i < NF; i++) {
+                int[] r = cardRect(i);
+                boolean have = (ownedMask >> i & 1) != 0, seen = (scratchedMask >> i & 1) != 0;
+                rectPx(c, r[0], r[1], r[2], r[3], Color.rgb(8, 10, 20));
+                if (seen) {
+                    rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(236, 222, 180));
+                    rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, 1, Color.rgb(196, 160, 100));
+                    String f = FORM[i];
+                    if (f.length() * 4 <= r[2] - 2) text(c, f, r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 60, 40), 1);
+                    else text(c, "" + (i + 1), r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 60, 40), 1);
+                } else if (have) {
+                    silver(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2);
+                    if (((int) (clock * 3) + i & 3) == 0) rectPx(c, r[0] + r[2] / 2 - 1, r[1] + r[3] / 2 - 3, 2, 6, Color.WHITE);
+                    text(c, "?", r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 96, 112), 1);
+                } else {
+                    rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(28, 34, 52));
+                    text(c, "" + (i + 1), r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(60, 70, 96), 1);
+                }
+            }
+            if (shown == NF) {
+                if (((int) (clock * 2) & 1) == 0) text(c, "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!", w / 2f, h - 11, 1, Color.rgb(120, 255, 160), 1);
+            } else if ((ownedMask & ~scratchedMask) != 0) {
+                text(c, "TAP A SILVER CARD TO SCRATCH IT OFF", w / 2f, h - 11, 1, Color.rgb(255, 200, 80), 1);
+            } else {
+                text(c, "FIND SCROLLS ON YOUR RUNS TO RECOVER MORE", w / 2f, h - 11, 1, Color.rgb(150, 190, 215), 1);
+            }
+            drawParticles(c);
+        }
+
+        void drawScratch(Canvas c) {
+            rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
+            closeButton(c);
+            text(c, selScratched ? FNAME[selCard] : "SCRATCH IT OFF", 8, 8, 1, Color.rgb(255, 215, 120), 0);
+            // the parchment
+            rectPx(c, scx - 2, scy - 2, scw + 4, sch + 4, Color.rgb(8, 10, 20));
+            rectPx(c, scx, scy, scw, sch, Color.rgb(236, 222, 180));
+            rectPx(c, scx, scy, scw, 3, Color.rgb(196, 160, 100));
+            rectPx(c, scx, scy + sch - 3, scw, 3, Color.rgb(196, 160, 100));
+            int ink = Color.rgb(90, 60, 40);
+            text(c, FNAME[selCard], scx + scw / 2f, scy + 9, 1, Color.rgb(140, 100, 60), 1);
+            String f = FORM[selCard];
+            int sc = f.length() * 8 <= scw - 12 ? 2 : 1;
+            text(c, f, scx + scw / 2f, scy + 32, sc, ink, 1);
+            wrapText(c, FDESC[selCard], scx + scw / 2f, scy + 56, 1, ink, scw - 24);
+            // the silver layer left to scratch
+            if (!selScratched) {
+                for (int cy = 0; cy < mrows; cy++) {
+                    for (int cx = 0; cx < mcols; cx++) {
+                        if (mask[cy * mcols + cx]) continue;
+                        int hsh = (cx * 7 + cy * 13 + cx * cy) % 3;
+                        rectPx(c, scx + cx * 4, scy + cy * 4, 4, 4, hsh == 0 ? Color.rgb(176, 182, 196) : hsh == 1 ? Color.rgb(160, 166, 182) : Color.rgb(192, 198, 210));
+                    }
+                }
+                if (cleared < mcols * mrows * 0.15f) text(c, "SCRATCH HERE", scx + scw / 2f, scy + sch / 2f - 2, 1, Color.rgb(90, 96, 112), 1);
+            }
+            drawParticles(c);
+        }
+
         void debris(float bx, float by) {
             int k = pNext++ % NP;
             px[k] = bx; py[k] = by;
@@ -474,15 +768,8 @@ public class Main extends Activity {
             pcol[k] = cols[rnd.nextInt(cols.length)];
         }
 
-        /** waiting at the sling: title, intro picture, the flip to side view, and aiming */
+        /** waiting at the sling: title screen and aiming */
         void updateLaunch(float dt) {
-            if (state == INTRO) {
-                introT += dt;
-                if (introT > 3.6f) { state = FLIP; flipT = 0; sfx(S_FLIP); }
-            } else if (state == FLIP) {
-                flipT += dt;
-                if (flipT >= 0.8f) state = LAUNCH;
-            }
             y = slingY; vy = -1f; onFloor = !(state == LAUNCH && dragging);
             speed = 0;
             for (int i = 0; i < NP; i++) {
@@ -547,7 +834,7 @@ public class Main extends Activity {
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
 
-            boolean waiting = state == START || state == INTRO || state == FLIP || state == LAUNCH;   // the scene holds still until he runs
+            boolean waiting = state == START || state == LAUNCH || state == ARCHIVE || state == SCRATCH;   // the scene holds still until he runs
             float nsc = (bgOff - lastBg) * 2.4f;       // background scientists move at 60% of the floor
             lastBg = bgOff;
             npcLeft -= nsc;
@@ -567,7 +854,16 @@ public class Main extends Activity {
                 return;
             }
             if (state == FLY) { updateFly(dt); return; }
-            if (state == START || state == INTRO || state == FLIP || state == LAUNCH) { updateLaunch(dt); return; }
+            if (state == ARCHIVE || state == SCRATCH) {
+                for (int i = 0; i < NP; i++) {
+                    if (pl[i] > 0) {
+                        pl[i] -= dt;
+                        px[i] += pvx[i] * dt; py[i] += pvy[i] * dt;
+                    }
+                }
+                return;
+            }
+            if (state == START || state == LAUNCH) { updateLaunch(dt); return; }
             if (state == BUILD) {
                 buildT += rdt;
                 dt = rdt * 0.15f;                           // time slows while the vehicle assembles
@@ -658,6 +954,19 @@ public class Main extends Activity {
                     continue;
                 }
                 if (k.x < -20) crates.remove(i);
+            }
+
+            if (bannerT > 0) bannerT -= rdt;
+            for (int i = scrolls.size() - 1; i >= 0; i--) {
+                Scroll k = scrolls.get(i);
+                k.x -= scroll;
+                float dx = k.x - playerX, dy = k.y - y;
+                if (state == PLAY && dx * dx + dy * dy < (r + 9) * (r + 9)) {
+                    collectScroll(k.idx);
+                    scrolls.remove(i);
+                    continue;
+                }
+                if (k.x < -20) scrolls.remove(i);
             }
 
             for (int i = coins.size() - 1; i >= 0; i--) {
@@ -827,6 +1136,7 @@ public class Main extends Activity {
             for (Coin k : coins) k.x -= sc;
             for (Zapper z : zappers) z.x -= sc;
             for (Crate k : crates) k.x -= sc;
+            for (Scroll k : scrolls) k.x -= sc;
             for (int i = missiles.size() - 1; i >= 0; i--) {
                 Missile m = missiles.get(i);
                 if (m.flying) { m.x -= (speed + 9f) * ppm * dt; if (m.x < -ppm) missiles.remove(i); }
@@ -887,6 +1197,18 @@ public class Main extends Activity {
                 }
                 return;
             }
+            if (dist >= nextParch) {
+                int idx = randomUnowned();
+                if (idx >= 0) {
+                    Scroll k = new Scroll();
+                    k.x = x0; k.y = randY(3f, 6f); k.idx = idx;
+                    scrolls.add(k);
+                    spawnLeft = 3f * ppm;
+                    nextParch = dist + 140 + rnd.nextInt(120);
+                    return;
+                }
+                nextParch = 1e9f;
+            }
             int roll = rnd.nextInt(10);
             float gap = (3.5f - Math.min(dist / 400f, 1.5f) + rnd.nextFloat() * 2f) * ppm;
             if (roll < 4) {
@@ -932,7 +1254,7 @@ public class Main extends Activity {
 
         // ---------- drawing (pixel art, drawn small then scaled up) ----------
 
-        static final String CH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!-+/:'^ ";
+        static final String CH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!-+/:'^ =?";
         static final String[] GL = {
             "010101111101101", "110101110101110", "011100100100011", "110101101101110", "111100110100111",
             "111100110100100", "011100101101011", "101101111101101", "111010010010111", "001001001101010",
@@ -943,7 +1265,7 @@ public class Main extends Activity {
             "111101101101111", "010110010010111", "110001010100111", "110001010001110", "101101111001001",
             "111100110001110", "011100111101111", "111001010010010", "111101111101111", "111101111001110",
             "000000000000010", "000000000010100", "010010010000010", "000000111000000", "000010111010000",
-            "001001010100100", "000010000010000", "010010000000000", "010101000000000", "000000000000000"
+            "001001010100100", "000010000010000", "010010000000000", "010101000000000", "000000000000000", "000111000111000", "110001010000010"
         };
 
         static final String[] SPR_HEAD = {
@@ -1334,25 +1656,13 @@ public class Main extends Activity {
         protected void onDraw(Canvas out) {
             if (w == 0 || bc == null) return;
             Canvas c = bc;
-            if (state == INTRO) {
-                drawTopDown(c);
-            } else if (state == FLIP) {
-                rectPx(c, 0, 0, w, h, Color.rgb(6, 8, 14));
-                float t = flipT / 0.8f;
-                boolean first = t < 0.5f;
-                float sy = first ? 1f - t / 0.5f : (t - 0.5f) / 0.5f;     // the picture tips over like a card
-                if (sy > 0.04f) {
-                    c.save();
-                    c.scale(1f, sy, w / 2f, h / 2f);
-                    if (first) drawTopDown(c); else drawScene(c);
-                    c.restore();
-                }
-            } else {
-                drawScene(c);
-            }
+            if (state == ARCHIVE) drawArchive(c);
+            else if (state == SCRATCH) drawScratch(c);
+            else drawScene(c);
             if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
+            if (state == START || state == LAUNCH || state == DEAD) drawArchiveButton(c);
             out.save();
             if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);
@@ -1368,6 +1678,7 @@ public class Main extends Activity {
             drawLauncher(c);
             drawCoins(c);
             drawCrates(c);
+            drawScrolls(c);
             drawZappers(c);
             drawMissiles(c);
             drawParticles(c);
@@ -1467,7 +1778,7 @@ public class Main extends Activity {
             rectPx(c, sx + 6, fy - 8, 3, 16, wood2);
             boolean aiming = (state == LAUNCH && dragging);
             float pcx = playerX + (aiming ? pdx : 0f), pcy = y + (aiming ? pdy : 0f);
-            boolean taut = state == START || state == LAUNCH || state == FLIP;
+            boolean taut = state == START || state == LAUNCH;
             for (int k = 0; k < 2; k++) {
                 float ax = k == 0 ? sx - 8 : sx + 7, ay = fy - 7;
                 float bx = taut ? pcx + (k == 0 ? -2 : 2) : sx, by = taut ? pcy - 2 : fy - 2;
@@ -1522,87 +1833,6 @@ public class Main extends Activity {
                 text(c, "STRETCH THE SPRINGS AND RELEASE", w / 2f, top, 1, Color.rgb(255, 200, 80), 1);
                 text(c, "A QUICK TAP REPEATS YOUR LAST SHOT", w / 2f, top + 9, 1, Color.rgb(150, 190, 215), 1);
             }
-        }
-
-        void drawTopDown(Canvas c) {
-            rectPx(c, 0, 0, w, h, Color.rgb(20, 32, 28));
-            for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(26, 42, 36));
-            for (int gy = 0; gy < h; gy += 16) rectPx(c, 0, gy, w, 1, Color.rgb(26, 42, 36));
-            int bx = Math.round(w * 0.46f), by = 16, bw = w - bx - 14, bh = h - 32;
-            // fence
-            int fence = Color.rgb(150, 150, 165);
-            for (int x = bx - 8; x < bx + bw + 8; x += 4) { rectPx(c, x, by - 8, 2, 2, fence); rectPx(c, x, by + bh + 6, 2, 2, fence); }
-            for (int yy = by - 8; yy < by + bh + 8; yy += 4) { rectPx(c, bx - 8, yy, 2, 2, fence); rectPx(c, bx + bw + 6, yy, 2, 2, fence); }
-            // roof of the enemy lab
-            rectPx(c, bx, by, bw, bh, Color.rgb(40, 50, 72));
-            rectPx(c, bx + 2, by + 2, bw - 4, bh - 4, Color.rgb(68, 80, 106));
-            int sw = (bw - 28) / 3;
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 2; j++) {
-                    int sx = bx + 8 + i * (sw + 6), sy = by + 8 + j * (bh - 44);
-                    rectPx(c, sx, sy, sw, 14, Color.rgb(30, 70, 100));
-                    rectPx(c, sx + 1, sy + 1, sw - 2, 12, Color.rgb(60, 140, 180));
-                    rectPx(c, sx + 2 + ((int) (clock * 20) + i * 9 + j * 5) % Math.max(1, sw - 6), sy + 2, 3, 10, Color.argb(90, 255, 255, 255));
-                }
-            }
-            text(c, "NULLCORP", bx + bw / 2f, by + bh / 2f - 4, 2, Color.rgb(205, 70, 70), 1);
-            // the hatch you are breaking in through
-            int hx = bx - 2, hy = by + bh / 2 - 5;
-            if (((int) (clock * 3) & 1) == 0) {
-                for (int i = -4; i <= 4; i++) {
-                    rectPx(c, hx + i, hy + 5 + i, 2, 2, Color.rgb(255, 70, 60));
-                    rectPx(c, hx + i, hy + 5 - i, 2, 2, Color.rgb(255, 70, 60));
-                }
-            }
-            // searchlights sweeping from two corners
-            for (int k = 0; k < 2; k++) {
-                float cx = k == 0 ? bx : bx + bw, cy = k == 0 ? by : by + bh;
-                float a = clock * (k == 0 ? 0.9f : -0.8f) + k * 2.1f;
-                path.reset();
-                path.moveTo(cx, cy);
-                path.lineTo(cx + (float) Math.cos(a - 0.18) * 80, cy + (float) Math.sin(a - 0.18) * 80);
-                path.lineTo(cx + (float) Math.cos(a + 0.18) * 80, cy + (float) Math.sin(a + 0.18) * 80);
-                path.close();
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.argb(46, 255, 245, 160));
-                c.drawPath(path, p);
-            }
-            // patrolling scientists in white coats
-            for (int i = 0; i < 5; i++) {
-                float t = (clock * 0.07f + i * 0.2f) % 1f;
-                float px0, py0;
-                float per = t * 4f;
-                int rx0 = bx + 6, ry0 = by + 6, rw = bw - 12, rh = bh - 12;
-                if (per < 1f) { px0 = rx0 + rw * per; py0 = ry0; }
-                else if (per < 2f) { px0 = rx0 + rw; py0 = ry0 + rh * (per - 1f); }
-                else if (per < 3f) { px0 = rx0 + rw * (3f - per); py0 = ry0 + rh; }
-                else { px0 = rx0; py0 = ry0 + rh * (4f - per); }
-                rectPx(c, px0 - 2, py0 - 2, 5, 5, Color.rgb(8, 10, 20));
-                rectPx(c, px0 - 1, py0 - 1, 3, 3, Color.rgb(245, 247, 252));
-                rectPx(c, px0, py0, 1, 1, Color.rgb(110, 70, 40));
-            }
-            // your launch tower, seen from above, and the way in
-            int tx = Math.round(w * 0.13f), ty = Math.round(h * 0.66f);
-            rectPx(c, tx - 11, ty - 11, 22, 22, Color.rgb(46, 54, 70));
-            rectPx(c, tx - 9, ty - 9, 18, 18, Color.rgb(112, 126, 150));
-            rectPx(c, tx - 1, ty - 1, 3, 8, Color.rgb(120, 78, 44));
-            rectPx(c, tx - 6, ty - 8, 3, 8, Color.rgb(160, 108, 64));
-            rectPx(c, tx + 4, ty - 8, 3, 8, Color.rgb(160, 108, 64));
-            rectPx(c, tx - 6, ty + 1, 13, 2, Color.rgb(120, 78, 44));
-            int shown = 3 + ((int) (clock * 9) % 14);
-            for (int i = 0; i < shown; i++) {
-                float f = i / 16f;
-                float ax = tx + 14 + (hx - tx - 18) * f, ay = ty + (hy + 5 - ty) * f - (float) Math.sin(f * Math.PI) * 8;
-                rectPx(c, ax, ay, 2, 2, Color.argb(220, 255, 255, 255));
-            }
-            // briefing
-            text(c, "NULLCORP STOLE EVERY", 10, 20, 1, Color.WHITE, 0);
-            text(c, "THEORY AND FORMULA.", 10, 29, 1, Color.WHITE, 0);
-            text(c, "STEAL THEM", 10, 42, 2, Color.rgb(255, 200, 80), 0);
-            text(c, "BACK.", 10, 55, 2, Color.rgb(255, 200, 80), 0);
-            text(c, "THEN SHARE THEM", 10, 72, 1, Color.rgb(120, 235, 255), 0);
-            text(c, "WITH THE WORLD.", 10, 81, 1, Color.rgb(120, 235, 255), 0);
-            if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO CONTINUE", 10, h - 16, 1, Color.rgb(150, 190, 215), 0);
         }
 
         void drawBackground(Canvas c) {
@@ -2161,6 +2391,22 @@ public class Main extends Activity {
             rectPx(c, w / 2f - bw / 2f, ceilY + 49, bw * Math.min(1f, buildT / BUILD_TIME), 3, Color.rgb(120, 235, 255));
         }
 
+        void drawScrolls(Canvas c) {
+            for (Scroll k : scrolls) {
+                int cx = Math.round(k.x), cy = Math.round(k.y + (float) Math.sin(clock * 3 + k.x * 0.04f) * 2);
+                int g = 34 + (int) (30 * Math.sin(clock * 5));
+                rectPx(c, cx - 11, cy - 10, 22, 20, Color.argb(g, 255, 230, 140));
+                rectPx(c, cx - 9, cy - 7, 18, 14, Color.rgb(30, 22, 16));
+                rectPx(c, cx - 6, cy - 5, 12, 10, Color.rgb(236, 222, 180));
+                for (int i = 0; i < 3; i++) rectPx(c, cx - 4, cy - 3 + i * 3, 8, 1, Color.rgb(120, 90, 60));
+                rectPx(c, cx - 8, cy - 6, 3, 12, Color.rgb(196, 160, 100));
+                rectPx(c, cx - 8, cy - 6, 1, 12, Color.rgb(230, 200, 140));
+                rectPx(c, cx + 5, cy - 6, 3, 12, Color.rgb(196, 160, 100));
+                rectPx(c, cx + 7, cy - 6, 1, 12, Color.rgb(150, 110, 60));
+                rectPx(c, cx - 1, cy - 6, 2, 12, Color.rgb(200, 60, 60));
+            }
+        }
+
         void drawCrates(Canvas c) {
             for (Crate k : crates) {
                 int cx = Math.round(k.x), cy = Math.round(k.y + (float) Math.sin(clock * 4 + k.x * 0.05f) * 2);
@@ -2178,6 +2424,7 @@ public class Main extends Activity {
             int top = Math.round(ceilY) + 4;
             text(c, (int) (state == DEAD ? finalDist : dist) + " M", 6, top, 2, Color.WHITE, 0);
             text(c, "E- " + electrons, 6, top + 14, 1, Color.rgb(120, 235, 255), 0);
+            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, 6, top + 22, 1, Color.rgb(255, 215, 120), 0);
             int rx = w - 6;
             Color_ = Color.rgb(170, 200, 220);
             text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, Color_, 2);
@@ -2188,6 +2435,11 @@ public class Main extends Activity {
         int Color_;
 
         void drawHint(Canvas c) {
+            if (bannerT > 0 && state == PLAY) {
+                text(c, "FORMULA RECOVERED", w / 2f, ceilY + 50, 1, Color.rgb(255, 215, 120), 1);
+                text(c, FNAME[bannerIdx], w / 2f, ceilY + 59, 1, Color.WHITE, 1);
+                text(c, "SCRATCH IT OFF IN THE ARCHIVE", w / 2f, ceilY + 68, 1, Color.rgb(150, 190, 215), 1);
+            }
             if (tipT > 0 && state == PLAY && vehicle == 0) {
                 text(c, "HOLD TO FIRE THE JETPACK", w / 2f, ceilY + 28, 1, Color.WHITE, 1);
             }
@@ -2198,9 +2450,10 @@ public class Main extends Activity {
         }
 
         void drawTitle(Canvas c) {
-            text(c, "THRUST LAB", w / 2f, h * 0.26f, 4, Color.WHITE, 1);
-            text(c, "STEAL BACK EVERY FORMULA", w / 2f, h * 0.26f + 30, 1, Color.rgb(120, 235, 255), 1);
-            if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO START", w / 2f, h * 0.26f + 44, 1, Color.rgb(255, 200, 80), 1);
+            text(c, "THRUST LAB", w / 2f, h * 0.14f, 4, Color.WHITE, 1);
+            text(c, "NULLCORP STOLE EVERY THEORY AND FORMULA.", w / 2f, h * 0.14f + 30, 1, Color.rgb(255, 200, 80), 1);
+            text(c, "STEAL THEM BACK AND SHARE THEM WITH THE WORLD.", w / 2f, h * 0.14f + 39, 1, Color.rgb(120, 235, 255), 1);
+            if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO START", w / 2f, h * 0.14f + 54, 1, Color.rgb(255, 220, 140), 1);
         }
 
         void drawDead(Canvas c) {
@@ -2211,10 +2464,13 @@ public class Main extends Activity {
             c.drawRect(0, 0, w, h, p);
             if (stateTime < 1.5f) return;
             text(c, (int) finalDist + " M", w / 2f, h * 0.18f, 4, Color.WHITE, 1);
-            text(c, electrons + " ELECTRONS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
+            text(c, electrons + " ELECTRONS   " + Integer.bitCount(ownedMask) + "/" + NF + " FORMULAS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
             wrapText(c, fact, w / 2f, h * 0.18f + 50, 1, Color.rgb(210, 220, 235), (int) (w * 0.7f));
             if (((int) (clock * 2) & 1) == 0) {
                 text(c, "TAP TO TRY AGAIN", w / 2f, h * 0.84f, 1, Color.rgb(255, 200, 80), 1);
+            }
+            if ((ownedMask & ~scratchedMask) != 0 && ((int) (clock * 3) & 1) == 0) {
+                text(c, "A NEW CARD IS WAITING IN THE ARCHIVE", w / 2f, h * 0.84f - 10, 1, Color.rgb(255, 215, 120), 1);
             }
         }
     }
