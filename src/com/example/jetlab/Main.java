@@ -69,10 +69,10 @@ public class Main extends Activity {
 
         static final int START = 0, PLAY = 1, DEAD = 2;
 
-        static final float GRAVITY = 15f;       // m/s^2, game gravity (Earth is 9.8)
-        static final float THRUST = 31f;        // m/s^2 from the pack, net 16 up
-        static final float VFALL = 10f;         // m/s, falling top speed
-        static final float JUMP = 7f;           // m/s, jump off the floor
+        static final float GRAVITY = 22f;       // m/s^2, game gravity (Earth is 9.8)
+        static final float THRUST = 38f;        // m/s^2 from the pack, net 16 up
+        static final float VFALL = 14f;         // m/s, falling top speed
+        static final float JUMP = 8.5f;          // m/s, jump off the floor
         static final float VMAX = 7f;           // m/s, "terminal" speed up or down
 
         static final String[] SYM = {"H", "He", "Li", "C", "N", "O", "Ne", "Na", "Si", "Fe", "Cu", "Ag", "Au", "U"};
