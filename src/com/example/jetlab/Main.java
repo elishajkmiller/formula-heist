@@ -2370,22 +2370,22 @@ public class Main extends Activity {
             "....LKKKK......."
         };
         static final String[] LEGS_AIR = {
-            "....DDDd.DDDd...",
-            "...DDDd..DDDd...",
-            "..DDDd...DDDd...",
-            ".DDDd....DDDd...",
-            ".DDd.....DDd....",
-            ".KKK.....KKKK...",
+            "....DDDdDDDd....",
+            "...DDDd.DDDd....",
+            "..DDDd..DDDd....",
+            ".DDDd...DDDd....",
+            ".DDd....DDd.....",
+            ".KKK....KKKK....",
             "................"
         };
 
         static final String[] LEGS_AIR2 = {
-            "....DDDd.DDDd...",
-            "...DDDd...DDd...",
-            "..DDDd....DDDd..",
-            ".DDDd.....DDDd..",
-            ".DDd......DDd...",
-            ".KKK......KKK...",
+            "....DDDdDDDd....",
+            "...DDDd..DDd....",
+            "..DDDd...DDDd...",
+            ".DDDd....DDDd...",
+            ".DDd.....DDd....",
+            ".KKK.....KKK....",
             "................"
         };
         static final String[] LEGS_FALL1 = {
