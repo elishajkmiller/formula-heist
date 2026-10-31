@@ -375,7 +375,6 @@ final class Sprites {
     };
 
     static final int HEAD_ROWS = 10;
-
     static final String[] HEAD_ONLY = headOnly();
 
     /** just the head, without the hose, for the vehicle cockpits */
