@@ -2846,7 +2846,7 @@ public class Main extends Activity {
         // ---------- wall with rooms ----------
 
         static final int RW = 170, PERIOD = 230;
-        static final String[] ROOM_NAMES = {"MISSION CONTROL", "CHEMISTRY LAB", "COMPUTER ROOM", "OBSERVATORY"};
+        static final String[] ROOM_NAMES = {"MISSION CONTROL", "CHEMISTRY LAB", "COMPUTER ROOM", "OBSERVATORY", "FLEX ROOM", "GYM", "BREAK ROOM", "THE CAT BOX", "POWER ROOM"};
         static final String[] DIG = new String[24];
         static {
             Random r = new Random(3);
@@ -2876,7 +2876,7 @@ public class Main extends Activity {
         }
 
         void drawRoom(Canvas c, int ox, int k) {
-            int kind = Math.floorMod(k, 4);
+            int kind = Math.floorMod(k, ROOM_NAMES.length);
             int oy = Math.round(ceilY) + 14, oh = Math.round(floorY) - oy;      // down to the floor line
             // name plate
             rectPx(c, ox + 25, ceilY + 2, RW - 50, 9, Color.rgb(16, 24, 38));
@@ -2891,7 +2891,12 @@ public class Main extends Activity {
                 case 0: interiorControl(c, ox, oy, RW, oh, k); break;
                 case 1: interiorLab(c, ox, oy, RW, oh); break;
                 case 2: interiorComputer(c, ox, oy, RW, oh); break;
-                default: interiorObservatory(c, ox, oy, RW, oh); break;
+                case 3: interiorObservatory(c, ox, oy, RW, oh); break;
+                case 4: interiorFlex(c, ox, oy, RW, oh); break;
+                case 5: interiorGym(c, ox, oy, RW, oh); break;
+                case 6: interiorBreak(c, ox, oy, RW, oh); break;
+                case 7: interiorCat(c, ox, oy, RW, oh); break;
+                default: interiorWheel(c, ox, oy, RW, oh); break;
             }
             // roll-up shutter: opens as the player gets close
             float d = Math.abs(ox + RW / 2f - playerX);
@@ -3038,6 +3043,267 @@ public class Main extends Activity {
                 }
                 rectPx(c, cx + 10, cy + 27, 18, 1, Color.rgb(60, 40, 30));
             }
+        }
+
+        /** a tiny scientist for the rooms: legs swing with phase, coat colour given */
+        void miniScientist(Canvas c, int cx, int base, int swing, int coat, boolean goggles) {
+            int skin = Color.rgb(240, 200, 160);
+            rectPx(c, cx - 2 + swing, base - 4, 2, 4, Color.rgb(50, 60, 100));
+            rectPx(c, cx - swing, base - 4, 2, 4, Color.rgb(50, 60, 100));
+            rectPx(c, cx - 2 + swing, base - 1, 2, 1, Color.rgb(30, 30, 40));
+            rectPx(c, cx - swing, base - 1, 2, 1, Color.rgb(30, 30, 40));
+            rectPx(c, cx - 3, base - 10, 6, 6, coat);
+            rectPx(c, cx - 3, base - 10, 1, 6, Color.rgb(170, 180, 200));
+            rectPx(c, cx - 2, base - 15, 5, 5, skin);
+            rectPx(c, cx - 2, base - 15, 5, 2, Color.rgb(90, 60, 40));
+            rectPx(c, cx, base - 13, 1, 1, Color.rgb(20, 20, 30));
+            rectPx(c, cx + 2, base - 13, 1, 1, Color.rgb(20, 20, 30));
+            if (goggles) rectPx(c, cx - 1, base - 14, 4, 1, Color.rgb(120, 235, 255));
+        }
+
+        /** the gym: a punching bag, a barbell of iron plates, a mirror and a scientist on a treadmill */
+        void interiorGym(Canvas c, int ox, int oy, int ow, int oh) {
+            int fl = oy + oh - 14;
+            rectPx(c, ox, oy, ow, oh, Color.rgb(46, 62, 84));
+            rectPx(c, ox, fl, ow, 14, Color.rgb(36, 40, 52));
+            rectPx(c, ox, fl, ow, 1, Color.rgb(90, 96, 120));
+            textOut(c, "NO PAIN NO GAIN", ox + ow / 2f, oy + 3, 1, Color.rgb(255, 215, 110), 1, false);
+            // mirror
+            rectPx(c, ox + 36, oy + 14, 54, 40, Color.rgb(24, 28, 40));
+            rectPx(c, ox + 37, oy + 15, 52, 38, Color.rgb(150, 178, 204));
+            for (int i = 0; i < 4; i++) rectPx(c, ox + 44 + i * 9 - (int) (clock * 6 % 9), oy + 15, 2, 38, Color.argb(50, 255, 255, 255));
+            // the punching bag swings on a chain
+            c.save();
+            c.rotate((float) Math.sin(clock * 2.2f) * 14f, ox + 16, oy + 8);
+            rectPx(c, ox + 16, oy + 8, 1, 14, Color.rgb(150, 150, 164));
+            rectPx(c, ox + 10, oy + 22, 13, 30, Color.rgb(180, 50, 50));
+            rectPx(c, ox + 10, oy + 22, 13, 2, Color.rgb(110, 30, 34));
+            rectPx(c, ox + 10, oy + 50, 13, 2, Color.rgb(110, 30, 34));
+            c.restore();
+            // a barbell with iron plates (FE)
+            int by = fl - 11;
+            rectPx(c, ox + 34, by + 4, 62, 2, Color.rgb(190, 196, 210));
+            for (int k = 0; k < 2; k++) {
+                int px0 = ox + 34 + k * 49;
+                rectPx(c, px0, by - 2, 11, 17, Color.rgb(20, 22, 30));
+                rectPx(c, px0 + 1, by - 1, 9, 15, Color.rgb(96, 102, 124));
+                textOut(c, "FE", px0 + 5, by + 3, 1, Color.rgb(230, 235, 245), 1, false);
+            }
+            // a treadmill with a scientist running on it
+            int tx = ox + 106;
+            rectPx(c, tx, fl - 7, 52, 7, Color.rgb(20, 22, 30));
+            rectPx(c, tx + 2, fl - 6, 48, 5, Color.rgb(60, 66, 84));
+            for (int x = tx + 4 - (int) (clock * 30 % 8); x < tx + 48; x += 8) if (x > tx + 2) rectPx(c, x, fl - 4, 3, 1, Color.rgb(120, 126, 150));
+            rectPx(c, tx + 44, fl - 36, 3, 30, Color.rgb(90, 96, 116));
+            rectPx(c, tx + 36, fl - 40, 14, 7, Color.rgb(20, 22, 30));
+            rectPx(c, tx + 37, fl - 39, 12, 5, hue(clock * 60));
+            miniScientist(c, tx + 24, fl - 7, new int[] {0, 2, 0, -2}[((int) (clock * 10)) & 3], Color.rgb(235, 240, 248), true);
+            if (((int) (clock * 6) & 1) == 0) rectPx(c, tx + 28, fl - 24, 1, 2, Color.rgb(150, 220, 255));   // sweat
+            if (((int) (clock * 6) & 1) == 1) rectPx(c, tx + 18, fl - 27, 1, 2, Color.rgb(150, 220, 255));
+        }
+
+        /** the break room: a sleeping scientist, a steaming coffee machine, donuts and a very honest sign */
+        void interiorBreak(Canvas c, int ox, int oy, int ow, int oh) {
+            int fl = oy + oh - 12;
+            rectPx(c, ox, oy, ow, oh, Color.rgb(176, 156, 118));
+            rectPx(c, ox, fl, ow, 12, Color.rgb(98, 80, 68));
+            rectPx(c, ox + 18, oy + 8, 134, 14, Color.rgb(20, 60, 44));
+            rectPx(c, ox + 19, oy + 9, 132, 12, Color.rgb(32, 90, 64));
+            textOut(c, "DAYS SINCE LAST EXPLOSION: 0", ox + ow / 2f, oy + 12, 1, Color.WHITE, 1, false);
+            // the couch with someone asleep on it
+            rectPx(c, ox + 6, fl - 30, 62, 30, Color.rgb(120, 40, 44));
+            rectPx(c, ox + 6, fl - 30, 62, 10, Color.rgb(150, 56, 60));
+            rectPx(c, ox + 10, fl - 14, 54, 6, Color.rgb(98, 30, 36));
+            rectPx(c, ox + 14, fl - 22, 14, 10, Color.rgb(240, 200, 160));              // head on the armrest
+            rectPx(c, ox + 14, fl - 23, 14, 4, Color.rgb(90, 60, 40));
+            rectPx(c, ox + 16, fl - 17, 3, 1, Color.rgb(40, 30, 30));                   // closed eyes
+            rectPx(c, ox + 22, fl - 17, 3, 1, Color.rgb(40, 30, 30));
+            rectPx(c, ox + 28, fl - 20, 34, 9, Color.rgb(235, 240, 248));               // coat
+            rectPx(c, ox + 60, fl - 20, 8, 9, Color.rgb(50, 60, 100));
+            for (int i = 0; i < 3; i++) {
+                float t = (clock * 0.7f + i * 0.33f) % 1f;
+                textOut(c, "Z", ox + 32 + i * 5 + t * 6, fl - 30 - t * 18, 1, Color.argb((int) (255 * (1 - t)), 255, 255, 255), 1, false);
+            }
+            // a table with donuts
+            rectPx(c, ox + 78, fl - 20, 34, 3, Color.rgb(110, 76, 50));
+            rectPx(c, ox + 80, fl - 17, 3, 17, Color.rgb(90, 60, 40));
+            rectPx(c, ox + 107, fl - 17, 3, 17, Color.rgb(90, 60, 40));
+            for (int i = 0; i < 3; i++) {
+                rectPx(c, ox + 83 + i * 9, fl - 26, 7, 6, Color.rgb(200, 140, 80));
+                rectPx(c, ox + 83 + i * 9, fl - 26, 7, 3, i == 1 ? Color.rgb(250, 240, 240) : Color.rgb(240, 120, 170));
+                rectPx(c, ox + 85 + i * 9, fl - 24, 3, 2, Color.rgb(176, 156, 118));
+            }
+            // a big coffee machine with steam
+            int mx = ox + 124;
+            rectPx(c, mx, fl - 44, 28, 44, Color.rgb(46, 50, 64));
+            rectPx(c, mx + 2, fl - 42, 24, 12, Color.rgb(20, 24, 30));
+            textOut(c, "COFFEE", mx + 14, fl - 40, 1, Color.rgb(255, 190, 90), 1, false);
+            rectPx(c, mx + 20, fl - 27, 4, 4, ((int) (clock * 3) & 1) == 0 ? Color.rgb(255, 70, 60) : Color.rgb(100, 40, 40));
+            rectPx(c, mx + 8, fl - 20, 12, 12, Color.rgb(230, 230, 240));               // a mug
+            rectPx(c, mx + 10, fl - 18, 8, 3, Color.rgb(90, 50, 30));
+            for (int i = 0; i < 3; i++) {
+                float t = (clock * 0.9f + i * 0.33f) % 1f;
+                rectPx(c, mx + 10 + i * 3 + (float) Math.sin(clock * 3 + i) * 1.5f, fl - 22 - t * 14, 2, 2, Color.argb((int) (150 * (1 - t)), 255, 255, 255));
+            }
+        }
+
+        /** the cat box: a cardboard box with a cat that is alive and not alive until you look */
+        void interiorCat(Canvas c, int ox, int oy, int ow, int oh) {
+            int fl = oy + oh - 12;
+            rectPx(c, ox, oy, ow, oh, Color.rgb(22, 50, 58));
+            rectPx(c, ox, fl, ow, 12, Color.rgb(34, 40, 50));
+            // a table
+            rectPx(c, ox + 22, fl - 28, 126, 4, Color.rgb(100, 76, 54));
+            rectPx(c, ox + 26, fl - 24, 4, 24, Color.rgb(80, 60, 44));
+            rectPx(c, ox + 140, fl - 24, 4, 24, Color.rgb(80, 60, 44));
+            // the box
+            int bx = ox + 62, by = fl - 28 - 32;
+            rectPx(c, bx, by, 48, 32, Color.rgb(60, 40, 24));
+            rectPx(c, bx + 1, by + 1, 46, 30, Color.rgb(196, 152, 100));
+            rectPx(c, bx + 21, by + 1, 6, 30, Color.rgb(176, 134, 86));
+            textOut(c, "DO NOT OPEN", bx + 24, by + 18, 1, Color.rgb(90, 40, 30), 1, false);
+            // the cat on top: alive, then both, then not alive, then both again
+            float t = clock % 2.8f;
+            boolean alive = t < 1f, dead = t >= 1.4f && t < 2.4f;
+            int cx = bx + 24, cy = by;
+            if (alive || !dead) drawCat(c, cx, cy, true, alive ? 255 : 110);
+            if (dead || (!alive && !dead)) drawCat(c, cx, cy, false, dead ? 255 : 110);
+            textOut(c, alive ? "ALIVE" : dead ? "DEAD" : "BOTH", cx, oy + 8, 1, alive ? Color.rgb(120, 255, 160) : dead ? Color.rgb(255, 110, 100) : Color.rgb(255, 215, 110), 1, false);
+            // a geiger counter that clicks and a flask
+            rectPx(c, ox + 26, fl - 44, 22, 16, Color.rgb(50, 56, 70));
+            rectPx(c, ox + 28, fl - 42, 18, 8, Color.rgb(200, 210, 190));
+            rectPx(c, ox + 37 + (float) Math.sin(clock * 17) * 4, fl - 41, 1, 6, Color.rgb(200, 40, 40));
+            rectPx(c, ox + 33, fl - 31, 8, 2, Color.rgb(255, 190, 60));
+            rectPx(c, ox + 122, fl - 44, 12, 16, Color.rgb(200, 235, 220));
+            rectPx(c, ox + 123, fl - 38, 10, 9, Color.rgb(90, 230, 120));
+            rectPx(c, ox + 125, fl - 47, 6, 3, Color.rgb(200, 235, 220));
+        }
+
+        void drawCat(Canvas c, int cx, int top, boolean alive, int alpha) {
+            int fur = Color.argb(alpha, 232, 150, 60), dark = Color.argb(alpha, 160, 90, 30), ink = Color.argb(alpha, 20, 20, 30);
+            if (alive) {
+                rectPx(c, cx - 6, top - 10, 12, 10, fur);                        // sitting up
+                rectPx(c, cx - 6, top - 19, 12, 9, fur);
+                rectPx(c, cx - 6, top - 22, 3, 3, fur);                          // ears
+                rectPx(c, cx + 3, top - 22, 3, 3, fur);
+                rectPx(c, cx - 4, top - 16, 2, 2, Color.argb(alpha, 120, 255, 120));
+                rectPx(c, cx + 2, top - 16, 2, 2, Color.argb(alpha, 120, 255, 120));
+                rectPx(c, cx - 5, top - 10, 10, 1, dark);
+                rectPx(c, cx + 6, top - 8, 3, 8, fur);                           // tail
+            } else {
+                rectPx(c, cx - 9, top - 7, 18, 7, fur);                          // lying on its back with its legs up
+                rectPx(c, cx - 8, top - 12, 2, 5, fur);
+                rectPx(c, cx + 5, top - 12, 2, 5, fur);
+                rectPx(c, cx - 12, top - 10, 7, 8, fur);                         // head
+                rectPx(c, cx - 11, top - 8, 1, 1, ink);                          // x x eyes
+                rectPx(c, cx - 9, top - 8, 1, 1, ink);
+                rectPx(c, cx - 10, top - 7, 1, 1, ink);
+                rectPx(c, cx - 11, top - 6, 1, 1, ink);
+                rectPx(c, cx - 9, top - 6, 1, 1, ink);
+            }
+        }
+
+        /** the power room: a scientist running in a hamster wheel to keep the lights on */
+        void interiorWheel(Canvas c, int ox, int oy, int ow, int oh) {
+            int fl = oy + oh - 12;
+            rectPx(c, ox, oy, ow, oh, Color.rgb(34, 30, 46));
+            rectPx(c, ox, fl, ow, 12, Color.rgb(54, 46, 60));
+            int sp = (int) (clock * 14);
+            float glow = 0.55f + 0.45f * (float) Math.sin(clock * 6);
+            for (int i = 0; i < 4; i++) {                                         // bulbs that flicker with the pedalling
+                int bx = ox + 18 + i * 42;
+                rectPx(c, bx, oy, 1, 8, Color.rgb(120, 120, 140));
+                rectPx(c, bx - 3, oy + 8, 7, 8, Color.argb(255, (int) (255 * glow), (int) (230 * glow), (int) (120 * glow)));
+                rectPx(c, bx - 6, oy + 5, 13, 14, Color.argb((int) (40 * glow), 255, 230, 140));
+            }
+            textOut(c, "POWER: 1 SCIENTIST", ox + ow / 2f, oy + 24, 1, Color.rgb(255, 215, 110), 1, false);
+            int cx = ox + 85, cy = fl - 34;
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(3);
+            p.setColor(Color.rgb(170, 176, 196));
+            c.drawCircle(cx, cy, 30, p);
+            p.setStrokeWidth(1);
+            p.setColor(Color.rgb(110, 116, 140));
+            for (int i = 0; i < 8; i++) {
+                double a = i * Math.PI / 4 + clock * 3;
+                c.drawLine(cx, cy, cx + (float) Math.cos(a) * 30, cy + (float) Math.sin(a) * 30, p);
+            }
+            p.setStyle(Paint.Style.FILL);
+            rectPx(c, cx - 4, cy - 4, 8, 8, Color.rgb(90, 96, 120));
+            rectPx(c, cx - 22, fl - 3, 8, 3, Color.rgb(90, 96, 120));          // the stand
+            rectPx(c, cx + 14, fl - 3, 8, 3, Color.rgb(90, 96, 120));
+            miniScientist(c, cx, cy + 28, new int[] {0, 2, 0, -2}[sp & 3], Color.rgb(235, 240, 248), true);
+        }
+
+        final float[] hsv = new float[3];
+
+        int hue(float deg) {
+            hsv[0] = ((deg % 360f) + 360f) % 360f; hsv[1] = 0.8f; hsv[2] = 1f;
+            return Color.HSVToColor(hsv);
+        }
+
+        /**
+         * The flex room: racks of glowing RAM sticks and a cartoon guy lounging on a giant stick of RAM, propped on one
+         * elbow with a smirk, now and then flexing an arm. Just a made-up character in a famous kind of pose.
+         */
+        void interiorFlex(Canvas c, int ox, int oy, int ow, int oh) {
+            rectPx(c, ox, oy, ow, oh, Color.rgb(16, 14, 32));
+            // racks of RAM sticks with RGB strips along the top
+            for (int row = 0; row < 2; row++) {
+                int sy = oy + 4 + row * 36;
+                rectPx(c, ox, sy + 32, ow, 3, Color.rgb(58, 62, 84));
+                for (int i = 0; i < 17; i++) {
+                    int x = ox + 4 + i * 10;
+                    rectPx(c, x, sy + 2, 6, 29, Color.rgb(32, 34, 48));
+                    rectPx(c, x + 1, sy + 4, 4, 25, Color.rgb(50, 54, 74));
+                    for (int k = 0; k < 4; k++) rectPx(c, x + 2, sy + 7 + k * 6, 2, 3, Color.rgb(20, 22, 30));
+                    rectPx(c, x + 1, sy, 4, 3, hue(clock * 80 + i * 22 + row * 70));
+                    rectPx(c, x + 1, sy + 29, 4, 2, Color.rgb(228, 188, 70));
+                }
+            }
+            rectPx(c, ox, oy + oh - 6, ow, 6, Color.rgb(34, 30, 52));
+            // the giant RAM stick he lounges on
+            int bx = ox + 14, by = oy + oh - 26, bw = ow - 28;
+            rectPx(c, bx, by, bw, 18, Color.rgb(10, 12, 22));
+            rectPx(c, bx + 1, by + 1, bw - 2, 14, Color.rgb(52, 58, 82));
+            for (int i = 0; i < 6; i++) rectPx(c, bx + 8 + i * 20, by + 4, 12, 7, Color.rgb(20, 22, 32));
+            rectPx(c, bx + 1, by + 1, bw - 2, 2, hue(clock * 80));
+            for (int x = bx + 3; x < bx + bw - 4; x += 4) rectPx(c, x, by + 15, 3, 3, Color.rgb(228, 188, 70));
+            // the guy, lying on his side with his head on his hand
+            int sk = Color.rgb(232, 190, 152), sh = Color.rgb(196, 146, 110), jeans = Color.rgb(64, 88, 146);
+            int top = by - 1;
+            boolean flex = ((int) (clock * 0.5f + 0.3f) & 1) == 1 && (clock * 0.5f + 0.3f) % 1f < 0.5f;
+            rectPx(c, bx + 58, top - 6, 58, 6, jeans);                          // legs
+            rectPx(c, bx + 80, top - 12, 8, 7, jeans);                           // one knee up
+            rectPx(c, bx + 112, top - 5, 8, 5, Color.rgb(220, 220, 230));        // sneakers
+            rectPx(c, bx + 54, top - 11, 6, 11, Color.rgb(50, 70, 120));         // waistband
+            rectPx(c, bx + 14, top - 11, 42, 11, sk);                            // bare chest and stomach
+            rectPx(c, bx + 18, top - 8, 14, 1, sh);                              // the line under the chest
+            rectPx(c, bx + 34, top - 8, 14, 1, sh);
+            rectPx(c, bx + 30, top - 11, 1, 6, sh);
+            for (int r = 0; r < 3; r++) { rectPx(c, bx + 40, top - 6 + r * 2, 8, 1, sh); }   // a hint of abs
+            rectPx(c, bx + 4, top - 9, 4, 9, sk);                                // the forearm his head rests on
+            rectPx(c, bx + 4, top - 9, 1, 9, sh);
+            rectPx(c, bx - 4, top - 20, 15, 14, sk);                             // head
+            rectPx(c, bx - 4, top - 21, 15, 5, Color.rgb(70, 46, 32));           // hair
+            rectPx(c, bx - 5, top - 19, 3, 7, Color.rgb(70, 46, 32));
+            rectPx(c, bx + 1, top - 13, 2, 2, Color.rgb(20, 20, 30));            // eyes
+            rectPx(c, bx + 7, top - 13, 2, 2, Color.rgb(20, 20, 30));
+            rectPx(c, bx + 7, top - 15, 3, 1, Color.rgb(70, 46, 32));            // one brow raised
+            rectPx(c, bx + 2, top - 8, 6, 1, Color.rgb(150, 70, 70));             // a smirk
+            rectPx(c, bx + 8, top - 9, 1, 1, Color.rgb(150, 70, 70));
+            if (flex) {
+                rectPx(c, bx + 30, top - 26, 5, 15, sk);                         // the free arm flexed up
+                rectPx(c, bx + 27, top - 24, 4, 6, sk);                          // bicep
+                rectPx(c, bx + 31, top - 30, 5, 5, sk);
+                rectPx(c, bx + 31, top - 26, 1, 15, sh);
+                textOut(c, "FLEX!", ox + ow / 2f, oy + 76, 1, Color.rgb(255, 215, 110), 1, false);
+            } else {
+                rectPx(c, bx + 22, top - 5, 30, 3, sk);                          // the free arm resting along his side
+                rectPx(c, bx + 22, top - 3, 30, 1, sh);
+            }
+            // a soft glow off the sticks
+            rectPx(c, ox, oy, ow, oh, Color.argb(16, 160, 90, 255));
         }
 
         void interiorObservatory(Canvas c, int ox, int oy, int ow, int oh) {

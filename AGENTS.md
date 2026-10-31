@@ -40,3 +40,6 @@ Settings has a CHARACTER row: MALE or FEMALE. Both are cartoon characters (HEAD_
 
 ## Hazards
 Spawned by spawn() with odds that change with distance: electric bars (zappers, from the start), floor and ceiling spikes (from 40 m, later as a pair that leaves a corridor to fly through, from 150 m), missiles (100 m), saw blades sliding on a rail (120 m) and laser gates (200 m: a red dotted warning for a second, then a beam for 0.9 s with one gap to fly through). Spikes and the laser gate are solid walls for helix shots; shots cut saws, zappers and missiles. Collision lives in hazardHits().
+
+## Rooms
+The wall has nine rooms in a loop (ROOM_NAMES, interiorXxx in Main.java): mission control, chemistry lab, computer room, observatory, FLEX ROOM (racks of RGB RAM sticks and a made-up guy lounging shirtless on a giant RAM stick, flexing now and then), GYM (punching bag, iron "FE" plates, a scientist on a treadmill), BREAK ROOM (a sleeper on the couch, coffee machine, donuts, "DAYS SINCE LAST EXPLOSION: 0"), THE CAT BOX (a cat that is alive, both, then not alive on a box marked DO NOT OPEN) and POWER ROOM (a scientist in a hamster wheel keeping the bulbs lit). Shutters open as you pass.
