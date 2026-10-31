@@ -23,6 +23,8 @@ import android.view.WindowManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main extends Activity {
 
@@ -76,6 +78,8 @@ public class Main extends Activity {
     static class Sfx {
         static final int RATE = 22050;
         final AudioTrack[] tr = new AudioTrack[9];
+        // stop/reload/play can block for a frame, so every call runs off the game thread
+        final ExecutorService io = Executors.newSingleThreadExecutor();
 
         Sfx() {
             try {
@@ -130,21 +134,36 @@ public class Main extends Activity {
             return a;
         }
 
-        void play(int id) {
+        void play(final int id) {
             try {
-                AudioTrack a = tr[id];
-                if (a == null) return;
-                a.stop();
-                a.reloadStaticData();
-                a.play();
+                io.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            AudioTrack a = tr[id];
+                            if (a == null) return;
+                            a.stop();
+                            a.reloadStaticData();
+                            a.play();
+                        } catch (Throwable t) { }
+                    }
+                });
             } catch (Throwable t) { }
         }
 
         void release() {
-            for (int i = 0; i < tr.length; i++) {
-                try { if (tr[i] != null) tr[i].release(); } catch (Throwable t) { }
-                tr[i] = null;
-            }
+            try {
+                io.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (int i = 0; i < tr.length; i++) {
+                            try { if (tr[i] != null) tr[i].release(); } catch (Throwable t) { }
+                            tr[i] = null;
+                        }
+                    }
+                });
+                io.shutdown();
+            } catch (Throwable t) { }
         }
     }
 
