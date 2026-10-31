@@ -1012,8 +1012,11 @@ public class Main extends Activity {
             state = SCRATCH;
         }
 
+        boolean anotherReady() { return selScratched && revealKind != 0 && tickets > 0; }
+
         void scratchDown(float gx, float gy) {
             if (closeHit(gx, gy)) { state = ARCHIVE; dragging = false; return; }
+            if (anotherReady() && gx >= w / 2f - 64 && gx < w / 2f + 64 && gy >= h - 15 && gy < h - 2) { openTicket(); return; }
             if (!selScratched && gx >= scx && gx < scx + scw && gy >= scy && gy < scy + sch) {
                 dragging = true;
                 scratchAt(gx, gy);
@@ -1177,7 +1180,6 @@ public class Main extends Activity {
             line(c, bx + P0[0] * sc, by + P0[1] * sc, bx + P1[0] * sc, by + P1[1] * sc, Color.rgb(215, 235, 255), Math.max(1f, sc));
             line(c, bx + P0[0] * sc, by + P0[1] * sc, bx + P2[0] * sc, by + P2[1] * sc, Color.rgb(170, 200, 240), Math.max(1f, sc));
             line(c, bx + P1[0] * sc, by + P1[1] * sc, bx + P2[0] * sc, by + P2[1] * sc, Color.rgb(140, 170, 220), Math.max(1f, sc));
-            if (((int) (clock * 4) & 3) == 0) rectPx(c, bx + E1[0] * sc - 1, by + E1[1] * sc - 1, 3, 3, Color.WHITE);
             c.restore();
         }
 
@@ -1233,7 +1235,6 @@ public class Main extends Activity {
                         if (mask[cy * mcols + cx]) rectPx(c, scx + cx * 4, scy + cy * 4, 4, 4, paper);
                     }
                 }
-                if (cleared < mcols * mrows * 0.12f) text(c, "SCRATCH HERE", scx + scw / 2f, scy + sch - 14, 1, Color.WHITE, 1);
             }
             int ink = Color.rgb(70, 42, 28);
             boolean clip = !selScratched;
@@ -1258,6 +1259,12 @@ public class Main extends Activity {
             wrapOut(c, FDESC[selCard], scx + scw / 2f, scy + 58, 1, ink, scw - 16, false);
             if (clip) c.restore();
             ov(FORMD[selCard], scx + scw / 2f, scy + 34, fitSize(FORMD[selCard], scw - 16, 17f), ink, clip);
+            if (anotherReady()) {
+                boolean blink = ((int) (clock * 3) & 1) == 0;
+                rectPx(c, w / 2 - 64, h - 15, 128, 13, Color.rgb(8, 10, 20));
+                rectPx(c, w / 2 - 63, h - 14, 126, 11, blink ? Color.rgb(130, 100, 30) : Color.rgb(44, 54, 82));
+                text(c, "SCRATCH ANOTHER (" + tickets + ")", w / 2f, h - 12, 1, Color.WHITE, 1);
+            }
             drawParticles(c);
         }
 
