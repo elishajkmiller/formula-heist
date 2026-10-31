@@ -275,6 +275,7 @@ public class Main extends Activity {
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
         static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
+        static final float GUARD_RUN = 150f;     // how fast the guards run away, in pixels per second
         static final int GUARD = 4;              // Npc mode of the guards
         static final int NF = 20;                // formulas to recover
         static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
@@ -629,17 +630,23 @@ public class Main extends Activity {
 
         void populateNpcs() {
             npcs.clear();
-            for (float nx = 100; nx < w + 20; nx += 70 + rnd.nextInt(80)) addSpawn(nx);
-            for (int i = 0; i < 4; i++) addNpc(12 + i * 13, GUARD, 1);       // the guards, standing together behind you
+            float from = Math.max(outX + 110, 100);
+            for (float nx = from; nx < w + 20; nx += 70 + rnd.nextInt(80)) addSpawn(nx);
+            for (int i = 0; i < 4; i++) addNpc(outX + 26 + i * 13, GUARD, -1);   // the guards: inside, just past the wall, watching you
         }
 
         /** mode: 0 stands alone, 1 walks left, 2 walks right, 3 stands in a group */
-        /** guards stand and shout, run when you run, and tumble like your character when you break through */
+        /** guards watch you through the wall, run away from you when you run, and are thrown over when you break through */
         void stepGuard(Npc n, float dt) {
             if (n.pointT > 0) n.pointT -= dt;
             else if ((n.nextPoint -= dt) <= 0) { n.pointT = 0.8f + rnd.nextFloat() * 1.2f; n.nextPoint = 1.5f + rnd.nextFloat() * 4f; }
-            if (state == PLAY && breaking && !n.falling) n.running = true;
-            if (!n.falling) return;
+            if (state == PLAY && breaking && !n.falling) { n.running = true; n.vw = GUARD_RUN; }
+            if (!n.falling) {
+                // inside the building they ride the world's scroll, and run away to the right when you run
+                n.x += (n.running ? GUARD_RUN - speed * ppm : -speed * ppm) * dt;
+                if (n.x > w + 30) n.x = w + 1000;      // out of sight, removed by the caller below
+                return;
+            }
             n.fvy -= GRAVITY * ppm * dt;
             n.fy += n.fvy * dt;
             if (n.fy <= 0) {
@@ -777,7 +784,7 @@ public class Main extends Activity {
                 n.falling = true; n.running = false;
                 n.fvy = 60f + rnd.nextFloat() * 70f;
                 n.angV = 420f + rnd.nextFloat() * 260f;
-                n.vw = speed * ppm * 0.95f;
+                n.vw = n.vw > 0 ? n.vw : GUARD_RUN * 0.6f;      // thrown on, in the direction they were running
             }
         }
 
@@ -1460,7 +1467,7 @@ public class Main extends Activity {
                 Npc n = npcs.get(i);
                 if (n.mode == GUARD) {
                     stepGuard(n, rdt);
-                    if (n.x < -30) npcs.remove(i);
+                    if (n.x < -30 || n.x > w + 500) npcs.remove(i);
                     continue;
                 }
                 n.x += (waiting ? 0f : n.walk * rdt) - nsc;
@@ -3023,6 +3030,7 @@ public class Main extends Activity {
             int nx = Math.round(n.x), base = Math.round(floorY - n.fy);
             boolean run = n.running && !n.falling;
             boolean point = n.pointT > 0 && !run && !n.falling;
+            int f = run || n.falling ? 1 : -1;                                // facing you, then facing away
             int wp = ((int) (clock * 12 + n.phase)) & 3;
             int[] swing = {0, 2, 0, -2};
             int sw = run ? swing[wp] : 0;
@@ -3039,13 +3047,13 @@ public class Main extends Activity {
             rectPx(c, nx - 3, base - 10, 1, 6, shade);
             rectPx(c, nx - 2, base - 15, 5, 5, skin);
             rectPx(c, nx - 2, base - 15, 5, 2, HAIRS[n.hair]);
-            rectPx(c, nx, base - 13, 1, 1, Color.rgb(20, 20, 30));          // an angry eye and brow
-            rectPx(c, nx + 2, base - 13, 1, 1, Color.rgb(20, 20, 30));
-            rectPx(c, nx, base - 14, 2, 1, Color.rgb(60, 36, 30));
-            if (point || run || n.falling) rectPx(c, nx + 1, base - 12, 2, 1, Color.rgb(90, 40, 40));   // shouting
+            rectPx(c, nx + (f > 0 ? 0 : -1), base - 13, 1, 1, Color.rgb(20, 20, 30));          // wide eyes and brows
+            rectPx(c, nx + (f > 0 ? 2 : -3), base - 13, 1, 1, Color.rgb(20, 20, 30));
+            rectPx(c, nx + (f > 0 ? 0 : -2), base - 14, 2, 1, Color.rgb(60, 36, 30));
+            if (point || run || n.falling) rectPx(c, nx + (f > 0 ? 1 : -2), base - 12, 2, 1, Color.rgb(90, 40, 40));   // shouting
             if (point) {
-                rectPx(c, nx + 2, base - 9, 4, 2, coat);                    // an arm pointing at the runner
-                rectPx(c, nx + 6, base - 9, 2, 2, skin);
+                rectPx(c, nx + (f > 0 ? 2 : -6), base - 9, 4, 2, coat);   // an arm pointing at the runner
+                rectPx(c, nx + (f > 0 ? 6 : -8), base - 9, 2, 2, skin);
             } else if (run) {
                 rectPx(c, nx + 2 - sw, base - 9, 1, 4, shade);              // swinging arms
                 rectPx(c, nx - 3 + sw, base - 9, 1, 4, shade);
