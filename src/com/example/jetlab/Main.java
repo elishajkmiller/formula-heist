@@ -813,10 +813,10 @@ public class Main extends Activity {
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
             "..P..saaaaaaaa..",
-            ".hOOowWWWVtW....",
-            ".hOOowxWWVtW....",
-            ".OOOowxxxSSN....",
-            ".OOoowWWWWWW....",
+            ".hOOowWWWWWW....",
+            ".hOOowxxWVtW....",
+            ".OOOowxxxxSS....",
+            ".OOoowxxxxSN....",
             ".hOOowWWWWWW....",
             ".NNNNwwwwwww....",
             "..NN.wwwwwww...."
@@ -832,14 +832,54 @@ public class Main extends Activity {
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
             "..P..saaaaaaaa..",
-            ".hOOowWWWVtW....",
-            ".hOOowxxxSSN....",
-            ".OOOowxWWVtW....",
-            ".OOoowWWWWWW....",
-            ".hOOowWWWWWW....",
+            ".hOOowwWWWWW....",
+            ".hOOowxxxxSS....",
+            ".OOOowxxxxSN....",
+            ".OOoowxxWWVt....",
+            ".hOOowwWWWWW....",
             ".NNNNwwwwwww....",
             "..NN.wwwwwww...."
         };
+        static final String[] SPR_RUN2 = {
+            "......b..bb.....",
+            ".....bBbBBBb....",
+            "....bBBBBBBBBb..",
+            "....BBBSSSSSSS..",
+            "....BsSSBBSBBS..",
+            "....BsSSEeSEeSS.",
+            "....BsSSEESEESs.",
+            "..P.BsSaSSSSsSS.",
+            "..P.Bsaaeeeeeaa.",
+            "..P..saaaaaaaa..",
+            ".hOOoxwwWWWw....",
+            ".hOOoxxxWVtw....",
+            ".OOOoxxxxxSS....",
+            ".OOooxxxxxSN....",
+            ".hOOoxwwWWWw....",
+            ".NNNNwwwwwww....",
+            "..NN.wwwwwww...."
+        };
+        static final String[] SPR_RUN3 = {
+            "......b..bb.....",
+            ".....bBbBBBb....",
+            "....bBBBBBBBBb..",
+            "....BBBSSSSSSS..",
+            "....BsSSBBSBBS..",
+            "....BsSSEeSEeSS.",
+            "....BsSSEESEESs.",
+            "..P.BsSaSSSSsSS.",
+            "..P.Bsaaeeeeeaa.",
+            "..P..saaaaaaaa..",
+            ".hOOowwWWWWW....",
+            ".hOOowxxxxSS....",
+            ".OOOowxxxxSN....",
+            ".OOoowxxVtWW....",
+            ".hOOowwWWWWW....",
+            ".NNNNwwwwwww....",
+            "..NN.wwwwwww...."
+        };
+        /** upper body per run phase: same outline, shading and tie shift so the torso seems to turn */
+        static final String[][] SPR_RUN = {SPR_HEAD, SPR_HEAD_B, SPR_RUN2, SPR_RUN3};
         static final String[] LEGS_A = {
             ".....DDd.DDd....",
             ".....DDd.DDd....",
@@ -1559,7 +1599,7 @@ public class Main extends Activity {
                 lean = 0;
                 if (run) {
                     dy = BOB[ph]; dx = LEAN[ph];
-                    if ((ph & 1) == 1) body = SPR_HEAD_B;
+                    body = SPR_RUN[ph];
                     if (landT > 0) { dy = 2; legs = LEGS_M; }
                 }
             } else if (thr) {
