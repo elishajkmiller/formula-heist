@@ -276,7 +276,7 @@ public class Main extends Activity {
         // ---------- constants ----------
 
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
-        static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
+        static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4, BIRD = 5;
         static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
         static final float GUARD_RUN = 100f;     // how fast the guards run away, in pixels per second
         static final int GUARD = 4;              // Npc mode of the guards
@@ -292,8 +292,8 @@ public class Main extends Activity {
         static final float VMAX = 7f;            // m/s, "terminal" speed going up
         static final float JUMP = 8.5f;          // m/s, jump off the floor
 
-        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER", "DNA HELIX"};
-        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES.", "HOLD TO RISE. TAP TO FIRE BASE PAIRS."};
+        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER", "DNA HELIX", "BERNOULLI BIRD"};
+        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES.", "HOLD TO RISE. TAP TO FIRE BASE PAIRS.", "TAP TO FLAP. HOLD TO GLIDE ON LIFT."};
 
         static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
         static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
@@ -556,7 +556,7 @@ public class Main extends Activity {
         final float[] yHist = new float[64];
         int yh;
         float bustOff, bustV, lastVy;                // the chest spring: it only reacts to jumps and landings, not to running
-        float boltCd, tilt;                          // tilt: degrees, nose up is negative
+        float boltCd, tilt, flapT;                          // tilt: degrees, nose up is negative
         static final int[][] RUNG = {{0xDC4646, 0x4678E6}, {0x50DC78, 0xF0C83C}, {0x4678E6, 0xDC4646}, {0xF0C83C, 0x50DC78}};   // A-T, C-G pairs
 
         // death
@@ -1494,6 +1494,10 @@ public class Main extends Activity {
                 sfx(S_FLIP);
                 buzz(15);
                 for (int i = 0; i < 10; i++) burst(playerX, y);
+            } else if (vehicle == BIRD) {
+                vy = -7f; flapT = 1f;                       // a wingbeat
+                sfx(S_JUMP);
+                for (int i = 0; i < 3; i++) burst(playerX - 6, y + 4);
             } else if (vehicle == HELIX) {
                 fireBolt();
             } else if (vehicle == QUANTUM) {
@@ -1570,6 +1574,7 @@ public class Main extends Activity {
             if (squash > 0) squash -= rdt;
             if (landT > 0) landT -= rdt;
             if (telePulse > 0) telePulse -= rdt;
+            if (flapT > 0) flapT -= dt * 4f;
             boolean playing = state == PLAY || state == BUILD;
             float r = vehicle == 0 ? 0.3f * ppm : (vehicle == STOMPER ? 8f : 7f);
 
@@ -1577,7 +1582,8 @@ public class Main extends Activity {
             if (jumpDelay > 0) jumpDelay -= dt;
             boolean helix = vehicle == HELIX;
             boolean fire = thrusting && state == PLAY && ((vehicle == 0 && jumpDelay <= 0) || helix);
-            ay = (helix ? 14f : GRAVITY) * gravDir - (fire ? (helix ? 30f : THRUST) : 0);
+            boolean glide = vehicle == BIRD && thrusting && state == PLAY;      // spread wings: lift cancels most of gravity
+            ay = (helix ? 14f : GRAVITY) * gravDir * (glide ? 0.3f : 1f) - (fire ? (helix ? 30f : THRUST) : 0);
             vy += ay * dt;
             float vmin = flips() ? -VFALL : -VMAX;
             if (vy > VFALL) vy = VFALL;
@@ -1621,6 +1627,9 @@ public class Main extends Activity {
             if (vehicle == STOMPER && y >= hi - 0.5f) onFloor = true;
 
             if (fire && !helix) emitExhaust();
+            if (vehicle == BIRD) {
+                tilt += (Math.max(-25f, Math.min(30f, vy * 3f)) - tilt) * Math.min(1f, 9f * dt);
+            }
             if (helix) {
                 yh = (yh + 1) & 63; yHist[yh] = y;
                 // nose up when rising, nose down when sinking, eased so it does not snap
@@ -1944,7 +1953,7 @@ public class Main extends Activity {
             if (dist >= nextCrate) {
                 if (vehicle == 0) {
                     Crate k = new Crate();
-                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(4);
+                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(5);
                     crates.add(k);
                     spawnLeft = 4f * ppm;
                     nextCrate = dist + 220 + rnd.nextInt(150);
@@ -2496,6 +2505,20 @@ public class Main extends Activity {
             return out;
         }
 
+        /** the glider bird's body: the pod with white feathers, a beak and a tail */
+        static final String[] BIRD_ROWS = birdRows();
+
+        static String[] birdRows() {
+            String[] rows = recolor(POD, 'R', 'W', 'U', 'w');
+            char[][] r = new char[rows.length][];
+            for (int i = 0; i < rows.length; i++) r[i] = rows[i].toCharArray();
+            for (int i = 7; i <= 9; i++) { r[i][18] = 'O'; r[i][19] = i == 8 ? 'O' : '.'; }       // beak
+            for (int i = 9; i <= 12; i++) { r[i][0] = 'V'; if (i > 9) r[i][1] = 'V'; }           // tail
+            String[] out = new String[rows.length];
+            for (int i = 0; i < rows.length; i++) out[i] = new String(r[i]);
+            return out;
+        }
+
         static final String[] BOARD = {
             "..mMMMMMMMMMMMMMMm..",
             "...mmmmmmmmmmmmmm...",
@@ -2518,6 +2541,7 @@ public class Main extends Activity {
             if (type == QUANTUM) return QUANT;
             if (type == INVERTER) return POD;
             if (type == HELIX) return HELIX_HEAD;
+            if (type == BIRD) return BIRD_ROWS;
             String[] legs = compressed ? LEGS_STOMP_C : LEGS_STOMP;
             String[] out = Arrays.copyOf(BODY_STOMP, BODY_STOMP.length + legs.length);
             System.arraycopy(legs, 0, out, BODY_STOMP.length, legs.length);
@@ -3940,6 +3964,37 @@ public class Main extends Activity {
             c.restore();
         }
 
+        /**
+         * The glider bird. Holding spreads the wing and draws the Bernoulli picture: air races over the curved top
+         * (short gaps, fast, low pressure) and drifts under the flat bottom (slow, high pressure), so the wing is pushed up.
+         */
+        void drawBird(Canvas c) {
+            int left = Math.round(playerX) - 10, top = Math.round(y) - 8;
+            boolean glide = thrusting && state == PLAY;
+            float lift = flapT > 0 ? (float) Math.cos(Math.PI * (1 - flapT)) : glide ? 0.35f : -0.3f;   // wing up is positive
+            float sx = playerX - 2, sy = y + 3;
+            c.save();
+            c.rotate(tilt, playerX, y);
+            outlined(c, BIRD_ROWS, left, top);
+            outlined(c, HEAD_ONLY, left, top + 3);
+            for (int k = 0; k < 5; k++) {
+                float len = 15 - k * 2f, ex = sx - 4 - k * 2.5f, ey = sy - lift * len;
+                line(c, sx, sy, ex, ey, k == 0 ? Color.rgb(120, 235, 255) : Color.WHITE, 2);
+            }
+            c.restore();
+            if (glide) {
+                for (int i = 0; i < 3; i++) {
+                    float fast = (clock * 90f + i * 13f) % 30f, slow = (clock * 25f + i * 11f) % 30f;
+                    float x1 = playerX + 6 - fast;
+                    line(c, x1, y - 15 - (i & 1) * 2, x1 - 7, y - 15 - (i & 1) * 2, Color.rgb(160, 240, 255), 1);
+                    float x2 = playerX + 6 - slow;
+                    line(c, x2, y + 12 + i * 3, x2 - 3, y + 12 + i * 3, Color.argb(150, 255, 190, 120), 1);
+                }
+                if (y - 24 > ceilY) text(c, "P-", playerX - 18, y - 24, 1, Color.rgb(160, 240, 255), 1);
+                text(c, "P+", playerX - 18, y + 25, 1, Color.rgb(255, 190, 120), 1);
+            }
+        }
+
         void drawBolts(Canvas c) {
             for (Bolt b : bolts) {
                 int[] pr = RUNG[b.kind * 1];
@@ -3954,6 +4009,7 @@ public class Main extends Activity {
         void drawVehicle(Canvas c) {
             if (vehicle == QUANTUM) { drawQuantum(c); return; }
             if (vehicle == HELIX) { drawHelix(c); return; }
+            if (vehicle == BIRD) { drawBird(c); return; }
             int left = Math.round(playerX) - 10;
             int hh = hhVeh(vehicle);
             int cy = Math.round(y);

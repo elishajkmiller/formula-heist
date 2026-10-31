@@ -32,6 +32,9 @@ Electrons you collect are banked across runs (prefs "bank"). The STORE button (b
 ## DNA Helix vehicle
 A fourth crate vehicle (HELIX): hold to rise (light gravity 14, thrust 30), release to sink, tap to fire base pairs (A-T and C-G rungs) that destroy a zapper or missile they touch (0.3 s cooldown). Its body is a double helix that trails the head by following a 64 sample history of the head's height (yHist), twisting as it goes.
 
+## Bernoulli Bird vehicle
+A fifth crate vehicle (BIRD): tap to flap (vy set to -7), hold to glide with spread wings (gravity x0.3). Science hook: while gliding it draws the Bernoulli picture, fast close streamlines and "P-" over the wing, slow wide ones and "P+" under it, so the wing is pushed up. Body is the pod recoloured with a beak and tail (BIRD_ROWS), wing is a fan of lines driven by flapT, nose tilts with vy. Drawn by drawBird().
+
 ## Settings
 The SETTINGS button (bottom centre on the title and death screens) opens: haptics, sounds, music (a looping chiptune synthesized in Sfx.song(), no audio file), and RESET PROGRESS behind an "ARE YOU SURE?" pop-up (erases formulas, tickets, clothes, electrons and best distance; settings stay). Choices are saved in prefs ("haptics", "sound", "music").
 
