@@ -43,3 +43,6 @@ Spawned by spawn() with odds that change with distance: electric bars (zappers, 
 
 ## Rooms
 The wall has nine rooms in a loop (ROOM_NAMES, interiorXxx in Main.java): mission control, chemistry lab, computer room, observatory, FLEX ROOM (racks of RGB RAM sticks and a made-up guy lounging shirtless on a giant RAM stick, flexing now and then), GYM (punching bag, iron "FE" plates, a scientist on a treadmill), BREAK ROOM (a sleeper on the couch, coffee machine, donuts, "DAYS SINCE LAST EXPLOSION: 0"), THE CAT BOX (a cat that is alive, both, then not alive on a box marked DO NOT OPEN) and POWER ROOM (a scientist in a hamster wheel keeping the bulbs lit). Shutters open as you pass.
+
+## Wear and tear, and the ERROR room
+The wall has imperfections (wallWear): cracks that branch, damp stains, soot scorches, scratches and a mismatched repair panel with rust, placed by panel number so they stay put as the wall scrolls; the brick wall outside has cracks too. The tenth room is titled ERROR (its plate blinks red): a busted door hanging off its lower hinge with cracks, a missing corner the light shines through, a dead keypad, sparking wires, rubble and an occasional glitch.

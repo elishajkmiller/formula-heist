@@ -2822,6 +2822,12 @@ public class Main extends Activity {
                     rectPx(c, ox + (((yy / 5) & 1) == 0 ? 4 : 8), yy, 1, 1, Color.rgb(86, 52, 44));
                 }
             }
+            // cracks in the bricks
+            for (int k = 0; k < 4; k++) {
+                int cx = ox + 2 + (k * 3) % 6, cy = 14 + k * 30;
+                if (holeOpen && Math.abs(cy - holeY) < 24) continue;
+                for (int j = 0; j < 16; j++) { rectPx(c, cx + (j % 3 == 1 ? 1 : 0), cy + j, 1, 1, Color.rgb(40, 24, 22)); }
+            }
             rectPx(c, ox, 0, 1, fl, Color.rgb(205, 125, 95));
             rectPx(c, ox + th - 1, 0, 1, fl, Color.rgb(110, 60, 48));
         }
@@ -2845,7 +2851,7 @@ public class Main extends Activity {
         // ---------- wall with rooms ----------
 
         static final int RW = 170, PERIOD = 230;
-        static final String[] ROOM_NAMES = {"MISSION CONTROL", "CHEMISTRY LAB", "COMPUTER ROOM", "OBSERVATORY", "FLEX ROOM", "GYM", "BREAK ROOM", "THE CAT BOX", "POWER ROOM"};
+        static final String[] ROOM_NAMES = {"MISSION CONTROL", "CHEMISTRY LAB", "COMPUTER ROOM", "OBSERVATORY", "FLEX ROOM", "GYM", "BREAK ROOM", "THE CAT BOX", "POWER ROOM", "ERROR"};
         static final String[] DIG = new String[24];
         static {
             Random r = new Random(3);
@@ -2853,6 +2859,56 @@ public class Main extends Activity {
                 StringBuilder b = new StringBuilder();
                 for (int k = 0; k < 6; k++) b.append((char) ('0' + r.nextInt(10)));
                 DIG[i] = b.toString();
+            }
+        }
+
+        /** cracks, stains, soot, scratches and a mismatched repair panel, placed by panel number so they stay put as it scrolls */
+        void wallWear(Canvas c, float px0, int pi, int wallTop) {
+            Random r = new Random(pi * 7919L + 13);
+            int kind = r.nextInt(8);
+            int x = Math.round(px0) + 6 + r.nextInt(26), y = wallTop + 6 + r.nextInt(50);
+            int dark = Color.rgb(14, 22, 36);
+            switch (kind) {
+                case 1: case 2: {                                    // a crack that runs down and branches
+                    int cx = x, cy = y;
+                    for (int k = 0; k < 22; k++) {
+                        rectPx(c, cx, cy, 1, 1, dark);
+                        if (k % 5 == 3) rectPx(c, cx + 1, cy, 1, 1, Color.argb(120, 130, 150, 190));
+                        cy++; cx += r.nextInt(3) - 1;
+                        if (k == 8 || k == 14) {
+                            int bx = cx, by = cy;
+                            for (int j = 0; j < 7; j++) { rectPx(c, bx, by, 1, 1, dark); bx += k == 8 ? 1 : -1; by += r.nextInt(2); }
+                        }
+                    }
+                    break;
+                }
+                case 3: {                                            // a damp stain
+                    for (int k = 0; k < 6; k++)
+                        rectPx(c, x - 4 + r.nextInt(8), y + k * 4, 6 + r.nextInt(8), 5, Color.argb(34, 10, 30, 30));
+                    rectPx(c, x, y + 6, 2, 36, Color.argb(30, 120, 90, 60));
+                    break;
+                }
+                case 4: {                                            // scorched by something that went off
+                    for (int k = 0; k < 5; k++)
+                        rectPx(c, x - k * 2, y + 2 * k - 8, 12 + k * 4, 18 - k * 2, Color.argb(30 + k * 6, 6, 6, 10));
+                    rectPx(c, x + 2, y + 2, 3, 3, Color.argb(160, 255, 140, 40));
+                    break;
+                }
+                case 5: {                                            // scratches
+                    for (int k = 0; k < 3; k++) {
+                        int sx = x + k * 3, sy = y + k * 2;
+                        for (int j = 0; j < 12; j++) rectPx(c, sx + j, sy + j / 2, 1, 1, Color.argb(110, 170, 190, 220));
+                    }
+                    break;
+                }
+                case 6: {                                            // a repair panel that does not match
+                    rectPx(c, x, y, 18, 12, Color.rgb(54, 72, 104));
+                    rectPx(c, x + 1, y + 1, 16, 10, Color.rgb(46, 62, 92));
+                    for (int k = 0; k < 4; k++) rectPx(c, x + (k & 1) * 16, y + (k >> 1) * 10 + 1, 1, 1, Color.rgb(150, 160, 190));
+                    rectPx(c, x + 2, y + 12, 1, 8, Color.argb(60, 150, 90, 50));      // rust running down from it
+                    break;
+                }
+                default: break;                                      // 0 and 7: this panel is fine
             }
         }
 
@@ -2865,6 +2921,9 @@ public class Main extends Activity {
             rectPx(c, 0, floorY - 5, w, 5, Color.rgb(22, 30, 46));
             float ho = bgOff % 16;
             for (float x = -ho; x < w; x += 16) rectPx(c, x, floorY - 4, 8, 2, Color.rgb(200, 160, 40));
+
+            int pi0 = (int) Math.floor(bgOff / 40f) - 1;
+            for (int pi = pi0; pi < pi0 + w / 40 + 3; pi++) wallWear(c, pi * 40 - bgOff, pi, wallTop);
 
             int k0 = (int) Math.floor((bgOff - 20) / PERIOD) - 1;
             for (int k = k0; k < k0 + w / PERIOD + 3; k++) {
@@ -2879,7 +2938,9 @@ public class Main extends Activity {
             int oy = Math.round(ceilY) + 14, oh = Math.round(floorY) - oy;      // down to the floor line
             // name plate
             rectPx(c, ox + 25, ceilY + 2, RW - 50, 9, Color.rgb(16, 24, 38));
-            textOut(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 4, 1, Color.rgb(255, 200, 80), 1, false);
+            boolean err = kind == ROOM_NAMES.length - 1;
+            int plateCol = err ? (((int) (clock * 4) & 1) == 0 ? Color.rgb(255, 80, 70) : Color.rgb(150, 40, 40)) : Color.rgb(255, 200, 80);
+            textOut(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 4, 1, plateCol, 1, false);
             // frame
             rectPx(c, ox - 3, oy - 3, RW + 6, oh + 6, Color.rgb(16, 24, 38));
             rectPx(c, ox - 2, oy - 2, RW + 4, oh + 4, Color.rgb(70, 90, 120));
@@ -2895,7 +2956,8 @@ public class Main extends Activity {
                 case 5: interiorGym(c, ox, oy, RW, oh); break;
                 case 6: interiorBreak(c, ox, oy, RW, oh); break;
                 case 7: interiorCat(c, ox, oy, RW, oh); break;
-                default: interiorWheel(c, ox, oy, RW, oh); break;
+                case 8: interiorWheel(c, ox, oy, RW, oh); break;
+                default: interiorError(c, ox, oy, RW, oh); break;
             }
             // roll-up shutter: opens as the player gets close
             float d = Math.abs(ox + RW / 2f - playerX);
@@ -3203,6 +3265,74 @@ public class Main extends Activity {
         }
 
         /** the power room: a scientist running in a hamster wheel to keep the lights on */
+        /** ERROR: nothing in here but a busted, cracked door, sparks and a glitch now and then */
+        void interiorError(Canvas c, int ox, int oy, int ow, int oh) {
+            int fl = oy + oh - 12;
+            rectPx(c, ox, oy, ow, oh, Color.rgb(20, 22, 30));
+            rectPx(c, ox, fl, ow, 12, Color.rgb(36, 36, 44));
+            rectPx(c, ox, fl, ow, 1, Color.rgb(70, 70, 82));
+            int fx = ox + 62, ftop = oy + 10, fw = 46;
+            // light spilling through the gap behind the door
+            rectPx(c, fx, ftop, fw, fl - ftop, Color.rgb(226, 214, 150));
+            rectPx(c, fx + 4, ftop + 4, fw - 8, fl - ftop - 4, Color.argb(120, 255, 250, 210));
+            // the frame
+            rectPx(c, fx - 4, ftop - 4, fw + 8, 4, Color.rgb(60, 64, 80));
+            rectPx(c, fx - 4, ftop, 4, fl - ftop, Color.rgb(60, 64, 80));
+            rectPx(c, fx + fw, ftop, 4, fl - ftop, Color.rgb(60, 64, 80));
+            // the door, hanging off its lower hinge and tilted out
+            c.save();
+            c.rotate(7f, fx + 2, fl);
+            int dw = 40, dh = fl - ftop - 2;
+            rectPx(c, fx + 2, fl - dh, dw, dh, Color.rgb(90, 98, 96));
+            rectPx(c, fx + 4, fl - dh + 3, dw - 4, 26, Color.rgb(76, 84, 82));
+            rectPx(c, fx + 4, fl - dh + 33, dw - 4, dh - 38, Color.rgb(76, 84, 82));
+            rectPx(c, fx + 2, fl - dh, 1, dh, Color.rgb(130, 138, 134));
+            // a dent and a missing corner that the light shows through
+            rectPx(c, fx + dw - 12, fl - dh, 14, 12, Color.rgb(226, 214, 150));
+            rectPx(c, fx + dw - 12, fl - dh + 10, 8, 3, Color.rgb(226, 214, 150));
+            rectPx(c, fx + dw - 12, fl - dh + 12, 3, 4, Color.rgb(226, 214, 150));
+            rectPx(c, fx + 10, fl - dh + 40, 12, 8, Color.rgb(66, 72, 70));
+            // cracks across the leaf
+            int[][] starts = {{fx + 12, fl - dh + 4}, {fx + 26, fl - dh + 20}, {fx + 8, fl - dh + 52}};
+            Random r = new Random(5);
+            for (int[] st : starts) {
+                int cx = st[0], cy = st[1];
+                for (int k = 0; k < 24; k++) {
+                    rectPx(c, cx, cy, 1, 1, Color.rgb(20, 24, 26));
+                    cy++; cx += r.nextInt(3) - 1;
+                    if (k % 6 == 5) { rectPx(c, cx + 1, cy, 1, 1, Color.rgb(20, 24, 26)); rectPx(c, cx + 2, cy + 1, 1, 1, Color.rgb(20, 24, 26)); }
+                }
+            }
+            // a dead keypad with a red X
+            rectPx(c, fx + 28, fl - dh + 34, 8, 12, Color.rgb(30, 32, 40));
+            rectPx(c, fx + 29, fl - dh + 35, 6, 4, Color.rgb(60, 20, 20));
+            rectPx(c, fx + 30, fl - dh + 36, 1, 1, Color.rgb(255, 70, 60));
+            rectPx(c, fx + 33, fl - dh + 36, 1, 1, Color.rgb(255, 70, 60));
+            rectPx(c, fx + 31, fl - dh + 37, 2, 1, Color.rgb(255, 70, 60));
+            c.restore();
+            // loose wires from above, swaying, with sparks at the top hinge
+            for (int k = 0; k < 3; k++) {
+                float sx = (float) Math.sin(clock * 2 + k) * 2;
+                int wx = fx + 8 + k * 14;
+                for (int j = 0; j < 14; j++) rectPx(c, wx + sx * j / 14f, ftop - 3 + j, 1, 1, k == 1 ? Color.rgb(220, 60, 60) : Color.rgb(90, 140, 220));
+                if (((int) (clock * 9) + k) % 5 == 0) {
+                    rectPx(c, wx + sx, ftop + 11, 2, 2, Color.rgb(255, 235, 140));
+                    rectPx(c, wx + sx - 2 + (int) (clock * 40) % 5, ftop + 12 + (int) (clock * 30) % 4, 1, 1, Color.WHITE);
+                }
+            }
+            // a warning lamp over the door, and rubble on the floor
+            rectPx(c, fx + fw / 2 - 3, ftop - 10, 6, 5, ((int) (clock * 3) & 1) == 0 ? Color.rgb(255, 70, 60) : Color.rgb(90, 30, 30));
+            for (int k = 0; k < 8; k++) rectPx(c, fx - 14 + k * 9 + (k * 5) % 4, fl - 2 - (k % 3), 3 + k % 3, 2 + k % 3, Color.rgb(70 + k * 4, 72 + k * 4, 80));
+            // a glitch every so often: shifted coloured slices
+            float gt = clock % 2.2f;
+            if (gt < 0.14f) {
+                for (int k = 0; k < 4; k++) {
+                    int gy = oy + 6 + (int) ((k * 29 + clock * 97) % (oh - 12));
+                    rectPx(c, ox + (k * 13) % 7, gy, ow - 8, 3, k % 2 == 0 ? Color.argb(70, 0, 255, 255) : Color.argb(70, 255, 0, 200));
+                }
+            }
+        }
+
         void interiorWheel(Canvas c, int ox, int oy, int ow, int oh) {
             int fl = oy + oh - 12;
             rectPx(c, ox, oy, ow, oh, Color.rgb(34, 30, 46));
