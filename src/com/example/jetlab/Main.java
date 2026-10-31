@@ -276,7 +276,7 @@ public class Main extends Activity {
         // ---------- constants ----------
 
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
-        static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4, BIRD = 5;
+        static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4, BIRD = 5, SCREW = 6;
         static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
         static final float GUARD_RUN = 100f;     // how fast the guards run away, in pixels per second
         static final int GUARD = 4;              // Npc mode of the guards
@@ -292,8 +292,8 @@ public class Main extends Activity {
         static final float VMAX = 7f;            // m/s, "terminal" speed going up
         static final float JUMP = 8.5f;          // m/s, jump off the floor
 
-        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER", "DNA HELIX", "BERNOULLI BIRD"};
-        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES.", "HOLD TO RISE. TAP TO FIRE BASE PAIRS.", "TAP TO FLAP. HOLD TO GLIDE ON LIFT."};
+        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER", "DNA HELIX", "BERNOULLI BIRD", "AERIAL SCREW"};
+        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES.", "HOLD TO RISE. TAP TO FIRE BASE PAIRS.", "TAP TO FLAP. HOLD TO GLIDE ON LIFT.", "HOLD TO SPIN THE SCREW. IT TAKES A MOMENT TO SPIN UP."};
 
         static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
         static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
@@ -556,7 +556,7 @@ public class Main extends Activity {
         final float[] yHist = new float[64];
         int yh;
         float bustOff, bustV, lastVy;                // the chest spring: it only reacts to jumps and landings, not to running
-        float boltCd, tilt, flapT;                          // tilt: degrees, nose up is negative
+        float boltCd, tilt, flapT, rotor, rotAng;                          // tilt: degrees, nose up is negative
         static final int[][] RUNG = {{0xDC4646, 0x4678E6}, {0x50DC78, 0xF0C83C}, {0x4678E6, 0xDC4646}, {0xF0C83C, 0x50DC78}};   // A-T, C-G pairs
 
         // death
@@ -777,9 +777,9 @@ public class Main extends Activity {
 
         float hTop() { return vehicle == 0 ? SH_TOP : hhVeh(vehicle); }
 
-        float hBot() { return vehicle == 0 ? SH_BOT : hhVeh(vehicle); }
+        float hBot() { return vehicle == 0 ? SH_BOT : vehicle == SCREW ? 8 : hhVeh(vehicle); }
 
-        static int hhVeh(int v) { return v == STOMPER ? 12 : v == QUANTUM ? 14 : 8; }
+        static int hhVeh(int v) { return v == STOMPER || v == SCREW ? 12 : v == QUANTUM ? 14 : 8; }
 
         /** vehicles that stick to a surface and switch which one gravity points at */
         boolean flips() { return vehicle == INVERTER || vehicle == QUANTUM; }
@@ -1582,8 +1582,13 @@ public class Main extends Activity {
             if (jumpDelay > 0) jumpDelay -= dt;
             boolean helix = vehicle == HELIX;
             boolean fire = thrusting && state == PLAY && ((vehicle == 0 && jumpDelay <= 0) || helix);
+            if (vehicle == SCREW) {
+                // the rotor needs time to spin up, and keeps turning (and holding you up) a while after you let go
+                rotor = Math.max(0f, Math.min(1f, rotor + (thrusting && state == PLAY ? 1.7f : -0.7f) * dt));
+                rotAng += rotor * 30f * dt;
+            }
             boolean glide = vehicle == BIRD && thrusting && state == PLAY;      // spread wings: lift cancels most of gravity
-            ay = (helix ? 14f : GRAVITY) * gravDir * (glide ? 0.3f : 1f) - (fire ? (helix ? 30f : THRUST) : 0);
+            ay = (helix ? 14f : GRAVITY) * gravDir * (glide ? 0.3f : 1f) - (fire ? (helix ? 30f : THRUST) : 0) - (vehicle == SCREW ? rotor * 34f : 0f);
             vy += ay * dt;
             float vmin = flips() ? -VFALL : -VMAX;
             if (vy > VFALL) vy = VFALL;
@@ -1764,7 +1769,7 @@ public class Main extends Activity {
         void finishBuild() {
             vehicle = buildType;
             Arrays.fill(yHist, y);
-            boltCd = 0; tilt = 0;
+            boltCd = 0; tilt = 0; rotor = 0.65f;
             charges = ENTANGLER_USES;
             state = PLAY;
             gravDir = 1;
@@ -1953,7 +1958,7 @@ public class Main extends Activity {
             if (dist >= nextCrate) {
                 if (vehicle == 0) {
                     Crate k = new Crate();
-                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(5);
+                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(6);
                     crates.add(k);
                     spawnLeft = 4f * ppm;
                     nextCrate = dist + 220 + rnd.nextInt(150);
@@ -2519,6 +2524,16 @@ public class Main extends Activity {
             return out;
         }
 
+        /** the aerial screw's body: the pod with a mast on top for the rotor */
+        static final String[] SCREW_ROWS = screwRows();
+
+        static String[] screwRows() {
+            String[] out = new String[POD.length + 4];
+            for (int i = 0; i < 4; i++) out[i] = "..........xx..........";
+            System.arraycopy(recolor(POD, 'R', 'x', 'U', 'm'), 0, out, 4, POD.length);
+            return out;
+        }
+
         static final String[] BOARD = {
             "..mMMMMMMMMMMMMMMm..",
             "...mmmmmmmmmmmmmm...",
@@ -2542,6 +2557,7 @@ public class Main extends Activity {
             if (type == INVERTER) return POD;
             if (type == HELIX) return HELIX_HEAD;
             if (type == BIRD) return BIRD_ROWS;
+            if (type == SCREW) return SCREW_ROWS;
             String[] legs = compressed ? LEGS_STOMP_C : LEGS_STOMP;
             String[] out = Arrays.copyOf(BODY_STOMP, BODY_STOMP.length + legs.length);
             System.arraycopy(legs, 0, out, BODY_STOMP.length, legs.length);
@@ -3995,6 +4011,30 @@ public class Main extends Activity {
             }
         }
 
+        /**
+         * Da Vinci's aerial screw. A spiral blade pushes air down and Newton's third law pushes the craft up, so
+         * the downwash streaks and a rotor speed readout are drawn. The blade is seen edge-on, so its width follows cos(angle).
+         */
+        void drawScrew(Canvas c) {
+            int left = Math.round(playerX) - 10, top = Math.round(y) - 12;
+            outlined(c, SCREW_ROWS, left, top);
+            outlined(c, HEAD_ONLY, left, top + 7);
+            float span = 22f * (float) Math.cos(rotAng);
+            float by = top + 1;
+            line(c, playerX - span, by, playerX + span, by, Color.rgb(200, 160, 100), 2);
+            line(c, playerX - span * 0.6f, by + 2, playerX + span * 0.6f, by + 2, Color.rgb(150, 110, 60), 1);
+            rectPx(c, playerX - span - 1, by - 1, 2, 3, Color.rgb(235, 210, 150));
+            rectPx(c, playerX + span - 1, by - 1, 2, 3, Color.rgb(235, 210, 150));
+            if (rotor > 0.15f) {
+                for (int i = 0; i < 4; i++) {
+                    float dy = ((clock * 70f + i * 9f) % 36f);
+                    float xx = playerX - 9 + (i & 1) * 6 + i;
+                    if (y + 9 + dy < floorY) line(c, xx, y + 9 + dy, xx, y + 12 + dy, Color.argb((int) (150 * rotor), 200, 235, 255), 1);
+                }
+                text(c, "RPM " + (int) (rotor * 120), playerX, Math.round(y) + 24, 1, Color.rgb(200, 235, 255), 1);
+            }
+        }
+
         void drawBolts(Canvas c) {
             for (Bolt b : bolts) {
                 int[] pr = RUNG[b.kind * 1];
@@ -4010,6 +4050,7 @@ public class Main extends Activity {
             if (vehicle == QUANTUM) { drawQuantum(c); return; }
             if (vehicle == HELIX) { drawHelix(c); return; }
             if (vehicle == BIRD) { drawBird(c); return; }
+            if (vehicle == SCREW) { drawScrew(c); return; }
             int left = Math.round(playerX) - 10;
             int hh = hhVeh(vehicle);
             int cy = Math.round(y);
@@ -4054,7 +4095,7 @@ public class Main extends Activity {
                 }
             }
             if (buildT > BUILD_TIME * 0.9f && buildType != QUANTUM) {
-                int headTop = top + (buildType == STOMPER ? 2 : 3);
+                int headTop = top + (buildType == STOMPER ? 2 : buildType == SCREW ? 7 : 3);
                 sprite(c, HEAD_ONLY, left, headTop);
             }
             text(c, "BUILDING", w / 2f, ceilY + 28, 1, Color.rgb(255, 200, 80), 1);

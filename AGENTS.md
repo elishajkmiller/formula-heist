@@ -35,6 +35,9 @@ A fourth crate vehicle (HELIX): hold to rise (light gravity 14, thrust 30), rele
 ## Bernoulli Bird vehicle
 A fifth crate vehicle (BIRD): tap to flap (vy set to -7), hold to glide with spread wings (gravity x0.3). Science hook: while gliding it draws the Bernoulli picture, fast close streamlines and "P-" over the wing, slow wide ones and "P+" under it, so the wing is pushed up. Body is the pod recoloured with a beak and tail (BIRD_ROWS), wing is a fan of lines driven by flapT, nose tilts with vy. Drawn by drawBird().
 
+## Aerial Screw vehicle
+A sixth crate vehicle (SCREW), Da Vinci's helicopter idea: hold to spin the rotor up (0 to 1 in about 0.6 s, spins down in 1.4 s), thrust is rotor x 34 against gravity 22, so it hovers near 65 percent. Science hook: the blade pushes air down (streaks and an RPM readout are drawn) and Newton's third law pushes the craft up. The sprite is the pod with a mast (SCREW_ROWS, 4 rows taller, so hTop is 12 and hBot 8); drawScrew() draws the edge-on blade by cos(rotAng).
+
 ## Settings
 The SETTINGS button (bottom centre on the title and death screens) opens: haptics, sounds, music (a looping chiptune synthesized in Sfx.song(), no audio file), and RESET PROGRESS behind an "ARE YOU SURE?" pop-up (erases formulas, tickets, clothes, electrons and best distance; settings stay). Choices are saved in prefs ("haptics", "sound", "music").
 
