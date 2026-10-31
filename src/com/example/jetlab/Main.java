@@ -238,7 +238,7 @@ public class Main extends Activity {
         boolean diving;
         float teleFromY, telePulse, invuln, squash, flash, shake, hitstop, hintT, nextCrate, lastCoinSfx, unit = 1f;
         Sfx sfx;
-        boolean ghost;
+        boolean ghost, outline;
         Vibrator vib;
         float jumpDelay, y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
         int electrons, best;
@@ -895,6 +895,19 @@ public class Main extends Activity {
             }
         }
 
+        /** a sprite with a dark one pixel outline so it stands off the backdrop */
+        void outlined(Canvas c, String[] rows, int left, int top) {
+            if (!ghost) {
+                outline = true;
+                sprite(c, rows, left - 1, top);
+                sprite(c, rows, left + 1, top);
+                sprite(c, rows, left, top - 1);
+                sprite(c, rows, left, top + 1);
+                outline = false;
+            }
+            sprite(c, rows, left, top);
+        }
+
         void sprite(Canvas c, String[] rows, int left, int top) {
             p.setStyle(Paint.Style.FILL);
             for (int r = 0; r < rows.length; r++) {
@@ -902,7 +915,7 @@ public class Main extends Activity {
                 for (int k = 0; k < row.length(); k++) {
                     int col = pal(row.charAt(k));
                     if (col == 0) continue;
-                    p.setColor(ghost ? Color.argb(110, 120, 235, 255) : col);
+                    p.setColor(ghost ? Color.argb(110, 120, 235, 255) : outline ? Color.rgb(8, 10, 20) : col);
                     c.drawRect(left + k, top + r, left + k + 1, top + r + 1, p);
                 }
             }
@@ -915,6 +928,7 @@ public class Main extends Activity {
             drawBackground(c);
             drawFloor(c);
             drawNpcs(c);
+            rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb(95, 6, 10, 24));   // push the whole backdrop back
             drawCoins(c);
             drawCrates(c);
             drawZappers(c);
@@ -946,7 +960,7 @@ public class Main extends Activity {
             drawWall(c);
             // ceiling pipe with rivets
             rectPx(c, 0, 0, w, ceilY, Color.rgb(36, 50, 72));
-            rectPx(c, 0, ceilY - 3, w, 3, Color.rgb(70, 190, 200));
+            rectPx(c, 0, ceilY - 3, w, 3, Color.rgb(110, 240, 250));
             rectPx(c, 0, ceilY - 4, w, 1, Color.rgb(30, 100, 120));
             float off = (dist * ppm) % 24;
             for (int x = -24; x < w + 24; x += 24) rectPx(c, x - off, 3, 2, 2, Color.rgb(90, 110, 140));
@@ -1184,7 +1198,7 @@ public class Main extends Activity {
 
         void drawFloor(Canvas c) {
             rectPx(c, 0, floorY, w, h - floorY, Color.rgb(30, 40, 58));
-            rectPx(c, 0, floorY, w, 3, Color.rgb(70, 190, 200));
+            rectPx(c, 0, floorY, w, 3, Color.rgb(110, 240, 250));
             rectPx(c, 0, floorY + 3, w, 1, Color.rgb(30, 100, 120));
             int m0 = (int) Math.floor(dist - playerX / ppm);
             for (int m = Math.max(0, m0); m < dist + (w - playerX) / ppm + 1; m++) {
@@ -1322,9 +1336,9 @@ public class Main extends Activity {
                 rectPx(c, left + 1, top + 14, 4, fl, Color.rgb(255, 170, 40));
                 rectPx(c, left + 2, top + 14, 2, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
             }
-            sprite(c, SPR_HEAD, left, top);
+            outlined(c, SPR_HEAD, left, top);
             String[] legs = !onFloor ? LEGS_AIR : (ph == 0 ? LEGS_A : ph == 2 ? LEGS_B : LEGS_M);
-            sprite(c, legs, left, top + SPR_HEAD.length);
+            outlined(c, legs, left, top + SPR_HEAD.length);
         }
 
         void quantumBody(Canvas c, int cy, boolean flip) {
@@ -1332,9 +1346,9 @@ public class Main extends Activity {
             if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
             int ph = ((int) (runPhase * 0.28f * 4)) & 3;
             String[] legs = ph == 0 ? LEGS_A : ph == 2 ? LEGS_B : LEGS_M;
-            sprite(c, SPR_HEAD, left + 2, top);
-            sprite(c, legs, left + 2, top + SPR_HEAD.length);
-            sprite(c, BOARD, left, top + SPR_HEAD.length + LEGS_A.length);
+            outlined(c, SPR_HEAD, left + 2, top);
+            outlined(c, legs, left + 2, top + SPR_HEAD.length);
+            outlined(c, BOARD, left, top + SPR_HEAD.length + LEGS_A.length);
             if (flip) c.restore();
         }
 
@@ -1369,12 +1383,12 @@ public class Main extends Activity {
             if (vehicle == STOMPER) {
                 boolean comp = squash > 0;
                 int off = comp ? 3 : 0;
-                sprite(c, BODY_STOMP, left, top + off);
-                sprite(c, comp ? LEGS_STOMP_C : LEGS_STOMP, left, top + BODY_STOMP.length + off);
-                sprite(c, HEAD_ONLY, left, top + 2 + off);
+                outlined(c, BODY_STOMP, left, top + off);
+                outlined(c, comp ? LEGS_STOMP_C : LEGS_STOMP, left, top + BODY_STOMP.length + off);
+                outlined(c, HEAD_ONLY, left, top + 2 + off);
             } else {
-                sprite(c, POD, left, top);
-                sprite(c, HEAD_ONLY, left, top + 3);
+                outlined(c, POD, left, top);
+                outlined(c, HEAD_ONLY, left, top + 3);
                 // field sparks at both magnet caps
                 rectPx(c, left + 6 + rnd.nextInt(8), top - 1 - rnd.nextInt(2), 1, 1, Color.rgb(255, 150, 150));
                 rectPx(c, left + 6 + rnd.nextInt(8), top + 12 + rnd.nextInt(2), 1, 1, Color.rgb(150, 190, 255));
