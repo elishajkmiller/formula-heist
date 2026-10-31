@@ -914,6 +914,21 @@ public class Main extends Activity {
             "................"
         };
 
+        /** face down on the floor after a zap, facing right (28 wide, 11 tall) */
+        static final String[] SPR_FLAT = {
+            "............................",
+            "...........ooO..bb.b........",
+            "..........hOOOoBBbBBb.......",
+            "..........hOOOoBBBBBBBb.....",
+            "....DDd...hOOOoWwBBBBBBBB...",
+            "...DDLd...NNNNwWWWBsSSSSSB..",
+            "..KKd.dDDDDDWWWWWWWBsSEXSs..",
+            "..KK...DDDDDwWWWWWWWxsSSSSSa",
+            "KKKDDDDDDDDDwwwwwwwwxsaannra",
+            "LKKDDDDDDDDDwwwwwwwwxaaaaaa.",
+            "......................xxxSSS"
+        };
+
         static final int HEAD_ROWS = 10;
         static final String[] HEAD_ONLY = headOnly();
 
@@ -1066,6 +1081,8 @@ public class Main extends Activity {
                 case 'C': return Color.rgb(120, 235, 255);
                 case 'O': return Color.rgb(120, 130, 100);
                 case 'a': return Color.rgb(170, 140, 115);
+                case 'r': return Color.rgb(230, 120, 140);
+                case 'X': return Color.rgb(60, 40, 40);
                 case 'e': return Color.rgb(255, 255, 255);
                 case 'P': return Color.rgb(210, 170, 60);
                 case 'o': return Color.rgb(80, 90, 70);
@@ -1564,24 +1581,30 @@ public class Main extends Activity {
         }
 
         void drawRagdoll(Canvas c) {
+            if (settled && settleT >= 1f) {
+                // face down on the floor: his own sprite, bobbing a pixel as he is dragged
+                boolean sliding = speed > 0.3f;
+                int bump = sliding && ((int) (clock * 14) & 1) == 0 ? 1 : 0;
+                int left = Math.round(playerX) - 14, top = Math.round(floorY) - SPR_FLAT.length - bump;
+                outlined(c, SPR_FLAT, left, top);
+                if (!sliding) {
+                    // dizzy stars circling his head
+                    for (int i = 0; i < 3; i++) {
+                        double a = clock * 5 + i * 2.094;
+                        rectPx(c, left + 22 + (float) Math.cos(a) * 7, top - 2 + (float) Math.sin(a) * 3, 2, 2, Color.rgb(255, 230, 90));
+                    }
+                }
+                return;
+            }
             int left = Math.round(playerX) - 8, top = Math.round(y) - SH;
-            boolean sliding = settled && speed > 0.3f;
-            boolean flop = ((int) (clock * (sliding ? 9 : 12)) & 1) == 0;
+            boolean flop = ((int) (clock * 12) & 1) == 0;
             String[] legs = flop ? LEGS_AIR : LEGS_AIR2;
-            if (settled && !sliding) legs = ((int) (clock * 2) & 3) == 0 ? LEGS_FALL2 : LEGS_FALL1;   // twitch when he stops
             c.save();
             c.rotate(ang, playerX, y);
             leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
             outlined(c, flop ? SPR_HEAD_B : SPR_HEAD, left, top);
             c.restore();
-            if (settled && !sliding) {
-                // dizzy stars circling his head
-                for (int i = 0; i < 3; i++) {
-                    double a = clock * 5 + i * 2.094;
-                    rectPx(c, playerX + 12 + (float) Math.cos(a) * 7, y - 3 + (float) Math.sin(a) * 3, 2, 2, Color.rgb(255, 230, 90));
-                }
-            }
         }
 
         void drawPlayer(Canvas c) {
