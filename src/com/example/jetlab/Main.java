@@ -470,7 +470,7 @@ public class Main extends Activity {
         // DNA helix: where the head has been, so the body can follow it
         final float[] yHist = new float[64];
         int yh;
-        float boltCd;
+        float boltCd, tilt;                          // tilt: degrees, nose up is negative
         static final int[][] RUNG = {{0xDC4646, 0x4678E6}, {0x50DC78, 0xF0C83C}, {0x4678E6, 0xDC4646}, {0xF0C83C, 0x50DC78}};   // A-T, C-G pairs
 
         // death
@@ -1465,7 +1465,12 @@ public class Main extends Activity {
             if (vehicle == STOMPER && y >= hi - 0.5f) onFloor = true;
 
             if (fire && !helix) emitExhaust();
-            if (helix) { yh = (yh + 1) & 63; yHist[yh] = y; }
+            if (helix) {
+                yh = (yh + 1) & 63; yHist[yh] = y;
+                // nose up when rising, nose down when sinking, eased so it does not snap
+                float target = Math.max(-26f, Math.min(34f, vy * 3.6f));
+                tilt += (target - tilt) * Math.min(1f, 9f * dt);
+            }
             for (int i = 0; i < NP; i++) {
                 if (pl[i] > 0) {
                     pl[i] -= dt;
@@ -1586,7 +1591,7 @@ public class Main extends Activity {
         void finishBuild() {
             vehicle = buildType;
             Arrays.fill(yHist, y);
-            boltCd = 0;
+            boltCd = 0; tilt = 0;
             charges = ENTANGLER_USES;
             state = PLAY;
             gravDir = 1;
@@ -3014,8 +3019,11 @@ public class Main extends Activity {
                 }
                 pax = sx; pay = ay2; pbx = sx; pby = by2;
             }
+            c.save();
+            c.rotate(tilt, playerX, y);
             outlined(c, HELIX_HEAD, left, top);
             outlined(c, HEAD_ONLY, left, top + 3);
+            c.restore();
         }
 
         void drawBolts(Canvas c) {
