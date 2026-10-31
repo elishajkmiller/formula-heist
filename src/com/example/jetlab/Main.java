@@ -2229,7 +2229,7 @@ public class Main extends Activity {
             "............Bb.."
         };
 
-        static final String[] BUST = {"WW.", "WWw", "ww."};      // small, on the upper chest just under the collar
+        static final String[] BUST = {"WW", "Ww", "w."};      // small, on the upper chest just under the collar
 
         /** the hanging lock swung backwards a little more or less in four frames, so it streams as she runs */
         static final String[][] LOCK_FRAMES = lockFrames();
