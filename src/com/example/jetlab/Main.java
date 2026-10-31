@@ -139,6 +139,68 @@ public class Main extends Activity {
             return d;
         }
 
+        /**
+         * A short looping chiptune, made here so there is no audio file: A minor, 128 bpm, eight bars
+         * of Am F C G twice. A square-wave arpeggio over a triangle bass and a noise hat.
+         */
+        static short[] song() {
+            double beat = 60.0 / 128.0, step = beat / 4;
+            int bars = 8, steps = bars * 16;
+            int n = (int) (steps * step * RATE);
+            float[] roots = {110.00f, 87.31f, 130.81f, 98.00f};
+            float[][] arp = {{440.00f, 523.25f, 659.25f}, {349.23f, 440.00f, 523.25f}, {523.25f, 659.25f, 783.99f}, {392.00f, 493.88f, 587.33f}};
+            int[] pattern = {0, 1, 2, 1, 0, 1, 2, 1, 2, 1, 0, 1, 2, 1, 0, 2};
+            short[] d = new short[n];
+            Random noise = new Random(5);
+            for (int i = 0; i < n; i++) {
+                double t = i / (double) RATE;
+                int st = Math.min(steps - 1, (int) (t / step));
+                int chord = (st / 16) % 4;
+                double inStep = (t - st * step) / step;                 // 0..1 inside this 16th note
+                // lead: the arpeggio
+                double lf = arp[chord][pattern[st % 16] % 3];
+                double lead = (((t * lf) % 1.0) < 0.25 ? 1 : -1) * Math.exp(-inStep * 3.2) * 0.12;
+                // bass: a triangle on the root, plucked on every beat
+                double bt = (t % beat) / beat;
+                double bf = roots[chord];
+                double ph = (t * bf) % 1.0;
+                double bass = (ph < 0.5 ? ph * 4 - 1 : 3 - ph * 4) * Math.exp(-bt * 2.2) * 0.3;
+                // hat: a tiny noise tick on the off 8ths
+                double hat = (st % 2 == 1 ? (noise.nextDouble() * 2 - 1) * Math.exp(-inStep * 12) * 0.05 : 0);
+                double v = lead + bass + hat;
+                d[i] = (short) (Math.max(-1, Math.min(1, v)) * 32767 * 0.6);
+            }
+            return d;
+        }
+
+        AudioTrack music;
+        boolean musicWanted;
+
+        /** start or pause the background music; the track is built the first time on the audio thread */
+        void setMusic(final boolean on) {
+            musicWanted = on;
+            try {
+                io.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            if (on) {
+                                if (music == null) {
+                                    short[] d = song();
+                                    music = mk(d);
+                                    music.setLoopPoints(0, d.length, -1);
+                                    music.setVolume(0.55f);
+                                }
+                                if (musicWanted) music.play();
+                            } else if (music != null) {
+                                music.pause();
+                            }
+                        } catch (Throwable t) { }
+                    }
+                });
+            } catch (Throwable t) { }
+        }
+
         static AudioTrack mk(short[] d) {
             AudioTrack a = new AudioTrack(AudioManager.STREAM_MUSIC, RATE, AudioFormat.CHANNEL_OUT_MONO,
                     AudioFormat.ENCODING_PCM_16BIT, d.length * 2, AudioTrack.MODE_STATIC);
@@ -172,6 +234,8 @@ public class Main extends Activity {
                             try { if (tr[i] != null) tr[i].release(); } catch (Throwable t) { }
                             tr[i] = null;
                         }
+                        try { if (music != null) music.release(); } catch (Throwable t) { }
+                        music = null;
                     }
                 });
                 io.shutdown();
@@ -191,7 +255,7 @@ public class Main extends Activity {
 
         // ---------- constants ----------
 
-        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6;
+        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
         static final int NF = 20;                // formulas to recover
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
@@ -432,6 +496,10 @@ public class Main extends Activity {
         float bannerT;
         int abx, aby, abw, abh, cbx, cby, cbw, cbh, scx, scy, scw, sch;   // buttons and the big card
 
+        // settings
+        boolean hapticsOn = true, soundOn = true, musicOn = true, confirmReset;
+        int settingsFrom, gbx, gby, gbw, gbh;        // the settings button on the title and death screens
+
         // sound and haptics
         Sfx sfx;
         Vibrator vib;
@@ -473,6 +541,9 @@ public class Main extends Activity {
                 tickets = Integer.bitCount(prefs.getInt("owned", 0) & ~revealed);
             }
             bank = prefs.getInt("bank", 0);
+            hapticsOn = prefs.getBoolean("haptics", true);
+            soundOn = prefs.getBoolean("sound", true);
+            musicOn = prefs.getBoolean("music", true);
             if (prefs.contains("inv0")) {
                 for (int t = 0; t < 3; t++) { inv[t] = prefs.getInt("inv" + t, 1) | 1; worn[t] = prefs.getInt("worn" + t, 0); }
             } else {                                    // earlier whole outfits become shirts
@@ -492,6 +563,7 @@ public class Main extends Activity {
             running = true;
             lastNanos = 0;
             if (sfx == null) sfx = new Sfx();
+            sfx.setMusic(musicOn);
             if (vib == null) vib = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
             Choreographer.getInstance().postFrameCallback(this);
         }
@@ -520,6 +592,7 @@ public class Main extends Activity {
             abw = 76; abh = 11; abx = w - abw - 4; aby = h - 12;
             sbw = 62; sbh = 11; sbx = 4; sby = h - 12;
             tbw = 124; tbh = 12; tbx = 8; tby = h - 14;
+            gbw = 52; gbh = 11; gbx = (w - gbw) / 2; gby = h - 12;
             cbw = 36; cbh = 11; cbx = w - cbw - 4; cby = 3;
             scw = Math.min(200, w - 24); sch = 104; scx = (w - scw) / 2; scy = 24;
             if (state == START) toStart(true);
@@ -591,11 +664,11 @@ public class Main extends Activity {
         /** vehicles that stick to a surface and switch which one gravity points at */
         boolean flips() { return vehicle == INVERTER || vehicle == QUANTUM; }
 
-        void sfx(int id) { if (sfx != null) sfx.play(id); }
+        void sfx(int id) { if (soundOn && sfx != null) sfx.play(id); }
 
         void buzz(int ms) {
             try {
-                if (vib != null) vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+                if (hapticsOn && vib != null) vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
             } catch (Throwable t) { }
         }
 
@@ -604,7 +677,11 @@ public class Main extends Activity {
             float gx = e.getX() / unit, gy = e.getY() / unit;
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    if (storeButtonHit(gx, gy)) {
+                    if (settingsButtonHit(gx, gy)) {
+                        settingsFrom = state; state = SETTINGS; confirmReset = false; thrusting = false;
+                    } else if (state == SETTINGS) {
+                        settingsTap(gx, gy);
+                    } else if (storeButtonHit(gx, gy)) {
                         storeFrom = state; state = STORE; thrusting = false;
                     } else if (state == STORE) {
                         storeTap(gx, gy);
@@ -696,6 +773,94 @@ public class Main extends Activity {
         }
 
         // ---------- outfit store: spend electrons on new looks ----------
+
+        // ---------- settings: haptics, sounds, music and a guarded reset ----------
+
+        boolean settingsButtonHit(float gx, float gy) {
+            if (!(state == START || (state == DEAD && stateTime > 0.3f))) return false;
+            return gx >= gbx && gx < gbx + gbw && gy >= gby && gy < gby + gbh;
+        }
+
+        void drawSettingsButton(Canvas c) {
+            rectPx(c, gbx, gby, gbw, gbh, Color.rgb(8, 10, 20));
+            rectPx(c, gbx + 1, gby + 1, gbw - 2, gbh - 2, Color.rgb(44, 54, 82));
+            text(c, "SETTINGS", gbx + gbw / 2f, gby + 3, 1, Color.WHITE, 1);
+        }
+
+        /** rows of the settings screen: x, y, width, height */
+        int[] settingsRow(int i) { return new int[] {w / 2 - 90, 28 + i * 24, 180, 20}; }
+
+        int[] confirmButton(int i) { return new int[] {w / 2 - 78 + i * 82, 92, 74, 16}; }   // 0 yes, 1 no
+
+        void settingsTap(float gx, float gy) {
+            if (confirmReset) {
+                for (int i = 0; i < 2; i++) {
+                    int[] b = confirmButton(i);
+                    if (gx >= b[0] && gx < b[0] + b[2] && gy >= b[1] && gy < b[1] + b[3]) {
+                        if (i == 0) { resetProgress(); sfx(S_HIT); shake = 4f; buzz(60); }
+                        confirmReset = false;
+                        return;
+                    }
+                }
+                return;
+            }
+            if (closeHit(gx, gy)) { state = settingsFrom; return; }
+            for (int i = 0; i < 4; i++) {
+                int[] r = settingsRow(i);
+                if (gx < r[0] || gx >= r[0] + r[2] || gy < r[1] || gy >= r[1] + r[3]) continue;
+                if (i == 0) { hapticsOn = !hapticsOn; buzz(30); }
+                else if (i == 1) { soundOn = !soundOn; sfx(S_COIN); }
+                else if (i == 2) { musicOn = !musicOn; if (sfx != null) sfx.setMusic(musicOn); }
+                else { confirmReset = true; return; }
+                prefs.edit().putBoolean("haptics", hapticsOn).putBoolean("sound", soundOn).putBoolean("music", musicOn).apply();
+                return;
+            }
+        }
+
+        /** erase formulas, tickets, clothes, electrons and the best distance; the settings stay */
+        void resetProgress() {
+            SharedPreferences.Editor e = prefs.edit();
+            for (String k : new String[] {"best", "bank", "inv0", "inv1", "inv2", "worn0", "worn1", "worn2", "formulas", "tickets", "pending", "owned", "scratched", "outfits", "outfit"}) e.remove(k);
+            e.apply();
+            best = 0; bank = 0; ownedMask = 0; tickets = 0; pending = -1;
+            for (int t = 0; t < 3; t++) { inv[t] = 1; worn[t] = 0; }
+            applyOutfit();
+        }
+
+        void drawSettings(Canvas c) {
+            rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
+            for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
+            text(c, "SETTINGS", 8, 5, 1, Color.rgb(255, 215, 120), 0);
+            closeButton(c);
+            String[] names = {"HAPTICS", "SOUNDS", "MUSIC", "RESET PROGRESS"};
+            boolean[] on = {hapticsOn, soundOn, musicOn, false};
+            for (int i = 0; i < 4; i++) {
+                int[] r = settingsRow(i);
+                boolean reset = i == 3;
+                rectPx(c, r[0], r[1], r[2], r[3], Color.rgb(8, 10, 20));
+                rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, reset ? Color.rgb(90, 36, 40) : Color.rgb(34, 42, 66));
+                text(c, names[i], r[0] + 8, r[1] + 7, 1, Color.WHITE, 0);
+                if (!reset) {
+                    rectPx(c, r[0] + r[2] - 38, r[1] + 3, 32, r[3] - 6, Color.rgb(8, 10, 20));
+                    rectPx(c, r[0] + r[2] - 37, r[1] + 4, 30, r[3] - 8, on[i] ? Color.rgb(50, 150, 90) : Color.rgb(120, 50, 50));
+                    text(c, on[i] ? "ON" : "OFF", r[0] + r[2] - 22, r[1] + 7, 1, Color.WHITE, 1);
+                }
+            }
+            if (confirmReset) {
+                rectPx(c, 0, 0, w, h, Color.argb(200, 6, 8, 16));
+                rectPx(c, w / 2 - 90, 36, 180, 78, Color.rgb(8, 10, 20));
+                rectPx(c, w / 2 - 89, 37, 178, 76, Color.rgb(40, 30, 40));
+                text(c, "ARE YOU SURE?", w / 2f, 42, 2, Color.rgb(255, 120, 100), 1);
+                wrapText(c, "THIS ERASES YOUR FORMULAS, TICKETS, CLOTHES, ELECTRONS AND BEST DISTANCE. IT CANNOT BE UNDONE.", w / 2f, 60, 1, Color.WHITE, 164);
+                for (int i = 0; i < 2; i++) {
+                    int[] b = confirmButton(i);
+                    rectPx(c, b[0], b[1], b[2], b[3], Color.rgb(8, 10, 20));
+                    rectPx(c, b[0] + 1, b[1] + 1, b[2] - 2, b[3] - 2, i == 0 ? Color.rgb(150, 45, 45) : Color.rgb(45, 120, 80));
+                    text(c, i == 0 ? "YES, RESET" : "NO, KEEP IT", b[0] + b[2] / 2f, b[1] + 5, 1, Color.WHITE, 1);
+                }
+            }
+            drawParticles(c);
+        }
 
         boolean storeButtonHit(float gx, float gy) {
             if (!(state == START || (state == DEAD && stateTime > 0.3f))) return false;
@@ -1202,7 +1367,7 @@ public class Main extends Activity {
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
 
-            boolean waiting = state == START || state == ARCHIVE || state == SCRATCH || state == STORE;   // the scene holds still until he runs
+            boolean waiting = state == START || state == ARCHIVE || state == SCRATCH || state == STORE || state == SETTINGS;   // the scene holds still until he runs
             float nsc = (bgOff - lastBg) * 2.4f;       // background scientists move at 60% of the floor
             lastBg = bgOff;
             npcLeft -= nsc;
@@ -1217,7 +1382,7 @@ public class Main extends Activity {
 
             float dt = rdt;
             if (state == DEAD) { updateDead(dt); return; }
-            if (state == ARCHIVE || state == SCRATCH || state == STORE) {
+            if (state == ARCHIVE || state == SCRATCH || state == STORE || state == SETTINGS) {
                 if (storeMsgT > 0) storeMsgT -= dt;
                 for (int i = 0; i < NP; i++) {
                     if (pl[i] > 0) {
@@ -2078,14 +2243,15 @@ public class Main extends Activity {
             if (w == 0 || bc == null) return;
             Canvas c = bc;
             ovs.clear();
-            if (state == STORE) drawStore(c);
+            if (state == SETTINGS) drawSettings(c);
+            else if (state == STORE) drawStore(c);
             else if (state == ARCHIVE) drawArchive(c);
             else if (state == SCRATCH) drawScratch(c);
             else drawScene(c);
             if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
-            if (state == START || state == DEAD) { drawArchiveButton(c); drawStoreButton(c); }
+            if (state == START || state == DEAD) { drawArchiveButton(c); drawStoreButton(c); drawSettingsButton(c); }
             out.save();
             if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);

@@ -31,3 +31,6 @@ Electrons you collect are banked across runs (prefs "bank"). The STORE button (b
 
 ## DNA Helix vehicle
 A fourth crate vehicle (HELIX): hold to rise (light gravity 14, thrust 30), release to sink, tap to fire base pairs (A-T and C-G rungs) that destroy a zapper or missile they touch (0.3 s cooldown). Its body is a double helix that trails the head by following a 64 sample history of the head's height (yHist), twisting as it goes.
+
+## Settings
+The SETTINGS button (bottom centre on the title and death screens) opens: haptics, sounds, music (a looping chiptune synthesized in Sfx.song(), no audio file), and RESET PROGRESS behind an "ARE YOU SURE?" pop-up (erases formulas, tickets, clothes, electrons and best distance; settings stay). Choices are saved in prefs ("haptics", "sound", "music").
