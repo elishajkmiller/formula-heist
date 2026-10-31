@@ -14,6 +14,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Choreographer;
 import android.view.MotionEvent;
@@ -244,6 +245,13 @@ public class Main extends Activity {
             "T = 2PI SQRT L/G",
             "A = V^2/R"
         };
+        /** the formulas as they are written in a textbook, drawn with a real font so they are easy to read */
+        static final String[] FORMD = {
+            "F = ma", "E = mc\u00b2", "V = IR", "PV = nRT", "v = u + at", "F = G m1 m2 / r\u00b2", "E = hf", "S = k ln W",
+            "\u0394x \u0394p \u2265 \u0127/2", "F = \u2212kx", "KE = \u00bd m v\u00b2", "PE = m g h", "v = f \u03bb",
+            "n1 sin \u03b81 = n2 sin \u03b82", "F = k q1 q2 / r\u00b2", "p = m v", "W = F d", "P = E / t",
+            "T = 2\u03c0 \u221a(L/g)", "a = v\u00b2 / r"
+        };
         static final String[] FNAME = {
             "NEWTON'S SECOND LAW",
             "MASS-ENERGY",
@@ -288,6 +296,25 @@ public class Main extends Activity {
             "A LONGER PENDULUM SWINGS MORE SLOWLY.",
             "TO GO IN A CIRCLE YOU MUST ACCELERATE TOWARD THE CENTER."
         };
+        /** text drawn at screen resolution on top of the pixel picture */
+        static class Ov { String t; float x, y, size; int col; boolean clip; }
+        final ArrayList<Ov> ovs = new ArrayList<>();
+        final Paint ovp = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final Path clipPath = new Path();
+
+        void ov(String t, float gx, float gy, float gsize, int col, boolean clip) {
+            Ov o = new Ov();
+            o.t = t; o.x = gx; o.y = gy; o.size = gsize; o.col = col; o.clip = clip;
+            ovs.add(o);
+        }
+
+        /** the biggest text size, in game pixels, that fits the width */
+        float fitSize(String t, float maxW, float maxSize) {
+            ovp.setTextSize(maxSize * unit);
+            float wpx = ovp.measureText(t);
+            return wpx > maxW * unit ? maxSize * maxW * unit / wpx : maxSize;
+        }
+
         int ownedMask, scratchedMask, archFrom, selCard, mcols, mrows, cleared, bannerIdx, abx, aby, abw, abh, cbx, cby, cbw, cbh, scx, scy, scw, sch;
         boolean selScratched;
         final boolean[] mask = new boolean[2000];
@@ -338,6 +365,8 @@ public class Main extends Activity {
             scratchedMask = prefs.getInt("scratched", 0);
             p.setAntiAlias(false);
             blit.setFilterBitmap(false);
+            ovp.setTypeface(Typeface.create(Typeface.SERIF, Typeface.ITALIC));
+            ovp.setTextAlign(Paint.Align.CENTER);
         }
 
         void start() {
@@ -707,8 +736,8 @@ public class Main extends Activity {
                 if (seen) {
                     rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(236, 222, 180));
                     rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, 1, Color.rgb(196, 160, 100));
-                    String f = FORM[i];
-                    if (f.length() * 4 <= r[2] - 2) text(c, f, r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 60, 40), 1);
+                    float fs = fitSize(FORMD[i], r[2] - 3, 8f);
+                    if (fs >= 4.6f) ov(FORMD[i], r[0] + r[2] / 2f, r[1] + r[3] / 2f, fs, Color.rgb(70, 42, 28), false);
                     else text(c, "" + (i + 1), r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 60, 40), 1);
                 } else if (have) {
                     silver(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2);
@@ -740,9 +769,7 @@ public class Main extends Activity {
             rectPx(c, scx, scy + sch - 3, scw, 3, Color.rgb(196, 160, 100));
             int ink = Color.rgb(90, 60, 40);
             text(c, FNAME[selCard], scx + scw / 2f, scy + 9, 1, Color.rgb(140, 100, 60), 1);
-            String f = FORM[selCard];
-            int sc = f.length() * 8 <= scw - 12 ? 2 : 1;
-            text(c, f, scx + scw / 2f, scy + 32, sc, ink, 1);
+            ov(FORMD[selCard], scx + scw / 2f, scy + 32, fitSize(FORMD[selCard], scw - 16, 17f), Color.rgb(70, 42, 28), !selScratched);
             wrapText(c, FDESC[selCard], scx + scw / 2f, scy + 56, 1, ink, scw - 24);
             // the silver layer left to scratch
             if (!selScratched) {
@@ -1656,6 +1683,7 @@ public class Main extends Activity {
         protected void onDraw(Canvas out) {
             if (w == 0 || bc == null) return;
             Canvas c = bc;
+            ovs.clear();
             if (state == ARCHIVE) drawArchive(c);
             else if (state == SCRATCH) drawScratch(c);
             else drawScene(c);
@@ -1666,6 +1694,31 @@ public class Main extends Activity {
             out.save();
             if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);
+            for (Ov o : ovs) {
+                boolean clipped = false;
+                if (o.clip) {
+                    // only the scratched-off part of the card shows the text
+                    clipPath.reset();
+                    for (int cy = 0; cy < mrows; cy++) {
+                        int run = -1;
+                        for (int cx = 0; cx <= mcols; cx++) {
+                            boolean on = cx < mcols && mask[cy * mcols + cx];
+                            if (on && run < 0) run = cx;
+                            if (!on && run >= 0) {
+                                clipPath.addRect((scx + run * 4) * unit, (scy + cy * 4) * unit, (scx + cx * 4) * unit, (scy + cy * 4 + 4) * unit, Path.Direction.CW);
+                                run = -1;
+                            }
+                        }
+                    }
+                    out.save();
+                    out.clipPath(clipPath);
+                    clipped = true;
+                }
+                ovp.setTextSize(o.size * unit);
+                ovp.setColor(o.col);
+                out.drawText(o.t, o.x * unit, o.y * unit + o.size * unit * 0.34f, ovp);
+                if (clipped) out.restore();
+            }
             out.restore();
         }
 
