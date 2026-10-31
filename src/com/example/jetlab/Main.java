@@ -460,7 +460,7 @@ public class Main extends Activity {
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
             diving = false; nextCrate = 80; thrusting = false;
             settled = false; settleT = 0; ang = 0; angV = 0;
-            outX = Math.min(playerX + 140f, w - 40f); holeOpen = false;
+            outX = Math.min(playerX + 110f, w - 40f); holeOpen = false;
             bgOff = 20f - (outX + 10f); lastBg = bgOff;     // mission control sits just inside the wall
             y = floorY - SH_BOT; vy = 0; dist = 0; spawnLeft = w * 0.6f; speed = 0;
             dragging = false; bonus = 0; tipT = 0; onFloor = true;
@@ -1020,7 +1020,7 @@ public class Main extends Activity {
 
             if (tipT > 0) tipT -= rdt;
             bonus = Math.max(0f, bonus - 4.5f * dt);
-            speed = breaking ? Math.min(11f, 2f + stateTime * 9f) : 5f + Math.min(dist / 60f, 7f) + bonus;
+            speed = breaking ? Math.min(5f, 2f + stateTime * 8f) : 5f + Math.min(dist / 60f, 7f) + bonus;   // outside he tops out at the speed the run starts at
             float scroll = speed * ppm * dt;
             outX -= scroll;
             if (breaking && outX <= playerX + 8f) breach();
