@@ -436,7 +436,9 @@ public class Main extends Activity {
 
         void reset() {
             electrons = 0;
-            toStart(false);
+            toStart(true);
+            state = START;      // stand outside the wall again and wait for a tap
+            stateTime = 0;
         }
 
         /** back outside on the grass, in front of NULLCORP's wall */
