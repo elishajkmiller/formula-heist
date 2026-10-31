@@ -239,6 +239,7 @@ public class Main extends Activity {
         float teleFromY, telePulse, invuln, squash, flash, shake, hitstop, hintT, nextCrate, lastCoinSfx, unit = 1f;
         Sfx sfx;
         boolean ghost, outline;
+        float leanPx, landT;
         Vibrator vib;
         float jumpDelay, y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
         int electrons, best;
@@ -431,6 +432,7 @@ public class Main extends Activity {
             if (invuln > 0) invuln -= rdt;
             if (hintT > 0) hintT -= rdt;
             if (squash > 0) squash -= rdt;
+            if (landT > 0) landT -= rdt;
             if (telePulse > 0) telePulse -= rdt;
             boolean playing = state == PLAY || state == BUILD;
             float r = vehicle == 0 ? 0.3f * ppm : (vehicle == STOMPER ? 8f : 7f);
@@ -471,6 +473,7 @@ public class Main extends Activity {
                     } else {
                         if (vehicle == 0 && vy > 9f) {
                             shake = Math.max(shake, 1.5f);
+                            landT = 0.12f;
                             for (int i = 0; i < 5; i++) burst(playerX - 3, y + 10);
                         }
                         vy = 0;
@@ -829,6 +832,40 @@ public class Main extends Activity {
             "................"
         };
 
+        static final String[] LEGS_AIR2 = {
+            "....DDDd.DDDd...",
+            "...DDDd...DDd...",
+            "..DDDd....DDDd..",
+            ".DDDd.....DDDd..",
+            ".DDd......DDd...",
+            ".KKK......KKK...",
+            "................",
+            "................",
+            "................"
+        };
+        static final String[] LEGS_FALL1 = {
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDDd...",
+            ".....DDd..DDd...",
+            ".....KKK..KKK...",
+            ".....KKK..KKK...",
+            "................"
+        };
+        static final String[] LEGS_FALL2 = {
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd..DDDd..",
+            ".....DDd...DDd..",
+            ".....DDd...DDd..",
+            ".....KKK...KKKK.",
+            "................",
+            "................",
+            "................"
+        };
+
         static final int HEAD_ROWS = 8;
         static final String[] HEAD_ONLY = Arrays.copyOfRange(SPR_HEAD, 0, HEAD_ROWS);
 
@@ -1009,7 +1046,8 @@ public class Main extends Activity {
                     int col = pal(row.charAt(k));
                     if (col == 0) continue;
                     p.setColor(ghost ? Color.argb(110, 120, 235, 255) : outline ? Color.rgb(8, 10, 20) : col);
-                    c.drawRect(left + k, top + r, left + k + 1, top + r + 1, p);
+                    int dxr = leanPx == 0 ? 0 : Math.round(leanPx * (rows.length - 1 - r) / (rows.length - 1f));
+                    c.drawRect(left + k + dxr, top + r, left + k + dxr + 1, top + r + 1, p);
                 }
             }
         }
@@ -1427,12 +1465,40 @@ public class Main extends Activity {
         static final int[] BOB = {0, 1, 0, 1};     // body sinks on each step, like a shuffle
         static final int[] LEAN = {0, 1, 0, 1};
 
-        /** legs first, then the upper body (arm pumps, body dips and sways with the steps) */
+        /**
+         * Legs first, then the upper body. On the ground he shuffles (body dips, arm pumps).
+         * Firing the pack he leans into it with his legs trailing and a small recoil buzz;
+         * rising he tucks; falling he leans back and his legs dangle and kick.
+         */
         void scientist(Canvas c, int left, int top, int ph, boolean run) {
-            String[] legs = !onFloor ? LEGS_AIR : (ph == 0 ? LEGS_A : ph == 1 ? LEGS_B : ph == 2 ? LEGS_M : LEGS_C);
+            boolean thr = thrusting && state == PLAY && jumpDelay <= 0 && vehicle == 0;
+            String[] legs, body = SPR_HEAD;
+            float lean;
+            int dy = 0, dx = 0;
+            if (onFloor) {
+                legs = ph == 0 ? LEGS_A : ph == 1 ? LEGS_B : ph == 2 ? LEGS_M : LEGS_C;
+                lean = run ? 1 : 0;
+                if (run) {
+                    dy = BOB[ph]; dx = LEAN[ph];
+                    if ((ph & 1) == 1) body = SPR_HEAD_B;
+                    if (landT > 0) { dy = 2; legs = LEGS_M; }
+                }
+            } else if (thr) {
+                legs = ((int) (clock * 10) & 1) == 0 ? LEGS_AIR : LEGS_AIR2;
+                lean = 2;
+                dy = ((int) (clock * 30)) & 1;
+            } else if (vy * gravDir < 0) {
+                legs = LEGS_AIR;
+                lean = 1;
+            } else {
+                legs = ((int) (clock * 6) & 1) == 0 ? LEGS_FALL1 : LEGS_FALL2;
+                lean = -1;
+            }
+            leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
-            int dy = run ? BOB[ph] : 0, dx = run ? LEAN[ph] : 0;
-            outlined(c, run && (ph & 1) == 1 ? SPR_HEAD_B : SPR_HEAD, left + dx, top + dy);
+            leanPx = lean;
+            outlined(c, body, left + dx, top + dy);
+            leanPx = 0;
         }
 
         void drawPlayer(Canvas c) {
