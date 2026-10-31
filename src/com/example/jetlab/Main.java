@@ -322,13 +322,13 @@ public class Main extends Activity {
             state = PLAY; stateTime = 0;
         }
 
-        static final int SH = 13;     // half the scientist sprite height
+        static final int SH = 12;     // half the scientist sprite height
 
         float hTop() { return vehicle == 0 ? SH : hhVeh(vehicle); }
 
         float hBot() { return vehicle == 0 ? SH : hhVeh(vehicle); }
 
-        static int hhVeh(int v) { return v == STOMPER ? 12 : v == QUANTUM ? 15 : 8; }
+        static int hhVeh(int v) { return v == STOMPER ? 12 : v == QUANTUM ? 14 : 8; }
 
         /** vehicles that stick to a surface and switch which one gravity points at */
         boolean flips() { return vehicle == INVERTER || vehicle == QUANTUM; }
@@ -782,14 +782,10 @@ public class Main extends Activity {
             ".....DDd.DDd....",
             ".....DDd.DDd....",
             ".....DDd.DDd....",
-            ".....DDd.DDd....",
-            ".....DDd.DDd....",
             ".....KKKK.KKKK..",
             "....LKKKK.LKKKK."
         };
         static final String[] LEGS_B = {
-            ".....DDd.DDd....",
-            ".....DDd.DDd....",
             ".....DDd.DDd....",
             ".....DDd.DDd....",
             ".....DDd.DDd....",
@@ -804,14 +800,10 @@ public class Main extends Activity {
             ".....DDDDDd.....",
             ".....DDDDDd.....",
             ".....DDDDDd.....",
-            ".....DDDDDd.....",
-            ".....DDDDDd.....",
             ".....KKKKKKK....",
             "....LKKKKKKKK..."
         };
         static final String[] LEGS_C = {
-            ".....DDd.DDd....",
-            ".....DDd.DDd....",
             ".....DDd.DDd....",
             ".....DDd.DDd....",
             ".....DDd.DDd....",
@@ -827,8 +819,6 @@ public class Main extends Activity {
             ".DDDd....DDDd...",
             ".DDd.....DDd....",
             ".KKK.....KKKK...",
-            "................",
-            "................",
             "................"
         };
 
@@ -839,20 +829,16 @@ public class Main extends Activity {
             ".DDDd.....DDDd..",
             ".DDd......DDd...",
             ".KKK......KKK...",
-            "................",
-            "................",
             "................"
         };
         static final String[] LEGS_FALL1 = {
             ".....DDd.DDd....",
             ".....DDd.DDd....",
             ".....DDd.DDd....",
-            ".....DDd.DDd....",
             ".....DDd.DDDd...",
             ".....DDd..DDd...",
             ".....KKK..KKK...",
-            ".....KKK..KKK...",
-            "................"
+            ".....KKK..KKK..."
         };
         static final String[] LEGS_FALL2 = {
             ".....DDd.DDd....",
@@ -861,8 +847,6 @@ public class Main extends Activity {
             ".....DDd...DDd..",
             ".....DDd...DDd..",
             ".....KKK...KKKK.",
-            "................",
-            "................",
             "................"
         };
 
@@ -1537,7 +1521,7 @@ public class Main extends Activity {
         }
 
         void quantumBody(Canvas c, int cy, boolean flip) {
-            int left = Math.round(playerX) - 10, top = cy - 15;
+            int left = Math.round(playerX) - 10, top = cy - 14;
             if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
             int ph = ((int) (runPhase * 0.2f * 4)) & 3;
             scientist(c, left + 2, top, ph, true);
