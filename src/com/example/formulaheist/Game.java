@@ -1722,7 +1722,8 @@ final class Game extends View implements Choreographer.FrameCallback {
             ring(c, playerX, y, telePulse / 0.25f);
         }
         if (state == BUILD) drawBuild(c);
-        drawHud(c);
+        if ((state == PLAY && !breaking) || state == BUILD) drawHud(c);   // the readouts only show during a run, not on the title, outside or after dying
+        drawHint(c);
     }
 
     // ---------- outside: the yard and NULLCORP's wall ----------
@@ -2319,7 +2320,6 @@ final class Game extends View implements Choreographer.FrameCallback {
         text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, dim, 2);
         text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 8, 1, dim, 2);
         text(c, "BEST " + best + " M", rx, top + 16, 1, dim, 2);
-        drawHint(c);
     }
 
     void drawHint(Canvas c) {
