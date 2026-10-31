@@ -12,7 +12,7 @@ final class Npc {
     float x, phase, pointT, nextPoint, walk;
     int coat, hair, mode, face;
     // guards only: running, then tumbling when you smash through the wall
-    boolean running, falling, settled;
+    boolean running, falling, settled, female;
     float fy, fvy, ang, angV, vw;      // height above the floor and its speed (pixels), spin, speed along the ground
     int bounces;
 }

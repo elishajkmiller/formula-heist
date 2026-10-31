@@ -325,6 +325,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         n.walk = mode == 1 ? -28f : mode == 2 ? 38f : 0f;
         n.nextPoint = mode == 1 || mode == 2 ? 1e9f : 0.5f + rnd.nextFloat() * 7f;
         n.coat = rnd.nextInt(COATS.length); n.hair = rnd.nextInt(HAIRS.length);
+        n.female = mode != GUARD && rnd.nextInt(5) < 2;     // about two in five of the scientists in the background are women
         npcs.add(n);
         return n;
     }
@@ -2242,11 +2243,20 @@ final class Game extends View implements Choreographer.FrameCallback {
             // coat
             rectPx(c, nx - 3, base - 10, 6, 6, coat);
             rectPx(c, nx - 3, base - 10, 1, 6, shade);
+            if (n.female) {                               // the lab coat flares out like a dress
+                rectPx(c, nx - 4, base - 6, 8, 2, coat);
+                rectPx(c, nx - 4, base - 6, 1, 2, shade);
+            }
             // far arm swings with the walk
             rectPx(c, nx - f * 3 - sw * f, base - 9, 1, 4, shade);
             // head: looking up puts the lenses high; otherwise they sit level
             rectPx(c, nx - 2, base - 15, 5, 5, skin);
             rectPx(c, nx - 2, base - 15, 5, 2, HAIRS[n.hair]);
+            if (n.female) {                               // long hair: fuller on top and falling past the shoulders on both sides
+                rectPx(c, nx - 3, base - 16, 7, 2, HAIRS[n.hair]);
+                rectPx(c, nx - 3, base - 14, 1, 6, HAIRS[n.hair]);
+                rectPx(c, nx + 3, base - 14, 1, 6, HAIRS[n.hair]);
+            }
             int ey = lookUp ? base - 14 : base - 13;
             rectPx(c, nx + (f > 0 ? 0 : -1), ey, 1, 1, Color.rgb(120, 235, 255));
             rectPx(c, nx + (f > 0 ? 1 : 0), ey, 1, 1, Color.rgb(120, 235, 255));
