@@ -2071,9 +2071,9 @@ public class Main extends Activity {
             "..P.Bsaaeeeeeaa.",
             "..P..saaannaaa..",
             ".hOOowwWWVt.....",
-            ".hOOowxxxSS.....",
-            ".OOOowxxxSN.....",
-            ".OOoowxxWVt.....",
+            ".hOOowxxWVt.....",
+            ".OOOowxxSSW.....",
+            ".OOoowxxSNW.....",
             ".NNNNwwWWWW.....",
             "..NN.wwwwww....."
         };
@@ -2090,8 +2090,8 @@ public class Main extends Activity {
             "..P..saaaaaaaa..",
             ".hOOoxwwVtw.....",
             ".hOOoxxxVtw.....",
-            ".OOOoxxxxSS.....",
-            ".OOooxxxxSN.....",
+            ".OOOoxxSSWW.....",
+            ".OOooxxSNWW.....",
             ".NNNNxwwWWw.....",
             "..NN.wwwwww....."
         };
@@ -2107,9 +2107,9 @@ public class Main extends Activity {
             "..P.Bsaaeeeeeaa.",
             "..P..saaannaaa..",
             ".hOOowwVtWW.....",
-            ".hOOowxxxSS.....",
-            ".OOOowxxxSN.....",
-            ".OOoowxxtWW.....",
+            ".hOOowxxtWW.....",
+            ".OOOowxxSSW.....",
+            ".OOoowxxSNW.....",
             ".NNNNwwWWWW.....",
             "..NN.wwwwww....."
         };
