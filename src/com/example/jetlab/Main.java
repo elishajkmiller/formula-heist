@@ -285,7 +285,7 @@ public class Main extends Activity {
             floorY = h - 11;
             ceilY = 11;
             playerX = w * 0.22f;
-            if (state == START) y = floorY - SH;
+            if (state == START) y = floorY - SH_BOT;
             npcs.clear();
             for (float nx = 30; nx < w + 20; nx += 70 + rnd.nextInt(80)) addSpawn(nx);
         }
@@ -319,16 +319,16 @@ public class Main extends Activity {
             for (int i = 0; i < NP; i++) pl[i] = 0;
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
             diving = false; nextCrate = 80;
-            y = floorY - SH;
+            y = floorY - SH_BOT;
             vy = 0; dist = 0; electrons = 0; spawnLeft = w * 0.6f;
             state = PLAY; stateTime = 0;
         }
 
-        static final int SH = 12;     // half the scientist sprite height
+        static final int SH_TOP = 11, SH_BOT = 12;     // scientist sprite rows above and below his centre
 
-        float hTop() { return vehicle == 0 ? SH : hhVeh(vehicle); }
+        float hTop() { return vehicle == 0 ? SH_TOP : hhVeh(vehicle); }
 
-        float hBot() { return vehicle == 0 ? SH : hhVeh(vehicle); }
+        float hBot() { return vehicle == 0 ? SH_BOT : hhVeh(vehicle); }
 
         static int hhVeh(int v) { return v == STOMPER ? 12 : v == QUANTUM ? 14 : 8; }
 
@@ -648,7 +648,7 @@ public class Main extends Activity {
             vy += GRAVITY * dt;
             if (vy > VFALL) vy = VFALL;
             y += vy * ppm * dt;
-            float hb = SH - 4f * settleT;               // lying flat he sits lower than standing
+            float hb = SH_BOT - 4f * settleT;               // lying flat he sits lower than standing
             float hi = floorY - hb;
             if (y > hi) {
                 y = hi;
@@ -813,13 +813,12 @@ public class Main extends Activity {
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
             "..P..saaaaaaaa..",
-            ".hOOowWWWWWW....",
-            ".hOOowxxWVtW....",
-            ".OOOowxxxxSS....",
-            ".OOoowxxxxSN....",
-            ".hOOowWWWWWW....",
-            ".NNNNwwwwwww....",
-            "..NN.wwwwwww...."
+            ".hOOowWWVtW.....",
+            ".hOOowxxVtW.....",
+            ".OOOowxxxSS.....",
+            ".OOoowxxxSN.....",
+            ".NNNNwWWWWW.....",
+            "..NN.wwwwww....."
         };
         static final String[] SPR_HEAD_B = {
             ".......b..bb....",
@@ -832,13 +831,12 @@ public class Main extends Activity {
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
             "..P..saaannaaa..",
-            ".hOOowwWWWWW....",
-            ".hOOowxxxxSS....",
-            ".OOOowxxxxSN....",
-            ".OOoowxxWWVt....",
-            ".hOOowwWWWWW....",
-            ".NNNNwwwwwww....",
-            "..NN.wwwwwww...."
+            ".hOOowwWWVt.....",
+            ".hOOowxxxSS.....",
+            ".OOOowxxxSN.....",
+            ".OOoowxxWVt.....",
+            ".NNNNwwWWWW.....",
+            "..NN.wwwwww....."
         };
         static final String[] SPR_RUN2 = {
             "......b..bb.....",
@@ -851,13 +849,12 @@ public class Main extends Activity {
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
             "..P..saaaaaaaa..",
-            ".hOOoxwwWWWw....",
-            ".hOOoxxxWVtw....",
-            ".OOOoxxxxxSS....",
-            ".OOooxxxxxSN....",
-            ".hOOoxwwWWWw....",
-            ".NNNNwwwwwww....",
-            "..NN.wwwwwww...."
+            ".hOOoxwwVtw.....",
+            ".hOOoxxxVtw.....",
+            ".OOOoxxxxSS.....",
+            ".OOooxxxxSN.....",
+            ".NNNNxwwWWw.....",
+            "..NN.wwwwww....."
         };
         static final String[] SPR_RUN3 = {
             ".......b..bb....",
@@ -870,13 +867,12 @@ public class Main extends Activity {
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
             "..P..saaannaaa..",
-            ".hOOowwWWWWW....",
-            ".hOOowxxxxSS....",
-            ".OOOowxxxxSN....",
-            ".OOoowxxVtWW....",
-            ".hOOowwWWWWW....",
-            ".NNNNwwwwwww....",
-            "..NN.wwwwwww...."
+            ".hOOowwVtWW.....",
+            ".hOOowxxxSS.....",
+            ".OOOowxxxSN.....",
+            ".OOoowxxtWW.....",
+            ".NNNNwwWWWW.....",
+            "..NN.wwwwww....."
         };
         /** skin over the top row of the eyes, drawn on top of the head for a blink */
         static final String[] SPR_BLINK = {
@@ -886,7 +882,6 @@ public class Main extends Activity {
             "................",
             "................",
             "........SSSSS...",
-            "................",
             "................",
             "................",
             "................",
@@ -1657,7 +1652,7 @@ public class Main extends Activity {
                 }
                 return;
             }
-            int left = Math.round(playerX) - 8, top = Math.round(y) - SH;
+            int left = Math.round(playerX) - 8, top = Math.round(y) - SH_TOP;
             boolean flop = ((int) (clock * 12) & 1) == 0;
             String[] legs = flop ? LEGS_AIR : LEGS_AIR2;
             c.save();
@@ -1677,14 +1672,14 @@ public class Main extends Activity {
             float cyc = runPhase * 0.2f;
             int ph = ((int) (cyc * 4)) & 3;
             boolean thr = thrusting && state == PLAY && jumpDelay <= 0;
-            int left = Math.round(playerX) - 8, top = Math.round(y) - SH;
+            int left = Math.round(playerX) - 8, top = Math.round(y) - SH_TOP;
 
             if (thr) {
                 int fl = 7 + rnd.nextInt(6);
-                rectPx(c, left, top + 17, 6, fl, Color.rgb(255, 150, 50));
-                rectPx(c, left + 1, top + 17, 4, Math.max(1, fl - 2), Color.rgb(255, 215, 90));
-                rectPx(c, left + 2, top + 17, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
-                rectPx(c, left + 1 + rnd.nextInt(4), top + 17 + fl, 1, 2, Color.rgb(255, 150, 50));
+                rectPx(c, left, top + 16, 6, fl, Color.rgb(255, 150, 50));
+                rectPx(c, left + 1, top + 16, 4, Math.max(1, fl - 2), Color.rgb(255, 215, 90));
+                rectPx(c, left + 2, top + 16, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
+                rectPx(c, left + 1 + rnd.nextInt(4), top + 16 + fl, 1, 2, Color.rgb(255, 150, 50));
             }
             scientist(c, left, top, ph, onFloor && state == PLAY);
         }
