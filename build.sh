@@ -81,8 +81,8 @@ cp "$BUILD/unsigned.apk" "$BUILD/aligned.apk"
 
 echo "[6/6] sign"
 java -cp "$APKSIG:$BUILD/obj" Sign "$KEYSTORE" "$KEY_ALIAS" "$KEY_PASS" "$KEY_PASS" \
-  "$BUILD/aligned.apk" "$OUT/jetlab.apk"
-java -cp "$APKSIG:$BUILD/obj" Verify "$OUT/jetlab.apk"
+  "$BUILD/aligned.apk" "$OUT/formula-heist.apk"
+java -cp "$APKSIG:$BUILD/obj" Verify "$OUT/formula-heist.apk"
 
-ls -la "$OUT/jetlab.apk"
-echo "done: $OUT/jetlab.apk"
+ls -la "$OUT/formula-heist.apk"
+echo "done: $OUT/formula-heist.apk"

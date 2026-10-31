@@ -2296,7 +2296,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     }
 
     void drawTitle(Canvas c) {
-        text(c, "THRUST LAB", w / 2f, h * 0.14f, 4, Color.WHITE, 1);
+        text(c, "FORMULA HEIST", w / 2f, h * 0.14f, 4, Color.WHITE, 1);
         text(c, "NULLCORP STOLE EVERY THEORY AND FORMULA.", w / 2f, h * 0.14f + 30, 1, Color.rgb(255, 200, 80), 1);
         text(c, "STEAL THEM BACK AND SHARE THEM WITH THE WORLD.", w / 2f, h * 0.14f + 39, 1, Color.rgb(120, 235, 255), 1);
         if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO START", w / 2f, h * 0.14f + 54, 1, Color.rgb(255, 220, 140), 1);
