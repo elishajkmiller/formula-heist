@@ -27,6 +27,7 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@SuppressWarnings("deprecation")   // immersive flags, Vibrator and AudioTrack constructors still work on every phone we target
 public class Main extends Activity {
 
     private Game game;
@@ -175,24 +176,38 @@ public class Main extends Activity {
         }
     }
 
-    /** One game view: physics, drawing and input in one place. */
+    /**
+     * The whole game in one View: physics, drawing and input.
+     *
+     * Layout of this class, top to bottom: constants and text data, game state, setup and touch input,
+     * the formula archive and prism helpers, the update loop (physics, vehicles, spawning), then all
+     * drawing (world, the yard and wall, rooms, player, HUD and screens) and the pixel font.
+     * Everything is drawn at 144 pixels tall into a small bitmap that is scaled up with no smoothing.
+     */
     static class Game extends View implements Choreographer.FrameCallback {
 
+        // ---------- constants ----------
+
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5;
-        static final int NF = 20;           // formulas to recover
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
-        static final float BUILD_TIME = 1.5f;
+        static final int NF = 20;                // formulas to recover
+        static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
         static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9;
+
+        static final float GRAVITY = 22f;        // m/s^2, game gravity (Earth is 9.8)
+        static final float THRUST = 38f;         // m/s^2 from the pack, net 16 up
+        static final float VFALL = 14f;          // m/s, falling top speed
+        static final float VMAX = 7f;            // m/s, "terminal" speed going up
+        static final float JUMP = 8.5f;          // m/s, jump off the floor
+
         static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER"};
         static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN ON THE OTHER SIDE."};
 
-        static final float GRAVITY = 22f;       // m/s^2, game gravity (Earth is 9.8)
-        static final float THRUST = 38f;        // m/s^2 from the pack, net 16 up
-        static final float VFALL = 14f;         // m/s, falling top speed
-        static final float JUMP = 8.5f;          // m/s, jump off the floor
-        static final float VMAX = 7f;           // m/s, "terminal" speed up or down
+        static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
+        static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
 
-        static final String[] SYM = {"H", "He", "Li", "C", "N", "O", "Ne", "Na", "Si", "Fe", "Cu", "Ag", "Au", "U"};
+        // ---------- text data: death-card facts and the 20 formulas ----------
+
         static final String[] FACTS = {
             "Newton's 2nd law: a = F / m. More thrust, more acceleration.",
             "Newton's 3rd law: the exhaust goes down, so you go up.",
@@ -206,44 +221,6 @@ public class Main extends Activity {
             "Electrons repel each other, which is why static makes hair stand up."
         };
 
-        final Random rnd = new Random();
-        final Paint p = new Paint();
-        final Paint blit = new Paint();
-        final Path path = new Path();
-        final RectF dst = new RectF();
-        Bitmap buf;
-        Canvas bc;
-        final SharedPreferences prefs;
-
-        final ArrayList<Coin> coins = new ArrayList<>();
-        final ArrayList<Zapper> zappers = new ArrayList<>();
-        final ArrayList<Missile> missiles = new ArrayList<>();
-        final ArrayList<Crate> crates = new ArrayList<>();
-        final ArrayList<Npc> npcs = new ArrayList<>();
-        final ArrayList<Scroll> scrolls = new ArrayList<>();
-
-        static final String[] FORM = {
-            "F = MA",
-            "E = MC^2",
-            "V = IR",
-            "PV = NRT",
-            "V = U + AT",
-            "F = GMM/R^2",
-            "E = HF",
-            "S = K LN W",
-            "DX DP = H/4PI",
-            "F = KX",
-            "KE = MV^2/2",
-            "PE = MGH",
-            "V = FL",
-            "N1 SIN A = N2 SIN B",
-            "F = KQQ/R^2",
-            "P = MV",
-            "W = FD",
-            "P = E/T",
-            "T = 2PI SQRT L/G",
-            "A = V^2/R"
-        };
         /** the formulas as they are written in a textbook, drawn with a real font so they are easy to read */
         static final String[] FORMD = {
             "F = ma", "E = mc\u00b2", "V = IR", "PV = nRT", "v = u + at", "F = G m1 m2 / r\u00b2", "E = hf", "S = k ln W",
@@ -295,7 +272,9 @@ public class Main extends Activity {
             "A LONGER PENDULUM SWINGS MORE SLOWLY.",
             "TO GO IN A CIRCLE YOU MUST ACCELERATE TOWARD THE CENTER."
         };
-        /** text drawn at screen resolution on top of the pixel picture */
+
+        // ---------- text drawn at screen resolution (the formulas) ----------
+
         static class Ov { String t; float x, y, size; int col; boolean clip; }
         final ArrayList<Ov> ovs = new ArrayList<>();
         final Paint ovp = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -314,47 +293,78 @@ public class Main extends Activity {
             return wpx > maxW * unit ? maxSize * maxW * unit / wpx : maxSize;
         }
 
-        int ownedMask, scratchedMask, archFrom, selCard, mcols, mrows, cleared, bannerIdx, abx, aby, abw, abh, cbx, cby, cbw, cbh, scx, scy, scw, sch;
-        boolean selScratched;
-        final boolean[] mask = new boolean[2000];
-        float nextParch, bannerT, lastScratchSfx;
-        static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
-        static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
-        float lastBg, npcLeft;
+        // ---------- game state ----------
 
-        static final int NB = 64;
+        // drawing
+        final Random rnd = new Random();
+        final Paint p = new Paint();                 // pixel paint, no smoothing
+        final Paint blit = new Paint();              // scales the small bitmap up
+        final Path path = new Path();
+        final RectF dst = new RectF();
+        Bitmap buf;
+        Canvas bc;
+        int w, h;                                    // game size in pixels, h is always 144
+        float ppm, floorY, ceilY, playerX, unit = 1f;   // pixels per metre, edges, screen pixels per game pixel
+        float clock, flash, shake, hitstop;          // time, screen flash, screen shake, brief freeze on a big hit
+        final SharedPreferences prefs;
+
+        // world
+        final ArrayList<Coin> coins = new ArrayList<>();
+        final ArrayList<Zapper> zappers = new ArrayList<>();
+        final ArrayList<Missile> missiles = new ArrayList<>();
+        final ArrayList<Crate> crates = new ArrayList<>();
+        final ArrayList<Scroll> scrolls = new ArrayList<>();
+        final ArrayList<Npc> npcs = new ArrayList<>();
+        float bgOff, lastBg, npcLeft, spawnLeft, nextCrate, nextParch;
+
+        // particles
+        static final int NP = 140;
+        final float[] px = new float[NP], py = new float[NP], pvx = new float[NP], pvy = new float[NP], pl = new float[NP];
+        final int[] pcol = new int[NP];              // 0 means the default spark colour
+        int pNext;
+
+        // the run
+        int state = START;
+        boolean running, thrusting, onFloor;
+        float y, vy, ay, speed, dist, runPhase, stateTime;
+        float jumpDelay, landT, leanPx;
+        boolean ghost, outline;                      // sprite draw modes: translucent twin, dark outline
+        int electrons, best;
+        String fact = FACTS[0];
+        long lastNanos;
+
+        // outside, the wall and the break-in
+        boolean breaking, holeOpen;                  // breaking: still outside, running at the wall
+        float outX, holeY, bonus, tipT;
+
+        // vehicles
+        int vehicle, gravDir = 1;
+        boolean diving;
+        float invuln, squash, hintT, teleFromY, telePulse;
+        static final int NB = 64;                    // pixel blocks that fly in to build a vehicle
         final int[] brow = new int[NB], bcol = new int[NB];
         final float[] bdelay = new float[NB], bsx = new float[NB], bsy = new float[NB];
         final boolean[] bland = new boolean[NB];
         int nb, buildType;
         float buildT;
 
-        static final int NP = 140;
-        final int[] pcol = new int[NP];
-        final float[] px = new float[NP], py = new float[NP], pvx = new float[NP], pvy = new float[NP], pl = new float[NP];
-        int pNext;
-
-        int w, h;
-        float ppm, floorY, ceilY, playerX;
-
-        int state = START;
-        boolean thrusting, onFloor, running;
-        int vehicle, gravDir = 1;
-        boolean diving;
-        float teleFromY, telePulse, invuln, squash, flash, shake, hitstop, hintT, nextCrate, lastCoinSfx, unit = 1f;
-        Sfx sfx;
-        boolean ghost, outline;
-        float leanPx, landT, ang, angV, settleT, finalDist;
-        boolean dragging, breaking;      // breaking: still outside, running at the wall
-        float bonus, launchT, tipT, outX, holeY;
-        boolean holeOpen;
-        int bounces;
+        // death
         boolean settled;
+        int bounces;
+        float ang, angV, settleT, finalDist;
+
+        // formula archive
+        int ownedMask, scratchedMask;                // bit i set: formula i recovered / scratched off
+        int archFrom, selCard, mcols, mrows, cleared;
+        boolean selScratched, dragging;
+        final boolean[] mask = new boolean[2000];    // scratched-off cells of the open card
+        float bannerT;
+        int abx, aby, abw, abh, cbx, cby, cbw, cbh, scx, scy, scw, sch;   // buttons and the big card
+
+        // sound and haptics
+        Sfx sfx;
         Vibrator vib;
-        float jumpDelay, y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
-        int electrons, best;
-        String fact = FACTS[0];
-        long lastNanos;
+        float lastCoinSfx, lastScratchSfx;
 
         Game(Context c) {
             super(c);
@@ -366,7 +376,7 @@ public class Main extends Activity {
             blit.setFilterBitmap(false);
             ovp.setTypeface(Typeface.create(Typeface.SERIF, Typeface.ITALIC));
             ovp.setTextAlign(Paint.Align.CENTER);
-            
+
         }
 
         void start() {
@@ -452,7 +462,7 @@ public class Main extends Activity {
             outX = Math.min(playerX + 140f, w - 40f); holeOpen = false;
             bgOff = 20f - (outX + 10f); lastBg = bgOff;     // mission control sits just inside the wall
             y = floorY - SH_BOT; vy = 0; dist = 0; spawnLeft = w * 0.6f; speed = 0;
-            dragging = false; bonus = 0; launchT = 0; tipT = 0; onFloor = true;
+            dragging = false; bonus = 0; tipT = 0; onFloor = true;
             populateNpcs();
             breaking = false;
             if (!keepState) { state = PLAY; breaking = true; tipT = 4f; }
@@ -515,7 +525,7 @@ public class Main extends Activity {
             holeOpen = true; holeY = y;
             breaking = false; stateTime = 0; spawnLeft = w * 0.8f;
             bonus = Math.max(0f, speed - 5f);
-            launchT = 0f; tipT = 3f; invuln = 0.8f;
+            tipT = 3f; invuln = 0.8f;
             hitstop = 0.08f; shake = 7f; flash = 0.15f;
             sfx(S_HIT);
             buzz(50);
@@ -537,7 +547,7 @@ public class Main extends Activity {
         void collectScroll(int idx) {
             ownedMask |= 1 << idx;
             saveFormulas();
-            bannerIdx = idx; bannerT = 1.2f;
+            bannerT = 1.2f;
             flash = 0.12f;
             sfx(S_DONE);
             buzz(30);
@@ -788,7 +798,7 @@ public class Main extends Activity {
             if (shown == NF) {
                 if (((int) (clock * 2) & 1) == 0) text(c, "EVERY FORMULA IS BACK. SHARE THEM WITH THE WORLD!", w / 2f, h - 11, 1, Color.rgb(120, 255, 160), 1);
             } else if ((ownedMask & ~scratchedMask) != 0) {
-                text(c, "TAP A SILVER CARD TO SCRATCH IT OFF", w / 2f, h - 11, 1, Color.rgb(255, 200, 80), 1);
+                text(c, "TAP A PRISM CARD TO SCRATCH IT OFF", w / 2f, h - 11, 1, Color.rgb(255, 200, 80), 1);
             } else {
                 text(c, "FIND SCROLLS ON YOUR RUNS TO RECOVER MORE", w / 2f, h - 11, 1, Color.rgb(150, 190, 215), 1);
             }
@@ -957,7 +967,7 @@ public class Main extends Activity {
             boolean fire = thrusting && state == PLAY && vehicle == 0 && jumpDelay <= 0;
             ay = GRAVITY * gravDir - (fire ? THRUST : 0);
             vy += ay * dt;
-            float vmin = flips() ? -VFALL : -VMAX - (launchT > 0 ? 7f * launchT / 0.9f : 0f);
+            float vmin = flips() ? -VFALL : -VMAX;
             if (vy > VFALL) vy = VFALL;
             if (vy < vmin) vy = vmin;
             y += vy * ppm * dt;
@@ -1006,7 +1016,6 @@ public class Main extends Activity {
                 }
             }
 
-            if (launchT > 0) launchT -= dt;
             if (tipT > 0) tipT -= rdt;
             bonus = Math.max(0f, bonus - 4.5f * dt);
             speed = breaking ? Math.min(11f, 2f + stateTime * 9f) : 5f + Math.min(dist / 60f, 7f) + bonus;
@@ -1331,7 +1340,6 @@ public class Main extends Activity {
         }
 
         // ---------- drawing (pixel art, drawn small then scaled up) ----------
-
 
         static final String[] SPR_HEAD = {
             "......b..bb.....",
@@ -1824,7 +1832,7 @@ public class Main extends Activity {
             drawHud(c);
         }
 
-        // ---------- launch tower, sling and intro ----------
+        // ---------- outside: the yard and NULLCORP's wall ----------
 
         void line(Canvas c, float x0, float y0, float x1, float y1, int col, float wd) {
             p.setStyle(Paint.Style.STROKE);
@@ -2488,17 +2496,16 @@ public class Main extends Activity {
             text(c, "E- " + electrons, 6, top + 14, 1, Color.rgb(120, 235, 255), 0);
             text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, 6, top + 22, 1, Color.rgb(255, 215, 120), 0);
             int rx = w - 6;
-            Color_ = Color.rgb(170, 200, 220);
-            text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, Color_, 2);
-            text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 8, 1, Color_, 2);
-            text(c, "BEST " + best + " M", rx, top + 16, 1, Color_, 2);
+            int dim = Color.rgb(170, 200, 220);
+            text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, dim, 2);
+            text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 8, 1, dim, 2);
+            text(c, "BEST " + best + " M", rx, top + 16, 1, dim, 2);
             drawHint(c);
         }
-        int Color_;
 
         void drawHint(Canvas c) {
             if (bannerT > 0 && state == PLAY) {
-                // a silver scratch card pops up and rises, with no words so nothing is given away
+                // a prism scratch card pops up and rises, with no words so nothing is given away
                 float t = 1f - bannerT / 1.2f;
                 int cx = Math.round(playerX + 14), cy = Math.round(y - 22 - t * 14);
                 rectPx(c, cx - 7, cy - 9, 14, 18, Color.rgb(8, 10, 20));
