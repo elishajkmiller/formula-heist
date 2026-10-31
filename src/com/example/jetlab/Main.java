@@ -3109,19 +3109,19 @@ public class Main extends Activity {
             rectPx(c, ox + 18, oy + 8, 134, 14, Color.rgb(20, 60, 44));
             rectPx(c, ox + 19, oy + 9, 132, 12, Color.rgb(32, 90, 64));
             textOut(c, "DAYS SINCE LAST EXPLOSION: 0", ox + ow / 2f, oy + 12, 1, Color.WHITE, 1, false);
-            // the couch with someone asleep on it
-            rectPx(c, ox + 6, fl - 30, 62, 30, Color.rgb(120, 40, 44));
-            rectPx(c, ox + 6, fl - 30, 62, 10, Color.rgb(150, 56, 60));
-            rectPx(c, ox + 10, fl - 14, 54, 6, Color.rgb(98, 30, 36));
-            rectPx(c, ox + 14, fl - 22, 14, 10, Color.rgb(240, 200, 160));              // head on the armrest
-            rectPx(c, ox + 14, fl - 23, 14, 4, Color.rgb(90, 60, 40));
-            rectPx(c, ox + 16, fl - 17, 3, 1, Color.rgb(40, 30, 30));                   // closed eyes
-            rectPx(c, ox + 22, fl - 17, 3, 1, Color.rgb(40, 30, 30));
-            rectPx(c, ox + 28, fl - 20, 34, 9, Color.rgb(235, 240, 248));               // coat
-            rectPx(c, ox + 60, fl - 20, 8, 9, Color.rgb(50, 60, 100));
+            // the couch with someone asleep on it, a small scientist like the ones in mission control
+            rectPx(c, ox + 8, fl - 22, 48, 22, Color.rgb(120, 40, 44));
+            rectPx(c, ox + 8, fl - 22, 48, 8, Color.rgb(150, 56, 60));
+            rectPx(c, ox + 11, fl - 9, 42, 5, Color.rgb(98, 30, 36));
+            rectPx(c, ox + 14, fl - 15, 8, 7, Color.rgb(240, 200, 160));               // head on the armrest
+            rectPx(c, ox + 14, fl - 16, 8, 3, Color.rgb(90, 60, 40));
+            rectPx(c, ox + 15, fl - 12, 2, 1, Color.rgb(40, 30, 30));                  // closed eyes
+            rectPx(c, ox + 19, fl - 12, 2, 1, Color.rgb(40, 30, 30));
+            rectPx(c, ox + 22, fl - 14, 20, 6, Color.rgb(235, 240, 248));              // coat
+            rectPx(c, ox + 42, fl - 14, 9, 6, Color.rgb(50, 60, 100));
             for (int i = 0; i < 3; i++) {
                 float t = (clock * 0.7f + i * 0.33f) % 1f;
-                textOut(c, "Z", ox + 32 + i * 5 + t * 6, fl - 30 - t * 18, 1, Color.argb((int) (255 * (1 - t)), 255, 255, 255), 1, false);
+                textOut(c, "Z", ox + 20 + i * 4 + t * 6, fl - 22 - t * 16, 1, Color.argb((int) (255 * (1 - t)), 255, 255, 255), 1, false);
             }
             // a table with donuts
             rectPx(c, ox + 78, fl - 20, 34, 3, Color.rgb(110, 76, 50));
@@ -3234,34 +3234,22 @@ public class Main extends Activity {
             miniScientist(c, cx, cy + 28, new int[] {0, 2, 0, -2}[sp & 3], Color.rgb(235, 240, 248), true);
         }
 
-        /** the lounging guy in the flex room: 68 x 26, letters index FLEX_KEYS and FLEX_COLS (a made-up cartoon man) */
+        /** the lounging guy in the flex room: 38 x 14, about the size of the controllers in mission control (a made-up cartoon man) */
         static final String[] FLEX_GUY = {
-            ".......HHHHHHHHHH...................................................",
-            "......HHHHHHHHHHHHHH................................................",
-            ".....HHHHHHHHHHHHHHH................................................",
-            "....HHHHHHHHHHHHHHHH................................................",
-            "....HHHHHHHHHHHHHHHH................................................",
-            "...HHHHHHSSSSHHHHHHH................................................",
-            "...HHHHHHSSSSHHHHHHH...................................JJJJ.........",
-            "...HHHHHHHHHSSSSSSH..................................JJJJJJJJ.......",
-            ".sSHHHHHHSSSSSSSSSH.................................JJJJJJJJJJ......",
-            ".sSHHssHHKKSSSKKSss.................................JJJJJJJJJJ......",
-            ".sSHHssHHKKSSSKKSss................................JJJJJJJJJJJJ.....",
-            ".sSSHssHHSSSsSSSSss................................JJJJJJJJJJJJ.....",
-            ".sSSHHSSSSSSsSSSSS.................................JJJJJJJJJJJJ.....",
-            ".sSSSHHSSSSSSSmSS..................................JJJJJJJJJJJJ.....",
-            ".sSSS.HHSSSmmmSSsssSSSSSSSSSSSSS...................JJJJJJJJJJJJ.....",
-            ".sSSS...HSSSSSSsssshhhhhhSSShhhhhhS...........BjBBBJJJJJJJJJJJJ.....",
-            ".sSSS........SssssshhhhhhhshhhhhhhhhS.........BjBBB.JJJJJJJJJJJ.....",
-            ".sSSS........SssssshhhhhhhshhhhhhhhhhSSSSSSSSSSjBBBJJJJJJJJJJJJJJJ..",
-            ".sSSS.........sshhhhhhhhhhshhhhhhhhhhSSSSSSSSSSjBBBJJJJJJJJJWWWWWJ..",
-            ".sSSS.........ssShhhhhhhhhshhhhhSSSSSSSSSSSSSSSSBBBJJJJJJJJJWWWWWWWW",
-            ".sSSS.........ssSSsssssssssSssssSSSSSSSSSSSSSSSSBBBJjjjjjjjjWWWWWWWW",
-            ".sSSSSSS......ssSSSSSSSSSSSSSSSSssssssssssssSSSSBBBJjjjjjjjjWWWWWWWW",
-            ".sSSSSSS......sssssssssssssssssssssssssssssssssjBBBjjjjjjjjjWWWWWWWW",
-            "..SSSSSS......sssssssssssssssssssssssssssssssssjBBBjjjjjjjjjwwwwwwww",
-            "....................................................................",
-            "...................................................................."
+            "..HHHHHHHH............................",
+            ".HHHHHHHHH............................",
+            "HHHHHHHHHH...................JJJJ.....",
+            "HHHHHHSHHH..................JJJJJJ....",
+            "HHSHHSSSSH..................JJJJJJ....",
+            "HsSSKSSKSHs.................JJJJJJ....",
+            "HHSSSSSmSH..................JJJJJJ....",
+            "sHHSSmmSHss.................JJJJJJ....",
+            "sSHHSSSHsss....s........BB..JJJJJJ....",
+            "sS......ssshhhhshhhhSSSSSBJJJJJJJJJWWW",
+            "sS......SSShhhhshhhhSsssSBJJJJJJJJJWWW",
+            "SSSS....SSSSsSSSSSSSSSSSSBJJJJJJJJJWWW",
+            "SSSS....sssssssssssssssssBjjjjjjjjjwww",
+            "......................................"
         };
         static final String FLEX_KEYS = "SshHKJjWwBm";
         static final int[] FLEX_COLS = {
@@ -3312,23 +3300,23 @@ public class Main extends Activity {
             }
             rectPx(c, ox, oy + oh - 6, ow, 6, Color.rgb(34, 30, 52));
             // the giant RAM stick he lounges on
-            int bx = ox + 14, by = oy + oh - 26, bw = ow - 28;
+            int bw = 64, bx = ox + (ow - bw) / 2, by = oy + oh - 26;
             rectPx(c, bx, by, bw, 18, Color.rgb(10, 12, 22));
             rectPx(c, bx + 1, by + 1, bw - 2, 14, Color.rgb(52, 58, 82));
-            for (int i = 0; i < 6; i++) rectPx(c, bx + 8 + i * 20, by + 4, 12, 7, Color.rgb(20, 22, 32));
+            for (int i = 0; i < 3; i++) rectPx(c, bx + 6 + i * 20, by + 4, 12, 7, Color.rgb(20, 22, 32));
             rectPx(c, bx + 1, by + 1, bw - 2, 2, hue(clock * 80));
             for (int x = bx + 3; x < bx + bw - 4; x += 4) rectPx(c, x, by + 15, 3, 3, Color.rgb(228, 188, 70));
             // the guy, a pixel-art sprite lying on the stick; the bare chest and the jeans have their own colours
-            int top = by - 24;
-            drawPix(c, FLEX_GUY, bx + 6, top, FLEX_KEYS, FLEX_COLS);
+            int top = by - 13, gx = bx + 12;
+            drawPix(c, FLEX_GUY, gx, top, FLEX_KEYS, FLEX_COLS);
             boolean flex = ((int) (clock * 0.5f + 0.3f) & 1) == 1 && (clock * 0.5f + 0.3f) % 1f < 0.5f;
             if (flex) {
                 int sk = Color.rgb(232, 190, 152), sh = Color.rgb(196, 146, 110);
-                rectPx(c, bx + 25, top + 3, 5, 15, sk);                          // the free arm flexed up
-                rectPx(c, bx + 22, top + 5, 4, 6, sk);                           // bicep
-                rectPx(c, bx + 26, top - 3, 5, 5, sk);                           // fist
-                rectPx(c, bx + 26, top + 3, 1, 15, sh);
-                text(c, "FLEX!", ox + ow / 2f, top - 8, 1, Color.rgb(255, 215, 110), 1);
+                rectPx(c, gx + 16, top + 1, 3, 9, sk);                           // the free arm flexed up
+                rectPx(c, gx + 13, top + 3, 4, 3, sk);                           // bicep
+                rectPx(c, gx + 15, top - 2, 4, 3, sk);                           // fist
+                rectPx(c, gx + 16, top + 1, 1, 9, sh);
+                text(c, "FLEX!", ox + ow / 2f, top - 10, 1, Color.rgb(255, 215, 110), 1);
             }
             // a soft glow off the sticks
             rectPx(c, ox, oy, ow, oh, Color.argb(16, 160, 90, 255));
