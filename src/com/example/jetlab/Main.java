@@ -2874,7 +2874,7 @@ public class Main extends Activity {
             int[] swing = {0, 1, 0, -1};
             for (Npc n : npcs) {
                 int nx = Math.round(n.x);
-                boolean walking = n.mode == 1 || n.mode == 2;
+                boolean walking = (n.mode == 1 || n.mode == 2) && state != START;      // before you start, everyone stands still
                 boolean pointing = n.pointT > 0 && !walking;
                 boolean lookUp = !walking && (pointing || n.mode == 0);
                 boolean chatting = n.mode == 3 && !pointing;
