@@ -1361,6 +1361,16 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     // ---------- vehicles ----------
 
+    /** the widest row of a vehicle sprite; rows can differ in length (the screw's mast rows are wider than the pod) */
+    static int rowsWidth(String[] rows) {
+        int m = 0;
+        for (String s : rows) m = Math.max(m, s.length());
+        return m;
+    }
+
+    /** the sprite letter at (r, c), or '.' past the end of a short row */
+    static char rowCh(String[] rows, int r, int c) { return c < rows[r].length() ? rows[r].charAt(c) : '.'; }
+
     void startBuild(int type) {
         building = Vehicle.KINDS[type].make(this);
         building.kind = type;
@@ -1372,11 +1382,12 @@ final class Game extends View implements Choreographer.FrameCallback {
         String[] rows = building.rows();
         nb = 0;
         for (int r0 = 0; r0 < rows.length; r0 += 3) {
-            for (int c0 = 0; c0 < rows[0].length(); c0 += 3) {
+            int wide = rowsWidth(rows);
+            for (int c0 = 0; c0 < wide; c0 += 3) {
                 boolean any = false;
                 for (int rr = 0; rr < 3 && r0 + rr < rows.length; rr++)
-                    for (int cc = 0; cc < 3 && c0 + cc < rows[0].length(); cc++)
-                        if (rows[r0 + rr].charAt(c0 + cc) != '.') any = true;
+                    for (int cc = 0; cc < 3 && c0 + cc < wide; cc++)
+                        if (rowCh(rows, r0 + rr, c0 + cc) != '.') any = true;
                 if (!any || nb >= NB) continue;
                 brow[nb] = r0; bcol[nb] = c0;
                 bdelay[nb] = 0.1f + rnd.nextFloat() * 0.7f;
@@ -2527,8 +2538,8 @@ final class Game extends View implements Choreographer.FrameCallback {
             }
             if (t < 1f) rectPx(c, cx - 1, cy - 1, 5, 5, Color.argb(70, 120, 220, 255));
             for (int rr = 0; rr < 3 && brow[i] + rr < rows.length; rr++) {
-                for (int cc = 0; cc < 3 && bcol[i] + cc < rows[0].length(); cc++) {
-                    int col = pal(rows[brow[i] + rr].charAt(bcol[i] + cc));
+                for (int cc = 0; cc < 3 && bcol[i] + cc < rowsWidth(rows); cc++) {
+                    int col = pal(rowCh(rows, brow[i] + rr, bcol[i] + cc));
                     if (col != 0) rectPx(c, cx + cc, cy + rr, 1, 1, col);
                 }
             }
