@@ -42,7 +42,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     static final int GUARD = 4;              // Npc mode of the guards
     static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
     static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
-    static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9;
+    static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9, S_FANFARE = 10;
 
     static final float GRAVITY = 22f;        // m/s^2, game gravity (Earth is 9.8)
     static final float THRUST = 38f;         // m/s^2 from the pack, net 16 up
@@ -763,7 +763,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         pending = -1;
         saveFormulas();
         flash = 0.2f; shake = 2f;
-        sfx(S_DONE);
+        sfx(revealKind == 1 ? S_FANFARE : S_DONE);
         buzz(25);
         for (int i = 0; i < (revealKind == 1 ? 40 : 16); i++) confetti(scx + scw / 2f, scy + sch / 2f);
     }
@@ -879,7 +879,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         if (revealKind == 1) {
             text(c, "NEW!", w / 2f, 8, 2, Color.rgb(255, 215, 120), 1);
         } else {
-            String head = !selScratched ? "SCRATCH TO REVEAL" : revealKind == 2 ? "YOU HAD THIS ONE. +" + DUPLICATE_PAY + " E-" : "FORMULA";
+            String head = !selScratched ? "SCRATCH TO REVEAL" : revealKind == 2 ? "DUPLICATE! +" + DUPLICATE_PAY + " E-" : "FORMULA";
             text(c, head, 8, 8, 1, revealKind == 2 ? Color.rgb(120, 235, 255) : Color.rgb(255, 215, 120), 0);
         }
         rectPx(c, scx - 2, scy - 2, scw + 4, sch + 4, Color.rgb(8, 10, 20));

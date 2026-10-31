@@ -11,7 +11,7 @@ import java.util.concurrent.Executors;
 /** Short synthesized sound effects, no audio files. */
 final class Sfx {
     static final int RATE = 22050;
-    final AudioTrack[] tr = new AudioTrack[10];
+    final AudioTrack[] tr = new AudioTrack[11];
     // stop/reload/play can block for a frame, so every call runs off the game thread
     final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -27,6 +27,7 @@ final class Sfx {
             tr[Game.S_TELE] = mk(tone(1800, 250, 150, 0.5f, 0.15f, true));
             tr[Game.S_SCRATCH] = mk(tone(2600, 1400, 35, 0.22f, 0.85f, false));
             tr[Game.S_BUILD] = mk(build());
+            tr[Game.S_FANFARE] = mk(fanfare());
         } catch (Throwable t) { }
     }
 
@@ -59,6 +60,46 @@ final class Sfx {
             float env = (t < 0.05f ? t / 0.05f : 1f) * (t > 0.9f ? (1 - t) * 10 : 1f);
             d[i] = (short) (v * env * 32767 * 0.18);
         }
+        return d;
+    }
+
+    /**
+     * A trumpet fanfare for a new formula: "dun dun dun DUNNN", three quick G4s then a held C5
+     * with a third and fifth joining it. Each note is a brass tone: harmonics that get brighter
+     * as the note swells (a real horn sounds brighter the harder it is blown), plus vibrato on the long one.
+     */
+    static short[] fanfare() {
+        // start (s), length (s), pitches
+        float[][] notes = {
+            {0.00f, 0.12f, 392.00f},
+            {0.15f, 0.12f, 392.00f},
+            {0.30f, 0.12f, 392.00f},
+            {0.45f, 0.85f, 523.25f, 659.25f, 783.99f},
+        };
+        int n = (int) (RATE * 1.4f);
+        float[] f = new float[n];
+        for (float[] nt : notes) {
+            int i0 = (int) (nt[0] * RATE), len = (int) (nt[1] * RATE);
+            boolean held = nt[1] > 0.5f;
+            for (int v = 2; v < nt.length; v++) {
+                double ph = 0, gain = v == 2 ? 1.0 : 0.45;           // the harmony sits under the melody
+                for (int i = 0; i < len && i0 + i < n; i++) {
+                    double t = i / (double) RATE, u = i / (double) len;
+                    // swell in over 25 ms with a small bump, settle, then let go over the last 15 percent
+                    double env = t < 0.025 ? t / 0.025 * 1.15 : Math.max(0.85, 1.15 - (t - 0.025) * 3);
+                    if (u > 0.85) env *= (1 - u) / 0.15;
+                    double vib = held && t > 0.15 ? 1 + 0.006 * Math.sin(2 * Math.PI * 5.5 * t) : 1;
+                    ph += 2 * Math.PI * nt[v] * vib / RATE;
+                    double bright = 1 + 6 * Math.min(1, env), s = 0;
+                    for (int k = 1; k <= 10; k++) s += Math.sin(ph * k) / k * Math.exp(-(k - 1) / bright);
+                    f[i0 + i] += (float) (s * env * gain);
+                }
+            }
+        }
+        double peak = 1e-9;
+        for (float x : f) peak = Math.max(peak, Math.abs(x));
+        short[] d = new short[n];
+        for (int i = 0; i < n; i++) d[i] = (short) (f[i] / peak * 32767 * 0.55);
         return d;
     }
 
