@@ -1984,11 +1984,9 @@ public class Main extends Activity {
                     if (r[i][c] == 'x' || r[i][c] == 'S' || r[i][c] == 'N') { r[i + 1][c] = r[i][c]; r[i][c] = 'W'; }
                 }
             }
-            for (int c = 5; c < 12; c++) {                   // a V neckline where the collar and tie were
-                if (r[0][c] == 'V' || r[0][c] == 't') r[0][c] = 'S';
-                if (r[1][c] == 'V') r[1][c] = 'S';
-                else if (r[1][c] == 't') r[1][c] = 'W';
-            }
+            // the same small V neckline on every step (the collar and tie positions differ per step, which made it flicker)
+            String top = "wWSSWw", next = "wWWSWW";
+            for (int c = 0; c < 6; c++) { r[0][5 + c] = top.charAt(c); r[1][5 + c] = next.charAt(c); }
             String[] out = new String[body.length];
             for (int i = 0; i < body.length; i++) out[i] = new String(r[i]);
             return out;
@@ -2036,7 +2034,7 @@ public class Main extends Activity {
             return new String[][] {HAIR_BACK, f1, f2, f1};
         }
 
-        /** her hair down the back: it hangs behind the pack and past the waist, and swings with the same four frames */
+        /** her hair down the back: it runs on from the hair at the back of her head, behind the pack, and ends just below it */
         static final String[] HAIR_TAIL = {
             "................",
             "................",
@@ -2045,31 +2043,28 @@ public class Main extends Activity {
             "................",
             "................",
             "................",
-            "................",
-            "................",
-            "................",
-            "BB..............",
+            "..BB............",
+            ".BBB............",
+            ".BBB............",
+            "BBB.............",
             "BB..............",
             "BBb.............",
             "BB..............",
-            "BBB.............",
-            ".BBBb...........",
-            ".BBBb...........",
-            "..BBb...........",
-            "..Bb............",
-            "...b............"
+            "BBb.............",
+            ".BB.............",
+            ".b.............."
         };
         static final String[][] TAIL_FRAMES = tailFrames();
 
         static String[][] tailFrames() {
-            String[] f1 = shiftRows(HAIR_TAIL, 13, -1);
-            String[] f2 = shiftRows(shiftRows(HAIR_TAIL, 12, -1), 15, -1);
+            String[] f1 = shiftRows(HAIR_TAIL, 14, 1);
+            String[] f2 = shiftRows(shiftRows(HAIR_TAIL, 12, 1), 15, 1);
             return new String[][] {HAIR_TAIL, f1, f2, f1};
         }
 
         int hairFrame() { return onFloor && state == PLAY ? ((int) (runPhase * 0.2f * 4)) & 3 : ((int) (clock * 6)) & 3; }
 
-        /** drawn first, behind the body and the pack */
+        /** drawn first, behind the body and the pack, so the pack stays visible */
         void drawHairTail(Canvas c, int left, int top) {
             if (female) outlined(c, TAIL_FRAMES[hairFrame()], left, top);
         }
