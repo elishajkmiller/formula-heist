@@ -328,7 +328,7 @@ public class Main extends Activity {
 
         float hBot() { return vehicle == 0 ? SH : hhVeh(vehicle); }
 
-        static int hhVeh(int v) { return v == STOMPER ? 11 : v == QUANTUM ? 15 : 7; }
+        static int hhVeh(int v) { return v == STOMPER ? 12 : v == QUANTUM ? 15 : 8; }
 
         /** vehicles that stick to a surface and switch which one gravity points at */
         boolean flips() { return vehicle == INVERTER || vehicle == QUANTUM; }
@@ -739,39 +739,39 @@ public class Main extends Activity {
         };
 
         static final String[] SPR_HEAD = {
-            "......bBBBBB....",
-            ".....BGCCGCCGB..",
-            ".....BBBBBBBBB..",
-            ".....BsSSSSSSSs.",
-            ".....BsSSESSESS.",
-            ".....BsSSESSESS.",
-            ".....BsSSSSnnSS.",
-            "......sSSSSS....",
-            ".hOOowWWWVVW....",
-            ".hOOowxWWWVt....",
-            ".OOOowxxWyVt....",
-            ".OOoowxxxxSS....",
+            "......b..bb.....",
+            ".....bBbBBBb....",
+            "....bBBBBBBBBb..",
+            "....BBBSSSSSSS..",
+            "....BsSSBBSBBS..",
+            "....BsSSEeSEeSS.",
+            "....BsSSEESEESs.",
+            "..P.BsSaSSSSsSS.",
+            "..P.Bsaaeeeeeaa.",
+            "..P..saaaaaaaa..",
+            ".hOOowWWWVtW....",
+            ".hOOowxWWVtW....",
+            ".OOOowxxxSSN....",
             ".OOoowWWWWWW....",
-            ".hOOowWWWWWW....",
             ".hOOowWWWWWW....",
             ".NNNNwwwwwww....",
             "..NN.wwwwwww...."
         };
         static final String[] SPR_HEAD_B = {
-            "......bBBBBB....",
-            ".....BGCCGCCGB..",
-            ".....BBBBBBBBB..",
-            ".....BsSSSSSSSs.",
-            ".....BsSSESSESS.",
-            ".....BsSSESSESS.",
-            ".....BsSSSSnnSS.",
-            "......sSSSSS....",
-            ".hOOowWWWVVW....",
-            ".hOOowxWWWVt....",
-            ".OOOowxxxxSS....",
-            ".OOoowxxWyVt....",
+            "......b..bb.....",
+            ".....bBbBBBb....",
+            "....bBBBBBBBBb..",
+            "....BBBSSSSSSS..",
+            "....BsSSBBSBBS..",
+            "....BsSSEeSEeSS.",
+            "....BsSSEESEESs.",
+            "..P.BsSaSSSSsSS.",
+            "..P.Bsaaeeeeeaa.",
+            "..P..saaaaaaaa..",
+            ".hOOowWWWVtW....",
+            ".hOOowxxxSSN....",
+            ".OOOowxWWVtW....",
             ".OOoowWWWWWW....",
-            ".hOOowWWWWWW....",
             ".hOOowWWWWWW....",
             ".NNNNwwwwwww....",
             "..NN.wwwwwww...."
@@ -866,12 +866,21 @@ public class Main extends Activity {
             "................"
         };
 
-        static final int HEAD_ROWS = 8;
-        static final String[] HEAD_ONLY = Arrays.copyOfRange(SPR_HEAD, 0, HEAD_ROWS);
+        static final int HEAD_ROWS = 10;
+        static final String[] HEAD_ONLY = headOnly();
+
+        /** just the head, without the hose, for the vehicle cockpits */
+        static String[] headOnly() {
+            String[] h = Arrays.copyOfRange(SPR_HEAD, 0, HEAD_ROWS);
+            for (int i = 0; i < h.length; i++) h[i] = h[i].replace('P', '.');
+            return h;
+        }
 
         static final String[] BODY_STOMP = {
             "....mmmmmmmmmmmm....",
             "...mMMMMMMMMMMMMm...",
+            "..mMggggggggggggMm..",
+            "..mMggggggggggggMm..",
             "..mMggggggggggggMm..",
             "..mMggggggggggggMm..",
             "..mMggggggggggggMm..",
@@ -897,6 +906,8 @@ public class Main extends Activity {
             "......RRRRRRRR......",
             ".....RRRRRRRRRR.....",
             "....mmmmmmmmmmmm....",
+            "..mMggggggggggggMm..",
+            "..mMggggggggggggMm..",
             "..mMggggggggggggMm..",
             "..mMggggggggggggMm..",
             "..mMggggggggggggMm..",
@@ -996,17 +1007,20 @@ public class Main extends Activity {
                 case 'b': return Color.rgb(135, 90, 55);
                 case 'E': return Color.rgb(30, 30, 45);
                 case 'n': return Color.rgb(150, 70, 70);
-                case 'h': return Color.rgb(255, 175, 95);
+                case 'h': return Color.rgb(165, 175, 140);
                 case 'x': return Color.rgb(150, 160, 185);
                 case 'd': return Color.rgb(78, 92, 140);
                 case 'L': return Color.rgb(95, 95, 108);
                 case 'y': return Color.rgb(150, 110, 70);
-                case 't': return Color.rgb(200, 60, 60);
+                case 't': return Color.rgb(40, 45, 70);
                 case 'S': return Color.rgb(240, 200, 160);
                 case 'G': return Color.rgb(50, 60, 80);
                 case 'C': return Color.rgb(120, 235, 255);
-                case 'O': return Color.rgb(240, 120, 50);
-                case 'o': return Color.rgb(170, 80, 40);
+                case 'O': return Color.rgb(120, 130, 100);
+                case 'a': return Color.rgb(170, 140, 115);
+                case 'e': return Color.rgb(255, 255, 255);
+                case 'P': return Color.rgb(210, 170, 60);
+                case 'o': return Color.rgb(80, 90, 70);
                 case 'N': return Color.rgb(120, 125, 140);
                 case 'W': return Color.rgb(240, 244, 250);
                 case 'w': return Color.rgb(195, 203, 220);
@@ -1513,9 +1527,11 @@ public class Main extends Activity {
             int left = Math.round(playerX) - 8, top = Math.round(y) - SH;
 
             if (thr) {
-                int fl = 4 + rnd.nextInt(5);
-                rectPx(c, left + 1, top + 17, 4, fl, Color.rgb(255, 170, 40));
-                rectPx(c, left + 2, top + 17, 2, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
+                int fl = 7 + rnd.nextInt(6);
+                rectPx(c, left, top + 17, 6, fl, Color.rgb(255, 150, 50));
+                rectPx(c, left + 1, top + 17, 4, Math.max(1, fl - 2), Color.rgb(255, 215, 90));
+                rectPx(c, left + 2, top + 17, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
+                rectPx(c, left + 1 + rnd.nextInt(4), top + 17 + fl, 1, 2, Color.rgb(255, 150, 50));
             }
             scientist(c, left, top, ph, onFloor && state == PLAY);
         }
@@ -1568,7 +1584,7 @@ public class Main extends Activity {
                 outlined(c, HEAD_ONLY, left, top + 3);
                 // field sparks at both magnet caps
                 rectPx(c, left + 6 + rnd.nextInt(8), top - 1 - rnd.nextInt(2), 1, 1, Color.rgb(255, 150, 150));
-                rectPx(c, left + 6 + rnd.nextInt(8), top + 14 + rnd.nextInt(2), 1, 1, Color.rgb(150, 190, 255));
+                rectPx(c, left + 6 + rnd.nextInt(8), top + 16 + rnd.nextInt(2), 1, 1, Color.rgb(150, 190, 255));
             }
             if (flip) c.restore();
         }
