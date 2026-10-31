@@ -192,6 +192,7 @@ public class Main extends Activity {
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
         static final int NF = 20;                // formulas to recover
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
+        static final int ENTANGLER_USES = 5;     // teleports before the Quantum Entangler burns out
         static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9;
 
         static final float GRAVITY = 22f;        // m/s^2, game gravity (Earth is 9.8)
@@ -201,7 +202,7 @@ public class Main extends Activity {
         static final float JUMP = 8.5f;          // m/s, jump off the floor
 
         static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER"};
-        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN ON THE OTHER SIDE."};
+        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN. FIVE USES."};
 
         static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
         static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
@@ -338,7 +339,7 @@ public class Main extends Activity {
         float outX, holeY, bonus, tipT;
 
         // vehicles
-        int vehicle, gravDir = 1;
+        int vehicle, gravDir = 1, charges;       // charges: teleports left on the Entangler
         boolean diving;
         float invuln, squash, hintT, teleFromY, telePulse;
         static final int NB = 64;                    // pixel blocks that fly in to build a vehicle
@@ -883,6 +884,7 @@ public class Main extends Activity {
             sfx(S_TELE);
             buzz(15);
             for (int i = 0; i < 12; i++) burst(playerX, y);
+            if (--charges <= 0) breakVehicle();      // the fifth jump burns it out
         }
 
         void press() {
@@ -1125,6 +1127,7 @@ public class Main extends Activity {
 
         void finishBuild() {
             vehicle = buildType;
+            charges = ENTANGLER_USES;
             state = PLAY;
             gravDir = 1;
             vy = 0;
@@ -2403,6 +2406,13 @@ public class Main extends Activity {
             quantumBody(c, gy, gravDir > 0);     // the entangled twin on the other side
             ghost = false;
             quantumBody(c, cy, gravDir < 0);
+            // one pip per teleport left
+            int py0 = gravDir > 0 ? cy - 20 : cy + 17;
+            for (int i = 0; i < ENTANGLER_USES; i++) {
+                int pxl = Math.round(playerX) - 14 + i * 6;
+                rectPx(c, pxl - 1, py0 - 1, 5, 5, Color.rgb(8, 10, 22));
+                rectPx(c, pxl, py0, 3, 3, i < charges ? Color.rgb(120, 235, 255) : Color.rgb(50, 60, 80));
+            }
         }
 
         void drawVehicle(Canvas c) {
