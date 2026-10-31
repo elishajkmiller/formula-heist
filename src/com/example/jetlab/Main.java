@@ -210,23 +210,55 @@ public class Main extends Activity {
         static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
         static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
 
-        // ---------- outfit store ----------
+        // ---------- clothes store: shirts, pants and jetpacks, each bought and worn on its own ----------
 
-        static final String[] ONAME = {"LAB COAT", "FIRE RED", "OCEAN BLUE", "NIGHT SHIFT", "GOLD RUSH", "PINK STORM", "HAZMAT", "STEALTH"};
-        static final int[] OCOST = {0, 25, 25, 40, 40, 60, 60, 100};      // electrons
-        /** sprite letters an outfit recolours, in the order of the colours below */
-        static final char[] OKEYS = {'W', 'w', 'x', 'D', 'd', 'O', 'o', 'h', 't', 'V'};
-        static final int[][] OPAL = {
-            null,
-            new int[] {Color.rgb(220, 70, 60), Color.rgb(170, 45, 45), Color.rgb(130, 35, 40), Color.rgb(60, 40, 50), Color.rgb(90, 60, 70), Color.rgb(250, 200, 70), Color.rgb(190, 140, 40), Color.rgb(255, 230, 120), Color.rgb(255, 220, 80), Color.rgb(235, 235, 240)},
-            new int[] {Color.rgb(90, 160, 240), Color.rgb(60, 120, 200), Color.rgb(45, 90, 160), Color.rgb(30, 40, 80), Color.rgb(50, 66, 110), Color.rgb(240, 240, 250), Color.rgb(170, 175, 195), Color.rgb(255, 255, 255), Color.rgb(255, 255, 255), Color.rgb(200, 230, 255)},
-            new int[] {Color.rgb(70, 72, 86), Color.rgb(50, 52, 64), Color.rgb(38, 40, 52), Color.rgb(24, 26, 36), Color.rgb(40, 44, 60), Color.rgb(120, 235, 255), Color.rgb(60, 150, 170), Color.rgb(200, 250, 255), Color.rgb(120, 235, 255), Color.rgb(160, 170, 190)},
-            new int[] {Color.rgb(245, 205, 90), Color.rgb(205, 160, 55), Color.rgb(165, 120, 40), Color.rgb(70, 50, 30), Color.rgb(100, 76, 46), Color.rgb(70, 70, 80), Color.rgb(40, 40, 50), Color.rgb(110, 110, 125), Color.rgb(120, 40, 40), Color.rgb(255, 245, 220)},
-            new int[] {Color.rgb(255, 140, 190), Color.rgb(215, 100, 150), Color.rgb(170, 75, 120), Color.rgb(90, 50, 110), Color.rgb(125, 80, 150), Color.rgb(120, 235, 255), Color.rgb(60, 150, 170), Color.rgb(200, 250, 255), Color.rgb(255, 255, 255), Color.rgb(255, 230, 245)},
-            new int[] {Color.rgb(235, 225, 70), Color.rgb(195, 185, 45), Color.rgb(150, 140, 35), Color.rgb(215, 205, 55), Color.rgb(245, 235, 90), Color.rgb(200, 200, 205), Color.rgb(140, 140, 150), Color.rgb(240, 240, 245), Color.rgb(40, 40, 40), Color.rgb(235, 225, 70)},
-            new int[] {Color.rgb(40, 40, 46), Color.rgb(28, 28, 34), Color.rgb(20, 20, 26), Color.rgb(20, 20, 26), Color.rgb(34, 34, 42), Color.rgb(70, 70, 80), Color.rgb(40, 40, 50), Color.rgb(100, 100, 115), Color.rgb(200, 50, 50), Color.rgb(60, 62, 70)}
+        static final String[] TABS = {"SHIRTS", "PANTS", "JETPACKS"};
+        static final String[][] INAME = {
+            {"LAB COAT", "FIRE RED", "OCEAN BLUE", "NIGHT SHIFT", "GOLD RUSH", "PINK STORM", "HAZMAT", "STEALTH"},
+            {"DEFAULT", "BLACK", "KHAKI", "LIGHT JEANS", "RED", "GREEN", "PURPLE", "GOLD"},
+            {"RED ORANGE", "OLIVE", "SILVER", "CYAN GLOW", "BLACK", "GOLD", "PINK", "RAINBOW"}
         };
-        static final int[] OVR = new int[128];     // the equipped outfit's colours, looked up by pal()
+        static final int[][] ICOST = {      // electrons
+            {0, 25, 25, 40, 40, 60, 60, 100},
+            {0, 15, 15, 25, 25, 40, 40, 60},
+            {0, 20, 30, 40, 50, 70, 90, 150}
+        };
+        /** the sprite letters each kind of item recolours, in the order of its colours */
+        static final char[][] IKEYS = {{'W', 'w', 'x', 't', 'V'}, {'D', 'd'}, {'O', 'o', 'h'}};
+        static final int[][][] IPAL = {     // null means the plain colours drawn in pal()
+            {
+                null,
+                new int[] {Color.rgb(220, 70, 60), Color.rgb(170, 45, 45), Color.rgb(130, 35, 40), Color.rgb(255, 220, 80), Color.rgb(235, 235, 240)},
+                new int[] {Color.rgb(90, 160, 240), Color.rgb(60, 120, 200), Color.rgb(45, 90, 160), Color.rgb(255, 255, 255), Color.rgb(200, 230, 255)},
+                new int[] {Color.rgb(70, 72, 86), Color.rgb(50, 52, 64), Color.rgb(38, 40, 52), Color.rgb(120, 235, 255), Color.rgb(160, 170, 190)},
+                new int[] {Color.rgb(245, 205, 90), Color.rgb(205, 160, 55), Color.rgb(165, 120, 40), Color.rgb(120, 40, 40), Color.rgb(255, 245, 220)},
+                new int[] {Color.rgb(255, 140, 190), Color.rgb(215, 100, 150), Color.rgb(170, 75, 120), Color.rgb(255, 255, 255), Color.rgb(255, 230, 245)},
+                new int[] {Color.rgb(235, 225, 70), Color.rgb(195, 185, 45), Color.rgb(150, 140, 35), Color.rgb(40, 40, 40), Color.rgb(235, 225, 70)},
+                new int[] {Color.rgb(40, 40, 46), Color.rgb(28, 28, 34), Color.rgb(20, 20, 26), Color.rgb(200, 50, 50), Color.rgb(60, 62, 70)}
+            },
+            {
+                null,
+                new int[] {Color.rgb(28, 28, 34), Color.rgb(46, 46, 56)},
+                new int[] {Color.rgb(150, 130, 90), Color.rgb(185, 165, 120)},
+                new int[] {Color.rgb(70, 110, 170), Color.rgb(100, 140, 200)},
+                new int[] {Color.rgb(150, 40, 50), Color.rgb(190, 70, 80)},
+                new int[] {Color.rgb(40, 100, 60), Color.rgb(70, 140, 90)},
+                new int[] {Color.rgb(90, 50, 120), Color.rgb(125, 80, 155)},
+                new int[] {Color.rgb(190, 150, 50), Color.rgb(225, 185, 80)}
+            },
+            {
+                null,
+                new int[] {Color.rgb(120, 130, 100), Color.rgb(80, 90, 70), Color.rgb(165, 175, 140)},
+                new int[] {Color.rgb(175, 180, 195), Color.rgb(120, 125, 145), Color.rgb(225, 230, 245)},
+                new int[] {Color.rgb(80, 210, 230), Color.rgb(40, 140, 170), Color.rgb(180, 245, 255)},
+                new int[] {Color.rgb(60, 60, 70), Color.rgb(32, 32, 40), Color.rgb(100, 100, 118)},
+                new int[] {Color.rgb(235, 190, 70), Color.rgb(180, 135, 40), Color.rgb(255, 230, 130)},
+                new int[] {Color.rgb(240, 120, 180), Color.rgb(185, 80, 135), Color.rgb(255, 175, 215)},
+                null
+            }
+        };
+        static final int RAINBOW_PACK = 7;
+        static final int[] OVR = new int[128];     // the worn items' colours, looked up first by pal()
 
         // ---------- text data: death-card facts and the 20 formulas ----------
 
@@ -382,8 +414,9 @@ public class Main extends Activity {
         int bounces;
         float ang, angV, settleT, finalDist;
 
-        // outfit store
-        int bank, outfitsOwned = 1, outfit, storeFrom, sbx, sby, sbw, sbh;   // bank: electrons kept across runs
+        // clothes store
+        int bank, storeFrom, storeTab, sbx, sby, sbw, sbh;       // bank: electrons kept across runs
+        final int[] inv = {1, 1, 1}, worn = {0, 0, 0};           // per tab: owned items (bit mask) and the item being worn
         float storeMsgT;
         String storeMsg = "";
 
@@ -405,14 +438,25 @@ public class Main extends Activity {
         float lastCoinSfx, lastScratchSfx;
 
         void saveStore() {
-            prefs.edit().putInt("bank", bank).putInt("outfits", outfitsOwned).putInt("outfit", outfit).apply();
+            prefs.edit().putInt("bank", bank).putInt("inv0", inv[0]).putInt("inv1", inv[1]).putInt("inv2", inv[2])
+                    .putInt("worn0", worn[0]).putInt("worn1", worn[1]).putInt("worn2", worn[2]).apply();
         }
 
-        /** make the sprites use an outfit's colours (0 is the plain lab coat) */
-        static void applyOutfit(int idx) {
+        /** the jetpack colours of pack i; the rainbow one cycles through the hues */
+        int[] packColors(int i) {
+            if (i != RAINBOW_PACK) return IPAL[2][i];
+            float hue = (clock * 90f) % 360f;
+            return new int[] {Color.HSVToColor(new float[] {hue, 0.85f, 1f}), Color.HSVToColor(new float[] {hue, 0.9f, 0.6f}), Color.HSVToColor(new float[] {hue, 0.45f, 1f})};
+        }
+
+        /** make the sprites use what is worn (item 0 of each tab is the plain colours) */
+        void applyOutfit() {
             java.util.Arrays.fill(OVR, 0);
-            if (idx <= 0 || OPAL[idx] == null) return;
-            for (int i = 0; i < OKEYS.length; i++) OVR[OKEYS[i]] = OPAL[idx][i];
+            for (int t = 0; t < 3; t++) {
+                int[] cols = t == 2 && worn[2] == RAINBOW_PACK ? packColors(worn[2]) : IPAL[t][worn[t]];
+                if (cols == null) continue;
+                for (int i = 0; i < IKEYS[t].length; i++) OVR[IKEYS[t][i]] = cols[i];
+            }
         }
 
         Game(Context c) {
@@ -429,9 +473,13 @@ public class Main extends Activity {
                 tickets = Integer.bitCount(prefs.getInt("owned", 0) & ~revealed);
             }
             bank = prefs.getInt("bank", 0);
-            outfitsOwned = prefs.getInt("outfits", 1) | 1;
-            outfit = prefs.getInt("outfit", 0);
-            applyOutfit(outfit);
+            if (prefs.contains("inv0")) {
+                for (int t = 0; t < 3; t++) { inv[t] = prefs.getInt("inv" + t, 1) | 1; worn[t] = prefs.getInt("worn" + t, 0); }
+            } else {                                    // earlier whole outfits become shirts
+                inv[0] = prefs.getInt("outfits", 1) | 1;
+                worn[0] = prefs.getInt("outfit", 0);
+            }
+            applyOutfit();
             p.setAntiAlias(false);
             blit.setFilterBitmap(false);
             ovp.setTypeface(Typeface.create(Typeface.SERIF, Typeface.ITALIC));
@@ -657,29 +705,36 @@ public class Main extends Activity {
         void drawStoreButton(Canvas c) {
             rectPx(c, sbx, sby, sbw, sbh, Color.rgb(8, 10, 20));
             rectPx(c, sbx + 1, sby + 1, sbw - 2, sbh - 2, Color.rgb(44, 54, 82));
-            text(c, "OUTFITS E- " + bank, sbx + sbw / 2f, sby + 3, 1, Color.WHITE, 1);
+            text(c, "STORE E- " + bank, sbx + sbw / 2f, sby + 3, 1, Color.WHITE, 1);
         }
 
-        /** x, y, width, height of outfit card i: four across, two down */
+        /** x, y, width, height of item card i: four across, two down, under the tabs */
         int[] storeRect(int i) {
             int cw = (w - 12) / 4;
-            return new int[] {6 + (i % 4) * cw, 22 + (i / 4) * 60, cw - 3, 58};
+            return new int[] {6 + (i % 4) * cw, 36 + (i / 4) * 54, cw - 3, 52};
         }
+
+        int[] tabRect(int t) { return new int[] {8 + t * 66, 21, 62, 11}; }
 
         void storeTap(float gx, float gy) {
             if (closeHit(gx, gy)) { state = storeFrom; saveStore(); return; }
-            for (int i = 0; i < ONAME.length; i++) {
+            for (int t = 0; t < 3; t++) {
+                int[] r = tabRect(t);
+                if (gx >= r[0] && gx < r[0] + r[2] && gy >= r[1] && gy < r[1] + r[3]) { storeTab = t; sfx(S_COIN); return; }
+            }
+            int tab = storeTab;
+            for (int i = 0; i < INAME[tab].length; i++) {
                 int[] r = storeRect(i);
                 if (gx < r[0] || gx >= r[0] + r[2] || gy < r[1] || gy >= r[1] + r[3]) continue;
-                if ((outfitsOwned >> i & 1) != 0) {
-                    outfit = i; applyOutfit(i); saveStore();
+                if ((inv[tab] >> i & 1) != 0) {
+                    worn[tab] = i; applyOutfit(); saveStore();
                     sfx(S_COIN);
-                } else if (bank >= OCOST[i]) {
-                    bank -= OCOST[i]; outfitsOwned |= 1 << i; outfit = i; applyOutfit(i); saveStore();
+                } else if (bank >= ICOST[tab][i]) {
+                    bank -= ICOST[tab][i]; inv[tab] |= 1 << i; worn[tab] = i; applyOutfit(); saveStore();
                     flash = 0.15f; sfx(S_DONE); buzz(30);
                     for (int k = 0; k < 30; k++) confetti(r[0] + r[2] / 2f, r[1] + 20);
                 } else {
-                    storeMsg = "NEED " + (OCOST[i] - bank) + " MORE E-"; storeMsgT = 1.6f;
+                    storeMsg = "NEED " + (ICOST[tab][i] - bank) + " MORE E-"; storeMsgT = 1.6f;
                     shake = 2f; sfx(S_WARN);
                 }
                 return;
@@ -689,31 +744,40 @@ public class Main extends Activity {
         void drawStore(Canvas c) {
             rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
             for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
-            text(c, "OUTFIT STORE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
-            text(c, "E- " + bank, 8, 13, 1, Color.rgb(120, 235, 255), 0);
-            if (storeMsgT > 0) text(c, storeMsg, w / 2f, 9, 1, Color.rgb(255, 120, 100), 1);
+            text(c, "CLOTHES STORE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
+            text(c, "E- " + bank, 110, 5, 1, Color.rgb(120, 235, 255), 0);
+            if (storeMsgT > 0) text(c, storeMsg, w / 2f + 40, 5, 1, Color.rgb(255, 120, 100), 1);
             closeButton(c);
-            for (int i = 0; i < ONAME.length; i++) {
+            for (int t = 0; t < 3; t++) {
+                int[] r = tabRect(t);
+                boolean on = storeTab == t;
+                rectPx(c, r[0], r[1], r[2], r[3], on ? Color.rgb(255, 200, 80) : Color.rgb(8, 10, 20));
+                rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, on ? Color.rgb(70, 60, 30) : Color.rgb(44, 54, 82));
+                text(c, TABS[t], r[0] + r[2] / 2f, r[1] + 3, 1, on ? Color.rgb(255, 230, 150) : Color.WHITE, 1);
+            }
+            int tab = storeTab, keep = worn[tab];
+            for (int i = 0; i < INAME[tab].length; i++) {
                 int[] r = storeRect(i);
-                boolean own = (outfitsOwned >> i & 1) != 0, on = outfit == i;
+                boolean own = (inv[tab] >> i & 1) != 0, on = keep == i;
                 rectPx(c, r[0], r[1], r[2], r[3], on ? Color.rgb(255, 200, 80) : own ? Color.rgb(90, 100, 130) : Color.rgb(8, 10, 20));
                 rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(28, 34, 52));
-                // the scientist wearing it, drawn twice as big
-                applyOutfit(i);
+                // the scientist with this item on, drawn twice as big
+                worn[tab] = i;
+                applyOutfit();
                 c.save();
-                c.translate(r[0] + 6, r[1] + 6);
+                c.translate(r[0] + 6, r[1] + 3);
                 c.scale(2f, 2f);
                 outlined(c, LEGS_A, 0, SPR_HEAD.length);
                 outlined(c, SPR_HEAD, 0, 0);
                 c.restore();
-                applyOutfit(outfit);
+                worn[tab] = keep;
+                applyOutfit();
                 int tx = r[0] + 42, tw = r[2] - 44;
-                wrapOut(c, ONAME[i], tx + tw / 2f, r[1] + 6, 1, Color.WHITE, tw, false);
-                String st = on ? "WORN" : own ? "OWNED" : OCOST[i] + " E-";
-                int sc = on ? Color.rgb(255, 215, 120) : own ? Color.rgb(150, 190, 215) : bank >= OCOST[i] ? Color.rgb(120, 255, 160) : Color.rgb(255, 130, 110);
+                wrapOut(c, INAME[tab][i], tx + tw / 2f, r[1] + 6, 1, Color.WHITE, tw, false);
+                String st = on ? "WORN" : own ? "OWNED" : ICOST[tab][i] + " E-";
+                int sc = on ? Color.rgb(255, 215, 120) : own ? Color.rgb(150, 190, 215) : bank >= ICOST[tab][i] ? Color.rgb(120, 255, 160) : Color.rgb(255, 130, 110);
                 textOut(c, st, tx + tw / 2f, r[1] + r[3] - 12, 1, sc, 1, false);
             }
-            text(c, "TAP AN OUTFIT TO BUY IT OR WEAR IT", w / 2f, h - 7, 1, Color.rgb(150, 190, 215), 1);
             drawParticles(c);
         }
 
@@ -1133,6 +1197,7 @@ public class Main extends Activity {
         void update(float rdt) {
             clock += rdt;
             stateTime += rdt;
+            if (worn[2] == RAINBOW_PACK) applyOutfit();      // the rainbow jetpack cycles colours
             if (flash > 0) flash -= rdt;
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
