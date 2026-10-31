@@ -705,8 +705,6 @@ public class Main extends Activity {
             if (!n.falling) {
                 // inside the building they ride the world's scroll, and run away to the right when you run
                 n.x += (n.running ? GUARD_RUN - speed * ppm : -speed * ppm) * dt;
-                if (n.running && rnd.nextInt(3) == 0) puff(n.x - 2, floorY - 1);       // dust kicked up by their feet
-                if (n.running && rnd.nextInt(8) == 0) sweat(n.x, floorY - 16);
                 if (n.x > w + 30) n.x = w + 1000;      // out of sight, removed by the caller below
                 return;
             }
@@ -722,7 +720,6 @@ public class Main extends Activity {
             // they were running with the world; friction slows them while the world keeps going, so they get dragged back
             n.vw *= Math.max(0f, 1f - (n.settled ? 4f : 0.3f) * dt);
             n.x += (n.vw - speed * ppm) * dt;
-            if (n.settled && speed > 0.3f && rnd.nextInt(3) == 0) dust(n.x, floorY - 1);
         }
 
         Npc addNpc(float nx, int mode, int face) {
@@ -1793,27 +1790,6 @@ public class Main extends Activity {
             // ragdoll: popped up, tumbling forward
             vehicle = 0; gravDir = 1; thrusting = false;
             vy = -6f; ang = 0; angV = 640f; bounces = 0; settled = false; settleT = 0;
-        }
-
-        /** a small pale puff of dust that drifts back and fades */
-        void puff(float bx, float by) {
-            int k = pNext++ % NP;
-            px[k] = bx; py[k] = by;
-            pvx[k] = (-10f - rnd.nextFloat() * 14f);
-            pvy[k] = -(4f + rnd.nextFloat() * 10f);
-            pl[k] = 0.35f + rnd.nextFloat() * 0.25f;
-            int g = 170 + rnd.nextInt(50);
-            pcol[k] = Color.rgb(g, g - 8, g - 20);
-        }
-
-        /** a drop of sweat flung up and back off a running guard */
-        void sweat(float bx, float by) {
-            int k = pNext++ % NP;
-            px[k] = bx; py[k] = by;
-            pvx[k] = -(8f + rnd.nextFloat() * 18f);
-            pvy[k] = -(14f + rnd.nextFloat() * 16f);
-            pl[k] = 0.4f;
-            pcol[k] = Color.rgb(150, 220, 255);
         }
 
         /** a spark kicked up where he drags along the floor */
@@ -3258,6 +3234,56 @@ public class Main extends Activity {
             miniScientist(c, cx, cy + 28, new int[] {0, 2, 0, -2}[sp & 3], Color.rgb(235, 240, 248), true);
         }
 
+        /** the lounging guy in the flex room: 68 x 26, letters index FLEX_KEYS and FLEX_COLS (a made-up cartoon man) */
+        static final String[] FLEX_GUY = {
+            ".......HHHHHHHHHH...................................................",
+            "......HHHHHHHHHHHHHH................................................",
+            ".....HHHHHHHHHHHHHHH................................................",
+            "....HHHHHHHHHHHHHHHH................................................",
+            "....HHHHHHHHHHHHHHHH................................................",
+            "...HHHHHHSSSSHHHHHHH................................................",
+            "...HHHHHHSSSSHHHHHHH...................................JJJJ.........",
+            "...HHHHHHHHHSSSSSSH..................................JJJJJJJJ.......",
+            ".sSHHHHHHSSSSSSSSSH.................................JJJJJJJJJJ......",
+            ".sSHHssHHKKSSSKKSss.................................JJJJJJJJJJ......",
+            ".sSHHssHHKKSSSKKSss................................JJJJJJJJJJJJ.....",
+            ".sSSHssHHSSSsSSSSss................................JJJJJJJJJJJJ.....",
+            ".sSSHHSSSSSSsSSSSS.................................JJJJJJJJJJJJ.....",
+            ".sSSSHHSSSSSSSmSS..................................JJJJJJJJJJJJ.....",
+            ".sSSS.HHSSSmmmSSsssSSSSSSSSSSSSS...................JJJJJJJJJJJJ.....",
+            ".sSSS...HSSSSSSsssshhhhhhSSShhhhhhS...........BjBBBJJJJJJJJJJJJ.....",
+            ".sSSS........SssssshhhhhhhshhhhhhhhhS.........BjBBB.JJJJJJJJJJJ.....",
+            ".sSSS........SssssshhhhhhhshhhhhhhhhhSSSSSSSSSSjBBBJJJJJJJJJJJJJJJ..",
+            ".sSSS.........sshhhhhhhhhhshhhhhhhhhhSSSSSSSSSSjBBBJJJJJJJJJWWWWWJ..",
+            ".sSSS.........ssShhhhhhhhhshhhhhSSSSSSSSSSSSSSSSBBBJJJJJJJJJWWWWWWWW",
+            ".sSSS.........ssSSsssssssssSssssSSSSSSSSSSSSSSSSBBBJjjjjjjjjWWWWWWWW",
+            ".sSSSSSS......ssSSSSSSSSSSSSSSSSssssssssssssSSSSBBBJjjjjjjjjWWWWWWWW",
+            ".sSSSSSS......sssssssssssssssssssssssssssssssssjBBBjjjjjjjjjWWWWWWWW",
+            "..SSSSSS......sssssssssssssssssssssssssssssssssjBBBjjjjjjjjjwwwwwwww",
+            "....................................................................",
+            "...................................................................."
+        };
+        static final String FLEX_KEYS = "SshHKJjWwBm";
+        static final int[] FLEX_COLS = {
+            Color.rgb(232, 190, 152), Color.rgb(196, 146, 110), Color.rgb(246, 212, 178), Color.rgb(78, 50, 34),
+            Color.rgb(24, 22, 30), Color.rgb(64, 88, 146), Color.rgb(46, 66, 116), Color.rgb(228, 228, 238),
+            Color.rgb(120, 124, 140), Color.rgb(48, 66, 112), Color.rgb(150, 70, 70)
+        };
+
+        /** draw a sprite with its own palette, so the clothes store and hair colours do not recolour it */
+        void drawPix(Canvas c, String[] rows, int left, int top, String keys, int[] cols) {
+            p.setStyle(Paint.Style.FILL);
+            for (int r = 0; r < rows.length; r++) {
+                String row = rows[r];
+                for (int k = 0; k < row.length(); k++) {
+                    int ki = keys.indexOf(row.charAt(k));
+                    if (ki < 0) continue;
+                    p.setColor(cols[ki]);
+                    c.drawRect(left + k, top + r, left + k + 1, top + r + 1, p);
+                }
+            }
+        }
+
         final float[] hsv = new float[3];
 
         int hue(float deg) {
@@ -3292,38 +3318,17 @@ public class Main extends Activity {
             for (int i = 0; i < 6; i++) rectPx(c, bx + 8 + i * 20, by + 4, 12, 7, Color.rgb(20, 22, 32));
             rectPx(c, bx + 1, by + 1, bw - 2, 2, hue(clock * 80));
             for (int x = bx + 3; x < bx + bw - 4; x += 4) rectPx(c, x, by + 15, 3, 3, Color.rgb(228, 188, 70));
-            // the guy, lying on his side with his head on his hand
-            int sk = Color.rgb(232, 190, 152), sh = Color.rgb(196, 146, 110), jeans = Color.rgb(64, 88, 146);
-            int top = by - 1;
+            // the guy, a pixel-art sprite lying on the stick; the bare chest and the jeans have their own colours
+            int top = by - 24;
+            drawPix(c, FLEX_GUY, bx + 6, top, FLEX_KEYS, FLEX_COLS);
             boolean flex = ((int) (clock * 0.5f + 0.3f) & 1) == 1 && (clock * 0.5f + 0.3f) % 1f < 0.5f;
-            rectPx(c, bx + 58, top - 6, 58, 6, jeans);                          // legs
-            rectPx(c, bx + 80, top - 12, 8, 7, jeans);                           // one knee up
-            rectPx(c, bx + 112, top - 5, 8, 5, Color.rgb(220, 220, 230));        // sneakers
-            rectPx(c, bx + 54, top - 11, 6, 11, Color.rgb(50, 70, 120));         // waistband
-            rectPx(c, bx + 14, top - 11, 42, 11, sk);                            // bare chest and stomach
-            rectPx(c, bx + 18, top - 8, 14, 1, sh);                              // the line under the chest
-            rectPx(c, bx + 34, top - 8, 14, 1, sh);
-            rectPx(c, bx + 30, top - 11, 1, 6, sh);
-            for (int r = 0; r < 3; r++) { rectPx(c, bx + 40, top - 6 + r * 2, 8, 1, sh); }   // a hint of abs
-            rectPx(c, bx + 4, top - 9, 4, 9, sk);                                // the forearm his head rests on
-            rectPx(c, bx + 4, top - 9, 1, 9, sh);
-            rectPx(c, bx - 4, top - 20, 15, 14, sk);                             // head
-            rectPx(c, bx - 4, top - 21, 15, 5, Color.rgb(70, 46, 32));           // hair
-            rectPx(c, bx - 5, top - 19, 3, 7, Color.rgb(70, 46, 32));
-            rectPx(c, bx + 1, top - 13, 2, 2, Color.rgb(20, 20, 30));            // eyes
-            rectPx(c, bx + 7, top - 13, 2, 2, Color.rgb(20, 20, 30));
-            rectPx(c, bx + 7, top - 15, 3, 1, Color.rgb(70, 46, 32));            // one brow raised
-            rectPx(c, bx + 2, top - 8, 6, 1, Color.rgb(150, 70, 70));             // a smirk
-            rectPx(c, bx + 8, top - 9, 1, 1, Color.rgb(150, 70, 70));
             if (flex) {
-                rectPx(c, bx + 30, top - 26, 5, 15, sk);                         // the free arm flexed up
-                rectPx(c, bx + 27, top - 24, 4, 6, sk);                          // bicep
-                rectPx(c, bx + 31, top - 30, 5, 5, sk);
-                rectPx(c, bx + 31, top - 26, 1, 15, sh);
-                textOut(c, "FLEX!", ox + ow / 2f, oy + 76, 1, Color.rgb(255, 215, 110), 1, false);
-            } else {
-                rectPx(c, bx + 22, top - 5, 30, 3, sk);                          // the free arm resting along his side
-                rectPx(c, bx + 22, top - 3, 30, 1, sh);
+                int sk = Color.rgb(232, 190, 152), sh = Color.rgb(196, 146, 110);
+                rectPx(c, bx + 25, top + 3, 5, 15, sk);                          // the free arm flexed up
+                rectPx(c, bx + 22, top + 5, 4, 6, sk);                           // bicep
+                rectPx(c, bx + 26, top - 3, 5, 5, sk);                           // fist
+                rectPx(c, bx + 26, top + 3, 1, 15, sh);
+                text(c, "FLEX!", ox + ow / 2f, top - 8, 1, Color.rgb(255, 215, 110), 1);
             }
             // a soft glow off the sticks
             rectPx(c, ox, oy, ow, oh, Color.argb(16, 160, 90, 255));
