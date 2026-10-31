@@ -1,11 +1,11 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.graphics.Canvas;
 
 import java.util.Arrays;
 
-import static com.example.jetlab.Game.*;
-import static com.example.jetlab.Sprites.*;
+import static com.example.formulaheist.Game.*;
+import static com.example.formulaheist.Sprites.*;
 
 /** Spring Stomper: bounces by itself; a tap in the air dives down for a big stomp bounce. */
 final class Stomper extends Vehicle {

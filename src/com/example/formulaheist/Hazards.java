@@ -1,10 +1,10 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 
-import static com.example.jetlab.Geom.*;
+import static com.example.formulaheist.Geom.*;
 
 /**
  * Floor and ceiling spikes, a sliding saw blade and a laser gate. Zappers and missiles live in their own lists.

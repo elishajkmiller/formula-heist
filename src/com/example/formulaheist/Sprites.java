@@ -1,4 +1,4 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.graphics.Color;
 

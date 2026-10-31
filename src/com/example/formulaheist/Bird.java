@@ -1,10 +1,10 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 
-import static com.example.jetlab.Game.*;
-import static com.example.jetlab.Sprites.*;
+import static com.example.formulaheist.Game.*;
+import static com.example.formulaheist.Sprites.*;
 
 /**
  * Bernoulli Bird: a tap is a wingbeat, holding spreads the wing to glide. While gliding it draws the Bernoulli

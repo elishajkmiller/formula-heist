@@ -1,4 +1,4 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 // the small plain objects that move through the world
 

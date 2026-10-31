@@ -1,4 +1,4 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 /** Small collision tests used by every hazard. */
 final class Geom {

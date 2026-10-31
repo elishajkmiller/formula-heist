@@ -1,4 +1,4 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -17,10 +17,10 @@ import android.view.View;
 import java.util.ArrayList;
 import java.util.Random;
 
-import static com.example.jetlab.Content.*;
-import static com.example.jetlab.Geom.*;
-import static com.example.jetlab.Prism.*;
-import static com.example.jetlab.Sprites.*;
+import static com.example.formulaheist.Content.*;
+import static com.example.formulaheist.Geom.*;
+import static com.example.formulaheist.Prism.*;
+import static com.example.formulaheist.Sprites.*;
 
 /**
  * The game View: state, input, the update loop and drawing. Vehicles, hazards and rooms are their own classes
@@ -190,7 +190,7 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     Game(Context c) {
         super(c);
-        prefs = c.getSharedPreferences("jetlab", Context.MODE_PRIVATE);
+        prefs = c.getSharedPreferences("formulaheist", Context.MODE_PRIVATE);
         best = prefs.getInt("best", 0);
         if (prefs.contains("formulas")) {
             Object saved = prefs.getAll().get("formulas");      // older saves stored this as an int

@@ -67,7 +67,7 @@ echo "[3/6] compile"
 java -jar "$ECJ" -source 8 -target 8 \
   -classpath "$ANDROID_JAR:$APKSIG" \
   -d "$BUILD/obj" \
-  $(find src -name '*.java') "$BUILD/gen/com/example/jetlab/R.java" tools/Sign.java tools/Verify.java
+  $(find src -name '*.java') "$BUILD/gen/com/example/formulaheist/R.java" tools/Sign.java tools/Verify.java
 
 echo "[4/6] dex"
 java -cp "$R8" com.android.tools.r8.D8 \

@@ -1,8 +1,8 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.graphics.Canvas;
 
-import static com.example.jetlab.Game.*;
+import static com.example.formulaheist.Game.*;
 
 /**
  * A vehicle from a blue crate. Game keeps the shared physics (speed limits, the floor and the ceiling);

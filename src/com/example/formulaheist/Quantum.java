@@ -1,10 +1,10 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
 
-import static com.example.jetlab.Game.*;
-import static com.example.jetlab.Sprites.*;
+import static com.example.formulaheist.Game.*;
+import static com.example.formulaheist.Sprites.*;
 
 /** Quantum Entangler: you and a twin on the opposite surface; a tap swaps you over. Burns out after USES jumps. */
 final class Quantum extends Vehicle {

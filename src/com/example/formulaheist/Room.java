@@ -1,4 +1,4 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -6,8 +6,8 @@ import android.graphics.Paint;
 
 import java.util.Random;
 
-import static com.example.jetlab.Game.*;
-import static com.example.jetlab.Sprites.*;
+import static com.example.formulaheist.Game.*;
+import static com.example.formulaheist.Sprites.*;
 
 /**
  * A room seen through the wall as you fly past, one subclass each. To add a room, write a subclass and list it

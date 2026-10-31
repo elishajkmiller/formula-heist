@@ -1,4 +1,4 @@
-package com.example.jetlab;
+package com.example.formulaheist;
 
 import android.media.AudioFormat;
 import android.media.AudioManager;
