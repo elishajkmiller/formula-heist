@@ -280,7 +280,7 @@ public class Main extends Activity {
         static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
         static final float GUARD_RUN = 100f;     // how fast the guards run away, in pixels per second
         static final int GUARD = 4;              // Npc mode of the guards
-        static final int NF = 40;                // formulas to recover
+        static final int NF = 60;                // formulas to recover
         static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
         static final int ENTANGLER_USES = 5;     // teleports before the Quantum Entangler burns out
@@ -388,7 +388,27 @@ public class Main extends Activity {
             "E = \u00bd k x\u00b2",
             "\u03c9 = 2\u03c0 f",
             "T = 2\u03c0 \u221a(m/k)",
-            "F = \u03bc N"
+            "F = \u03bc N",
+            "ε = −N ΔΦ / Δt",
+            "P = σ A T⁴",
+            "λ T = b",
+            "F = 6π η r v",
+            "P + ½ρv² + ρgh = const",
+            "A₁ v₁ = A₂ v₂",
+            "v = √(GM / r)",
+            "v = √(2GM / r)",
+            "T² ∝ r³",
+            "g = GM / r²",
+            "E = k q / r²",
+            "R = ρ L / A",
+            "R = R₁ + R₂",
+            "τ = RC",
+            "γ = 1 / √(1 − v²/c²)",
+            "Δt′ = γ Δt",
+            "N = N₀ e^(−λt)",
+            "K = hf − φ",
+            "ΔU = Q − W",
+            "η = 1 − Tc / Th"
         };
         static final String[] FNAME = {
             "NEWTON'S SECOND LAW",
@@ -430,7 +450,27 @@ public class Main extends Activity {
             "SPRING ENERGY",
             "ANGULAR FREQUENCY",
             "SPRING PERIOD",
-            "FRICTION"
+            "FRICTION",
+            "FARADAY'S LAW",
+            "STEFAN-BOLTZMANN LAW",
+            "WIEN'S LAW",
+            "STOKES DRAG",
+            "BERNOULLI'S PRINCIPLE",
+            "CONTINUITY",
+            "ORBITAL SPEED",
+            "ESCAPE VELOCITY",
+            "KEPLER'S THIRD LAW",
+            "GRAVITY FIELD",
+            "ELECTRIC FIELD",
+            "RESISTANCE OF A WIRE",
+            "RESISTORS IN SERIES",
+            "RC TIME CONSTANT",
+            "LORENTZ FACTOR",
+            "TIME DILATION",
+            "RADIOACTIVE DECAY",
+            "PHOTOELECTRIC EFFECT",
+            "FIRST LAW OF THERMODYNAMICS",
+            "CARNOT EFFICIENCY"
         };
         static final String[] FDESC = {
             "PUSH HARDER AND A THING SPEEDS UP MORE. HEAVIER THINGS SPEED UP LESS.",
@@ -472,7 +512,27 @@ public class Main extends Activity {
             "A STRETCHED OR SQUASHED SPRING STORES ENERGY. DOUBLE THE STRETCH, FOUR TIMES THE ENERGY.",
             "HOW FAST SOMETHING TURNS IN RADIANS EACH SECOND. ONE FULL TURN IS TWO PI RADIANS.",
             "A WEIGHT ON A SPRING BOUNCES SLOWER IF IT IS HEAVIER OR THE SPRING IS SOFTER.",
-            "SLIDING FRICTION PUSHES BACK IN PROPORTION TO HOW HARD THE SURFACES PRESS TOGETHER."
+            "SLIDING FRICTION PUSHES BACK IN PROPORTION TO HOW HARD THE SURFACES PRESS TOGETHER.",
+            "A CHANGING MAGNETIC FIELD THROUGH A COIL PUSHES A VOLTAGE ALONG IT. THIS IS HOW GENERATORS WORK.",
+            "HOT THINGS GLOW. DOUBLE THE TEMPERATURE AND THEY RADIATE SIXTEEN TIMES THE POWER.",
+            "THE HOTTER A THING IS, THE BLUER ITS GLOW. RED HOT IS COOLER THAN WHITE HOT.",
+            "A SMALL BALL SINKING SLOWLY THROUGH HONEY FEELS A DRAG THAT GROWS WITH ITS SPEED.",
+            "FASTER MOVING FLUID HAS LOWER PRESSURE. THAT IS PART OF HOW A WING GETS LIFT.",
+            "WATER SPEEDS UP WHEN A PIPE NARROWS, BECAUSE THE SAME AMOUNT MUST GET THROUGH EVERY SECOND.",
+            "MOVE SIDEWAYS FAST ENOUGH AND YOU KEEP MISSING THE GROUND. THAT IS AN ORBIT.",
+            "THE SPEED YOU NEED TO LEAVE A PLANET AND NEVER FALL BACK.",
+            "PLANETS FAR FROM THE SUN TAKE MUCH LONGER TO GO ROUND IT.",
+            "HOW STRONGLY A PLANET PULLS, AT A GIVEN DISTANCE FROM ITS CENTER.",
+            "A CHARGE FILLS THE SPACE AROUND IT WITH A PUSH OR PULL THAT FADES WITH DISTANCE SQUARED.",
+            "LONG THIN WIRES RESIST CURRENT MORE THAN SHORT THICK ONES.",
+            "PUT RESISTORS ONE AFTER ANOTHER AND THEIR RESISTANCES ADD UP.",
+            "HOW LONG A CAPACITOR TAKES TO CHARGE THROUGH A RESISTOR. BIGGER R OR C MEANS SLOWER.",
+            "NEAR THE SPEED OF LIGHT STRANGE THINGS HAPPEN, AND THIS NUMBER SAYS HOW STRANGE.",
+            "A FAST MOVING CLOCK TICKS MORE SLOWLY THAN ONE THAT STAYS STILL.",
+            "UNSTABLE ATOMS BREAK DOWN AT A STEADY RATE, SO HALF ARE LEFT AFTER EACH HALF LIFE.",
+            "LIGHT KNOCKS ELECTRONS OFF METAL, BUT ONLY IF EACH PACKET HAS ENOUGH ENERGY.",
+            "ENERGY IN A SYSTEM CHANGES BY THE HEAT ADDED MINUS THE WORK IT DOES.",
+            "NO ENGINE CAN BEAT THIS LIMIT. A BIGGER HEAT DIFFERENCE GIVES A BETTER ENGINE."
         };
 
         // ---------- text drawn at screen resolution (the formulas) ----------
