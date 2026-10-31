@@ -525,9 +525,9 @@ public class Main extends Activity {
                 if (cols == null) continue;
                 for (int i = 0; i < IKEYS[t].length; i++) OVR[IKEYS[t][i]] = cols[i];
             }
-            if (female) {                               // red hair
-                OVR['B'] = Color.rgb(170, 48, 32);
-                OVR['b'] = Color.rgb(225, 100, 56);
+            if (female) {                               // copper hair
+                OVR['B'] = Color.rgb(165, 78, 40);
+                OVR['b'] = Color.rgb(215, 125, 70);
             }
         }
 
@@ -1903,27 +1903,87 @@ public class Main extends Activity {
         static final String[][] SPR_RUN = {SPR_HEAD, SPR_HEAD_B, SPR_RUN2, SPR_RUN3};
         static final String[][] MALE = {SPR_HEAD.clone(), SPR_HEAD_B.clone(), SPR_RUN2.clone(), SPR_RUN3.clone()};   // the originals
 
-        /** the female character: longer hair down the back of the head and a softly rounded chest (the hair is recoloured red by pal) */
-        static String[] femalize(String[] m) {
-            char[][] r = new char[m.length][];
-            for (int i = 0; i < m.length; i++) r[i] = m[i].toCharArray();
-            for (int i = 4; i < 10; i++) if (r[i][3] == '.') r[i][3] = 'B';
-            if (r[11][11] == '.') r[11][11] = 'W';
-            if (r[12][11] == '.') r[12][11] = 'W';
-            if (r[13][11] == '.') r[13][11] = 'w';
-            String[] out = new String[m.length];
-            for (int i = 0; i < m.length; i++) out[i] = new String(r[i]);
+        // The two characters. The male has tousled brown hair, browline glasses and a moustache; the female has long
+        // wavy copper hair that falls over her shoulders, lashes, freckles and blush, a gold necklace and a rounded chest.
+        static final String[] HEAD_M = {
+            "......b.bb......",
+            ".....bBbBBbb....",
+            "....bBBBBBBBBb..",
+            "....BBBBBBSSSS..",
+            "....BsSFFFFFFFS.",
+            "....BsFEeFFEeFS.",
+            "....BsFEESSEEFs.",
+            "..P.BsSaBBBBSSS.",
+            "..P.BsaaSeeeSaa.",
+            "..P..saaaaaaaa.."
+        };
+        static final String[] HEAD_M_B = {
+            "......b.bb......",
+            ".....bBbBBbb....",
+            "....bBBBBBBBBb..",
+            "....BBBBBBSSSS..",
+            "....BsSFFFFFFFS.",
+            "....BsFEeFFEeFS.",
+            "....BsFEESSEEFs.",
+            "..P.BsSaBBBBSSS.",
+            "..P.BsaaSeeeSaa.",
+            "..P..saaannaaa.."
+        };
+        static final String[] HEAD_F = {
+            "......bBBBb.....",
+            ".....BBbBBBbb...",
+            "....BBBbBBBBBBb.",
+            "...BBBBBSSSBBBB.",
+            "...BBBsSsSsSsBB.",
+            "...BBBsEEeSEeEBB",
+            "...BBBsSEESEESBB",
+            "...BBBsSpSSpSBB.",
+            "...BBBsSSnnSSBb.",
+            ".BBBB.sSPPSSBb.."
+        };
+        static final String[] HEAD_F_B = {
+            "......bBBBb.....",
+            ".....BBbBBBbb...",
+            "....BBBbBBBBBBb.",
+            "...BBBBBSSSBBBB.",
+            "...BBBsSsSsSsBB.",
+            "...BBBsEEeSEeEBB",
+            "...BBBsSEESEESBB",
+            "...BBBsSpSSpSBB.",
+            "...BBBsSSeeSSBb.",
+            ".BBBB.sSPPSSBb.."
+        };
+
+        /** the torso rows for the female: hair over the back of the shoulder and down the front, a rounded chest */
+        static String[] femaleBody(String[] body) {
+            char[][] r = new char[body.length][];
+            for (int i = 0; i < body.length; i++) r[i] = body[i].toCharArray();
+            for (int i = 0; i < 4; i++) {
+                r[i][4] = 'B';
+                if (r[i][12] == '.') r[i][12] = 'B';
+                if (r[i][13] == '.') r[i][13] = 'B';
+            }
+            r[1][11] = 'W'; r[2][11] = 'W'; r[3][11] = 'w'; r[4][11] = 'w';
+            String[] out = new String[body.length];
+            for (int i = 0; i < body.length; i++) out[i] = new String(r[i]);
             return out;
         }
 
         /** rewrite the shared sprite arrays in place for the chosen character */
         static void applyCharacter(boolean female) {
             for (int k = 0; k < SPR_RUN.length; k++) {
-                String[] src = female ? femalize(MALE[k]) : MALE[k];
-                System.arraycopy(src, 0, SPR_RUN[k], 0, src.length);
+                boolean alt = (k & 1) == 1;      // the second and fourth step have the mouth open
+                String[] head = female ? (alt ? HEAD_F_B : HEAD_F) : (alt ? HEAD_M_B : HEAD_M);
+                String[] body = Arrays.copyOfRange(MALE[k], HEAD_ROWS, MALE[k].length);
+                if (female) body = femaleBody(body);
+                for (int i = 0; i < HEAD_ROWS; i++) SPR_RUN[k][i] = head[i];
+                for (int i = 0; i < body.length; i++) SPR_RUN[k][HEAD_ROWS + i] = body[i];
             }
+            // the vehicle cockpits show just the face, without the hose or the long hair outside the glass
+            for (int i = 0; i < HEAD_ROWS; i++) HEAD_ONLY[i] = ("...." + SPR_HEAD[i].substring(4)).replace('P', '.');
             for (int i = 0; i < SPR_HEAD.length; i++) QUANT[i] = ".." + SPR_HEAD[i] + "..";
         }
+
         static final String[] LEGS_A = {
             ".....DDd.DDd....",
             ".....DDd.DDd....",
@@ -2205,6 +2265,8 @@ public class Main extends Activity {
             int ov = ch < 128 ? OVR[ch] : 0;
             if (ov != 0) return ov;
             switch (ch) {
+                case 'F': return Color.rgb(120, 130, 160);
+                case 'p': return Color.rgb(238, 150, 160);
                 case 'Q': return Color.rgb(80, 220, 130);
                 case 'q': return Color.rgb(230, 90, 200);
                 case 'B': return Color.rgb(80, 50, 30);
