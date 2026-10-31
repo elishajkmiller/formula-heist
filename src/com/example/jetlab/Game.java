@@ -36,7 +36,6 @@ final class Game extends View implements Choreographer.FrameCallback {
     // ---------- constants ----------
 
     static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
-    static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
     static final float GUARD_RUN = 100f;     // how fast the guards run away, in pixels per second
     static final int GUARD = 4;              // Npc mode of the guards
     static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
@@ -935,9 +934,7 @@ final class Game extends View implements Choreographer.FrameCallback {
             }
             for (int j = hazards.size() - 1; j >= 0 && !gone; j--) {
                 Hazard hz = hazards.get(j);
-                if (hz.kind != SAW) continue;
-                float dx = hz.x - b.x, dy = sawY(hz) - b.y;
-                if (dx * dx + dy * dy < 100f) {
+                if (hz.cutBy(this, b.x, b.y)) {
                     hazards.remove(j);
                     for (int k = 0; k < 14; k++) burst(b.x, b.y);
                     sfx(S_HIT);
@@ -1149,8 +1146,8 @@ final class Game extends View implements Choreographer.FrameCallback {
             Hazard hz = hazards.get(i);
             hz.x -= scroll;
             if (hz.x + hz.w < -40) { hazards.remove(i); continue; }
-            if (hz.kind == LASER && hz.x < w + 10) hz.phase += dt;       // the cycle starts when it comes on screen
-            if (state == PLAY && invuln <= 0 && hazardHits(hz, r)) hit();
+            hz.update(this, dt);
+            if (state == PLAY && invuln <= 0 && hz.hits(this, r)) hit();
         }
 
         for (int i = missiles.size() - 1; i >= 0; i--) {
@@ -1336,29 +1333,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     }
 
     /** does the circle touch the square of the given half size (the zapper's end nodes)? */
-    static final float LASER_GAP = 26f;          // half the opening in a laser gate, in pixels
 
-    float sawY(Hazard hz) { return hz.y + (float) Math.sin(clock * 1.6f + hz.phase) * hz.amp; }
-
-    /** the laser beam is deadly for a second after a second of warning, in a cycle of three */
-    boolean laserOn(Hazard hz) { float t = hz.phase % 3f; return t >= 1f && t < 1.9f; }
-
-    boolean laserWarn(Hazard hz) { float t = hz.phase % 3f; return t > 0f && t < 1f; }
-
-    boolean hazardHits(Hazard hz, float r) {
-        switch (hz.kind) {
-            case SPIKE_FLOOR: return circleHitsRect(playerX, y, r, hz.x, floorY - 8, hz.w, 8);
-            case SPIKE_CEIL: return circleHitsRect(playerX, y, r, hz.x, ceilY, hz.w, 8);
-            case SAW: {
-                float dx = hz.x - playerX, dy = sawY(hz) - y, rr = r + 7;
-                return dx * dx + dy * dy < rr * rr;
-            }
-            default:
-                return laserOn(hz) && Math.abs(hz.x - playerX) < r + 2 && Math.abs(y - hz.y) > LASER_GAP - r;
-        }
-    }
-
-    // ---------- spawning ----------
 
     float randY(float loM, float hiM) {
         return (loM + rnd.nextFloat() * (hiM - loM)) * ppm;
@@ -1435,34 +1410,24 @@ final class Game extends View implements Choreographer.FrameCallback {
         spawnLeft = (n * 3.2f + 1.5f) * ppm + gap;
     }
 
-    Hazard addHazard(int kind, float x, float yy, float wd) {
-        Hazard hz = new Hazard();
-        hz.kind = kind; hz.x = x; hz.y = yy; hz.w = wd;
-        hz.phase = rnd.nextFloat() * 6f;
-        hazards.add(hz);
-        return hz;
-    }
-
     /** a row of spikes on the floor or the ceiling; later a pair that leaves a corridor to fly through */
     void spawnSpikes(float x0, float gap) {
         float wd = (3f + rnd.nextFloat() * 3f) * ppm;
         int mode = rnd.nextInt(dist > 150 ? 3 : 2);          // 0 floor, 1 ceiling, 2 both
-        if (mode != 1) addHazard(SPIKE_FLOOR, x0, floorY, wd);
-        if (mode != 0) addHazard(SPIKE_CEIL, x0, ceilY, wd);
+        if (mode != 1) hazards.add(new Spikes(true, x0, floorY, wd));
+        if (mode != 0) hazards.add(new Spikes(false, x0, ceilY, wd));
         spawnLeft = wd + 1.5f * ppm + gap;
     }
 
     /** a saw blade sliding up and down a rail */
     void spawnSaw(float x0, float gap) {
-        Hazard hz = addHazard(SAW, x0 + 24, randY(3.6f, 5.6f), 0);
-        hz.amp = (1.4f + rnd.nextFloat() * 1.1f) * ppm;
+        hazards.add(new Saw(x0 + 24, randY(3.6f, 5.6f), (1.4f + rnd.nextFloat() * 1.1f) * ppm, rnd.nextFloat() * 6f));
         spawnLeft = 4f * ppm + gap;
     }
 
     /** a laser gate: red warning, then a full beam top to bottom with one gap to fly through */
     void spawnLaser(float x0, float gap) {
-        Hazard hz = addHazard(LASER, x0 + 20, randY(3.2f, 6.0f), 0);   // y is the middle of the gap
-        hz.phase = 0;
+        hazards.add(new Laser(x0 + 20, randY(3.2f, 6.0f)));
         spawnLeft = 4.5f * ppm + gap;
     }
 
@@ -2071,81 +2036,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     void drawHazards(Canvas c) {
         for (Hazard hz : hazards) {
             if (hz.x > w + 40 || hz.x + hz.w < -40) continue;
-            switch (hz.kind) {
-                case SPIKE_FLOOR: drawSpikes(c, hz, true); break;
-                case SPIKE_CEIL: drawSpikes(c, hz, false); break;
-                case SAW: drawSaw(c, hz); break;
-                default: drawLaser(c, hz); break;
-            }
-        }
-    }
-
-    /** a metal strip with a row of steel spikes pointing into the room */
-    void drawSpikes(Canvas c, Hazard hz, boolean floor) {
-        int x0 = Math.round(hz.x), wd = Math.round(hz.w);
-        int base = Math.round(floor ? floorY : ceilY);
-        rectPx(c, x0, floor ? base - 2 : base, wd, 2, Color.rgb(70, 76, 94));
-        for (int x = x0; x + 6 <= x0 + wd; x += 6) {
-            for (int row = 0; row < 8; row++) {
-                int half = 3 - row * 3 / 8;                         // the spike narrows to a point
-                int y = floor ? base - 3 - row : base + 2 + row;
-                rectPx(c, x + 3 - half, y, half * 2, 1, row < 3 ? Color.rgb(205, 212, 228) : Color.rgb(160, 170, 190));
-                rectPx(c, x + 3 - half, y, 1, 1, Color.rgb(8, 10, 22));
-                rectPx(c, x + 2 + half, y, 1, 1, Color.rgb(8, 10, 22));
-            }
-            rectPx(c, x + 2, floor ? base - 11 : base + 10, 2, 1, Color.rgb(8, 10, 22));
-        }
-    }
-
-    void drawSaw(Canvas c, Hazard hz) {
-        float cy = sawY(hz);
-        int cx = Math.round(hz.x);
-        // the rail it slides on
-        rectPx(c, cx - 1, hz.y - hz.amp - 6, 2, hz.amp * 2 + 12, Color.rgb(50, 56, 76));
-        rectPx(c, cx - 3, hz.y - hz.amp - 7, 6, 2, Color.rgb(90, 98, 124));
-        rectPx(c, cx - 3, hz.y + hz.amp + 5, 6, 2, Color.rgb(90, 98, 124));
-        // the blade: sixteen teeth turning
-        float a0 = clock * 9f;
-        path.reset();
-        for (int i = 0; i < 16; i++) {
-            float a = a0 + i * (float) Math.PI / 8f, rr = (i & 1) == 0 ? 9f : 6f;
-            float px0 = cx + (float) Math.cos(a) * rr, py0 = cy + (float) Math.sin(a) * rr;
-            if (i == 0) path.moveTo(Math.round(px0), Math.round(py0)); else path.lineTo(Math.round(px0), Math.round(py0));
-        }
-        path.close();
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(Color.rgb(8, 10, 22));
-        c.save(); c.scale(1.18f, 1.18f, cx, cy); c.drawPath(path, p); c.restore();
-        p.setColor(Color.rgb(196, 204, 222));
-        c.drawPath(path, p);
-        p.setColor(Color.rgb(120, 130, 156));
-        c.drawCircle(cx, cy, 4, p);
-        p.setColor(Color.rgb(60, 66, 88));
-        c.drawCircle(cx, cy, 2, p);
-    }
-
-    void drawLaser(Canvas c, Hazard hz) {
-        int x = Math.round(hz.x), ty = Math.round(ceilY), by = Math.round(floorY);
-        int g0 = Math.round(hz.y - LASER_GAP), g1 = Math.round(hz.y + LASER_GAP);
-        boolean on = laserOn(hz), warn = laserWarn(hz);
-        // the emitters at both ends of the gate and around the gap
-        for (int yy : new int[] {ty, g0 - 2, g1, by - 5}) {
-            rectPx(c, x - 4, yy, 8, 5, Color.rgb(8, 10, 22));
-            rectPx(c, x - 3, yy + 1, 6, 3, Color.rgb(96, 104, 130));
-            rectPx(c, x - 1, yy + 2, 2, 1, on ? Color.rgb(255, 80, 70) : Color.rgb(80, 40, 50));
-        }
-        if (on) {
-            int[][] spans = {{ty + 5, g0 - 2}, {g1 + 5, by - 5}};
-            for (int[] sp : spans) {
-                rectPx(c, x - 3, sp[0], 7, sp[1] - sp[0], Color.argb(70, 255, 70, 60));
-                rectPx(c, x - 1, sp[0], 3, sp[1] - sp[0], Color.rgb(255, 90, 80));
-                rectPx(c, x, sp[0], 1, sp[1] - sp[0], Color.WHITE);
-            }
-        } else if (warn && ((int) (clock * 10) & 1) == 0) {
-            for (int yy = ty + 6; yy < by - 5; yy += 4) {
-                if (yy > g0 - 2 && yy < g1 + 5) continue;
-                rectPx(c, x, yy, 1, 2, Color.rgb(255, 120, 110));
-            }
+            hz.draw(this, c);
         }
     }
 

@@ -25,12 +25,6 @@ final class Bolt { float x, y; int kind; }
 
 final class Crate { float x, y; int type; }
 
-/** floor or ceiling spikes, a moving saw blade, or a laser gate with a gap and a warning */
-final class Hazard {
-    int kind;
-    float x, y, w, phase, amp;
-}
-
 final class Zapper {
     float x, y, len, angle, spin;
     /** half the bar's extent along each axis */
