@@ -72,6 +72,7 @@ public class Main extends Activity {
         static final float GRAVITY = 15f;       // m/s^2, game gravity (Earth is 9.8)
         static final float THRUST = 31f;        // m/s^2 from the pack, net 16 up
         static final float VFALL = 10f;         // m/s, falling top speed
+        static final float JUMP = 7f;           // m/s, jump off the floor
         static final float VMAX = 7f;           // m/s, "terminal" speed up or down
 
         static final String[] SYM = {"H", "He", "Li", "C", "N", "O", "Ne", "Na", "Si", "Fe", "Cu", "Ag", "Au", "U"};
@@ -110,7 +111,7 @@ public class Main extends Activity {
 
         int state = START;
         boolean thrusting, onFloor, running;
-        float y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
+        float jumpDelay, y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
         int electrons, best;
         String fact = FACTS[0];
         long lastNanos;
@@ -164,6 +165,7 @@ public class Main extends Activity {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     if (state == START || (state == DEAD && stateTime > 0.7f)) reset();
+                    if (state == PLAY && onFloor) { vy = -JUMP; jumpDelay = 0.22f; onFloor = false; }
                     thrusting = true;
                     break;
                 case MotionEvent.ACTION_UP:
@@ -193,7 +195,8 @@ public class Main extends Activity {
             float r = 0.3f * ppm;
 
             // vertical motion: gravity down, thrust up, speed limited
-            boolean fire = thrusting && state == PLAY;
+            if (jumpDelay > 0) jumpDelay -= dt;
+            boolean fire = thrusting && state == PLAY && jumpDelay <= 0;
             ay = GRAVITY - (fire ? THRUST : 0);
             vy += ay * dt;
             if (vy > VFALL) vy = VFALL;
@@ -613,7 +616,7 @@ public class Main extends Activity {
         void drawPlayer(Canvas c) {
             if (state == DEAD && stateTime < 0.2f) return;
             int left = Math.round(playerX) - 6, top = Math.round(y) - 11;
-            if (thrusting && state == PLAY) {
+            if (thrusting && state == PLAY && jumpDelay <= 0) {
                 int fl = 4 + rnd.nextInt(5);
                 rectPx(c, left + 1, top + 14, 3, fl, Color.rgb(255, 170, 40));
                 rectPx(c, left + 2, top + 14, 1, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
@@ -637,7 +640,7 @@ public class Main extends Activity {
 
         void drawTitle(Canvas c) {
             text(c, "THRUST LAB", w / 2f, h * 0.26f, 4, Color.WHITE, 1);
-            text(c, "HOLD TO FIRE THE JETPACK, LET GO TO FALL", w / 2f, h * 0.26f + 30, 1, Color.rgb(120, 235, 255), 1);
+            text(c, "TAP TO JUMP, THEN HOLD IN THE AIR TO FIRE THE JETPACK", w / 2f, h * 0.26f + 30, 1, Color.rgb(120, 235, 255), 1);
             if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO START", w / 2f, h * 0.26f + 44, 1, Color.rgb(255, 200, 80), 1);
         }
 
