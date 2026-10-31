@@ -497,7 +497,7 @@ public class Main extends Activity {
         int abx, aby, abw, abh, cbx, cby, cbw, cbh, scx, scy, scw, sch;   // buttons and the big card
 
         // settings
-        boolean hapticsOn = true, soundOn = true, musicOn = true, confirmReset;
+        boolean hapticsOn = true, soundOn = true, musicOn = true, confirmReset, female;
         int settingsFrom, gbx, gby, gbw, gbh;        // the settings button on the title and death screens
 
         // sound and haptics
@@ -525,6 +525,10 @@ public class Main extends Activity {
                 if (cols == null) continue;
                 for (int i = 0; i < IKEYS[t].length; i++) OVR[IKEYS[t][i]] = cols[i];
             }
+            if (female) {                               // red hair
+                OVR['B'] = Color.rgb(170, 48, 32);
+                OVR['b'] = Color.rgb(225, 100, 56);
+            }
         }
 
         Game(Context c) {
@@ -544,6 +548,8 @@ public class Main extends Activity {
             hapticsOn = prefs.getBoolean("haptics", true);
             soundOn = prefs.getBoolean("sound", true);
             musicOn = prefs.getBoolean("music", true);
+            female = prefs.getBoolean("female", false);
+            applyCharacter(female);
             if (prefs.contains("inv0")) {
                 for (int t = 0; t < 3; t++) { inv[t] = prefs.getInt("inv" + t, 1) | 1; worn[t] = prefs.getInt("worn" + t, 0); }
             } else {                                    // earlier whole outfits become shirts
@@ -788,7 +794,7 @@ public class Main extends Activity {
         }
 
         /** rows of the settings screen: x, y, width, height */
-        int[] settingsRow(int i) { return new int[] {w / 2 - 90, 28 + i * 24, 180, 20}; }
+        int[] settingsRow(int i) { return new int[] {w / 2 - 90, 22 + i * 21, 180, 18}; }
 
         int[] confirmButton(int i) { return new int[] {w / 2 - 78 + i * 82, 92, 74, 16}; }   // 0 yes, 1 no
 
@@ -805,14 +811,15 @@ public class Main extends Activity {
                 return;
             }
             if (closeHit(gx, gy)) { state = settingsFrom; return; }
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 5; i++) {
                 int[] r = settingsRow(i);
                 if (gx < r[0] || gx >= r[0] + r[2] || gy < r[1] || gy >= r[1] + r[3]) continue;
-                if (i == 0) { hapticsOn = !hapticsOn; buzz(30); }
-                else if (i == 1) { soundOn = !soundOn; sfx(S_COIN); }
-                else if (i == 2) { musicOn = !musicOn; if (sfx != null) sfx.setMusic(musicOn); }
+                if (i == 0) { female = !female; applyCharacter(female); applyOutfit(); sfx(S_COIN); }
+                else if (i == 1) { hapticsOn = !hapticsOn; buzz(30); }
+                else if (i == 2) { soundOn = !soundOn; sfx(S_COIN); }
+                else if (i == 3) { musicOn = !musicOn; if (sfx != null) sfx.setMusic(musicOn); }
                 else { confirmReset = true; return; }
-                prefs.edit().putBoolean("haptics", hapticsOn).putBoolean("sound", soundOn).putBoolean("music", musicOn).apply();
+                prefs.edit().putBoolean("haptics", hapticsOn).putBoolean("sound", soundOn).putBoolean("music", musicOn).putBoolean("female", female).apply();
                 return;
             }
         }
@@ -832,18 +839,22 @@ public class Main extends Activity {
             for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
             text(c, "SETTINGS", 8, 5, 1, Color.rgb(255, 215, 120), 0);
             closeButton(c);
-            String[] names = {"HAPTICS", "SOUNDS", "MUSIC", "RESET PROGRESS"};
-            boolean[] on = {hapticsOn, soundOn, musicOn, false};
-            for (int i = 0; i < 4; i++) {
+            String[] names = {"CHARACTER", "HAPTICS", "SOUNDS", "MUSIC", "RESET PROGRESS"};
+            boolean[] on = {true, hapticsOn, soundOn, musicOn, false};
+            for (int i = 0; i < 5; i++) {
                 int[] r = settingsRow(i);
-                boolean reset = i == 3;
+                boolean reset = i == 4;
                 rectPx(c, r[0], r[1], r[2], r[3], Color.rgb(8, 10, 20));
                 rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, reset ? Color.rgb(90, 36, 40) : Color.rgb(34, 42, 66));
-                text(c, names[i], r[0] + 8, r[1] + 7, 1, Color.WHITE, 0);
-                if (!reset) {
+                text(c, names[i], r[0] + 8, r[1] + 6, 1, Color.WHITE, 0);
+                if (i == 0) {
+                    rectPx(c, r[0] + r[2] - 50, r[1] + 3, 44, r[3] - 6, Color.rgb(8, 10, 20));
+                    rectPx(c, r[0] + r[2] - 49, r[1] + 4, 42, r[3] - 8, female ? Color.rgb(160, 60, 70) : Color.rgb(60, 90, 160));
+                    text(c, female ? "FEMALE" : "MALE", r[0] + r[2] - 28, r[1] + 6, 1, Color.WHITE, 1);
+                } else if (!reset) {
                     rectPx(c, r[0] + r[2] - 38, r[1] + 3, 32, r[3] - 6, Color.rgb(8, 10, 20));
                     rectPx(c, r[0] + r[2] - 37, r[1] + 4, 30, r[3] - 8, on[i] ? Color.rgb(50, 150, 90) : Color.rgb(120, 50, 50));
-                    text(c, on[i] ? "ON" : "OFF", r[0] + r[2] - 22, r[1] + 7, 1, Color.WHITE, 1);
+                    text(c, on[i] ? "ON" : "OFF", r[0] + r[2] - 22, r[1] + 6, 1, Color.WHITE, 1);
                 }
             }
             if (confirmReset) {
@@ -1890,6 +1901,29 @@ public class Main extends Activity {
         };
         /** upper body per run phase: same outline, shading and tie shift so the torso seems to turn */
         static final String[][] SPR_RUN = {SPR_HEAD, SPR_HEAD_B, SPR_RUN2, SPR_RUN3};
+        static final String[][] MALE = {SPR_HEAD.clone(), SPR_HEAD_B.clone(), SPR_RUN2.clone(), SPR_RUN3.clone()};   // the originals
+
+        /** the female character: longer hair down the back of the head and a softly rounded chest (the hair is recoloured red by pal) */
+        static String[] femalize(String[] m) {
+            char[][] r = new char[m.length][];
+            for (int i = 0; i < m.length; i++) r[i] = m[i].toCharArray();
+            for (int i = 4; i < 10; i++) if (r[i][3] == '.') r[i][3] = 'B';
+            if (r[11][11] == '.') r[11][11] = 'W';
+            if (r[12][11] == '.') r[12][11] = 'W';
+            if (r[13][11] == '.') r[13][11] = 'w';
+            String[] out = new String[m.length];
+            for (int i = 0; i < m.length; i++) out[i] = new String(r[i]);
+            return out;
+        }
+
+        /** rewrite the shared sprite arrays in place for the chosen character */
+        static void applyCharacter(boolean female) {
+            for (int k = 0; k < SPR_RUN.length; k++) {
+                String[] src = female ? femalize(MALE[k]) : MALE[k];
+                System.arraycopy(src, 0, SPR_RUN[k], 0, src.length);
+            }
+            for (int i = 0; i < SPR_HEAD.length; i++) QUANT[i] = ".." + SPR_HEAD[i] + "..";
+        }
         static final String[] LEGS_A = {
             ".....DDd.DDd....",
             ".....DDd.DDd....",

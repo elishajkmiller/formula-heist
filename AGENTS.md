@@ -34,3 +34,6 @@ A fourth crate vehicle (HELIX): hold to rise (light gravity 14, thrust 30), rele
 
 ## Settings
 The SETTINGS button (bottom centre on the title and death screens) opens: haptics, sounds, music (a looping chiptune synthesized in Sfx.song(), no audio file), and RESET PROGRESS behind an "ARE YOU SURE?" pop-up (erases formulas, tickets, clothes, electrons and best distance; settings stay). Choices are saved in prefs ("haptics", "sound", "music").
+
+## Characters
+Settings has a CHARACTER row: MALE or FEMALE. The female sprite is made in place from the male one (femalize/applyCharacter rewrite the shared SPR_RUN arrays and the Quantum figure): longer hair down the back and a softly rounded chest, and pal() turns the hair letters B and b red through OVR. The choice is saved in prefs ("female") and survives a progress reset.
