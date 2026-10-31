@@ -66,7 +66,18 @@ public class Main extends Activity {
     static class Coin { float x, y; boolean taken; }
 
     /** a background scientist who watches the player and points */
-    static class Npc { float x, phase, pointT, nextPoint, walk; int coat, hair, mode, face; }
+    /**
+     * A background scientist. mode: 0 stands alone, 1 walks left, 2 walks right, 3 stands in a group,
+     * 4 is one of the NULLCORP guards who stand behind you at the start and chase you at the wall.
+     */
+    static class Npc {
+        float x, phase, pointT, nextPoint, walk;
+        int coat, hair, mode, face;
+        // guards only: running, then tumbling when you smash through the wall
+        boolean running, falling, settled;
+        float fy, fvy, ang, angV, vw;      // height above the floor and its speed (pixels), spin, speed along the ground
+        int bounces;
+    }
 
     /** a stolen formula, rolled up */
     static class Scroll { float x, y; }
@@ -264,6 +275,7 @@ public class Main extends Activity {
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
         static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
+        static final int GUARD = 4;              // Npc mode of the guards
         static final int NF = 20;                // formulas to recover
         static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
@@ -617,10 +629,32 @@ public class Main extends Activity {
 
         void populateNpcs() {
             npcs.clear();
-            for (float nx = 30; nx < w + 20; nx += 70 + rnd.nextInt(80)) addSpawn(nx);
+            for (float nx = 100; nx < w + 20; nx += 70 + rnd.nextInt(80)) addSpawn(nx);
+            for (int i = 0; i < 4; i++) addNpc(12 + i * 13, GUARD, 1);       // the guards, standing together behind you
         }
 
         /** mode: 0 stands alone, 1 walks left, 2 walks right, 3 stands in a group */
+        /** guards stand and shout, run when you run, and tumble like your character when you break through */
+        void stepGuard(Npc n, float dt) {
+            if (n.pointT > 0) n.pointT -= dt;
+            else if ((n.nextPoint -= dt) <= 0) { n.pointT = 0.8f + rnd.nextFloat() * 1.2f; n.nextPoint = 1.5f + rnd.nextFloat() * 4f; }
+            if (state == PLAY && breaking && !n.falling) n.running = true;
+            if (!n.falling) return;
+            n.fvy -= GRAVITY * ppm * dt;
+            n.fy += n.fvy * dt;
+            if (n.fy <= 0) {
+                n.fy = 0;
+                if (n.fvy < -70f && n.bounces < 2) { n.fvy = -n.fvy * 0.5f; n.bounces++; n.angV *= 0.6f; }
+                else { n.fvy = 0; n.settled = true; }
+            }
+            if (!n.settled) n.ang += n.angV * dt;
+            else n.ang += (90f + 360f * Math.round((n.ang - 90f) / 360f) - n.ang) * Math.min(1f, 10f * dt);   // face down
+            // they were running with the world; friction slows them while the world keeps going, so they get dragged back
+            n.vw *= Math.max(0f, 1f - (n.settled ? 4f : 0.3f) * dt);
+            n.x += (n.vw - speed * ppm) * dt;
+            if (n.settled && speed > 0.3f && rnd.nextInt(3) == 0) dust(n.x, floorY - 1);
+        }
+
         Npc addNpc(float nx, int mode, int face) {
             Npc n = new Npc();
             n.x = nx; n.phase = rnd.nextFloat() * 6f;
@@ -738,6 +772,13 @@ public class Main extends Activity {
             sfx(S_HIT);
             buzz(50);
             for (int i = 0; i < 40; i++) debris(playerX + 8, y);
+            for (Npc n : npcs) {                          // the guards behind you are thrown off their feet
+                if (n.mode != GUARD || n.falling) continue;
+                n.falling = true; n.running = false;
+                n.fvy = 60f + rnd.nextFloat() * 70f;
+                n.angV = 420f + rnd.nextFloat() * 260f;
+                n.vw = speed * ppm * 0.95f;
+            }
         }
 
         /** a random formula; ones you do not have yet are three times as likely, so repeats are possible but rarer */
@@ -1417,6 +1458,11 @@ public class Main extends Activity {
             if (npcLeft <= 0) { addSpawn(w + 10); npcLeft = 60 + rnd.nextInt(110); }
             for (int i = npcs.size() - 1; i >= 0; i--) {
                 Npc n = npcs.get(i);
+                if (n.mode == GUARD) {
+                    stepGuard(n, rdt);
+                    if (n.x < -30) npcs.remove(i);
+                    continue;
+                }
                 n.x += (waiting ? 0f : n.walk * rdt) - nsc;
                 if (n.pointT > 0) n.pointT -= rdt;
                 else if ((n.nextPoint -= rdt) <= 0) { n.pointT = 0.8f + rnd.nextFloat() * 1.2f; n.nextPoint = 2f + rnd.nextFloat() * 7f; }
@@ -2621,6 +2667,7 @@ public class Main extends Activity {
             drawNpcs(c);
             rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb(95, 6, 10, 24));   // push the whole backdrop back
             drawExterior(c);
+            drawGuards(c);
             drawCoins(c);
             drawCrates(c);
             drawScrolls(c);
@@ -2971,9 +3018,51 @@ public class Main extends Activity {
             }
         }
 
+        /** a NULLCORP guard in a red coat: shouts and points at the start, runs in step with you, then tumbles and slides */
+        void drawGuard(Canvas c, Npc n) {
+            int nx = Math.round(n.x), base = Math.round(floorY - n.fy);
+            boolean run = n.running && !n.falling;
+            boolean point = n.pointT > 0 && !run && !n.falling;
+            int wp = ((int) (clock * 12 + n.phase)) & 3;
+            int[] swing = {0, 2, 0, -2};
+            int sw = run ? swing[wp] : 0;
+            int coat = Color.rgb(200, 60, 64), shade = Color.rgb(140, 36, 44), skin = Color.rgb(240, 200, 160);
+            if (n.fy < 1f && !n.falling) rectPx(c, nx - 4, floorY - 1, 8, 1, Color.argb(70, 0, 0, 0));
+            c.save();
+            if (n.falling) c.rotate(n.ang, nx, base - 8);
+            if (run) base -= (wp & 1);                                     // a bounce in the stride
+            rectPx(c, nx - 2 + sw, base - 4, 2, 4, Color.rgb(40, 40, 52));
+            rectPx(c, nx - sw, base - 4, 2, 4, Color.rgb(40, 40, 52));
+            rectPx(c, nx - 2 + sw, base - 1, 2, 1, Color.rgb(20, 20, 28));
+            rectPx(c, nx - sw, base - 1, 2, 1, Color.rgb(20, 20, 28));
+            rectPx(c, nx - 3, base - 10, 6, 6, coat);
+            rectPx(c, nx - 3, base - 10, 1, 6, shade);
+            rectPx(c, nx - 2, base - 15, 5, 5, skin);
+            rectPx(c, nx - 2, base - 15, 5, 2, HAIRS[n.hair]);
+            rectPx(c, nx, base - 13, 1, 1, Color.rgb(20, 20, 30));          // an angry eye and brow
+            rectPx(c, nx + 2, base - 13, 1, 1, Color.rgb(20, 20, 30));
+            rectPx(c, nx, base - 14, 2, 1, Color.rgb(60, 36, 30));
+            if (point || run || n.falling) rectPx(c, nx + 1, base - 12, 2, 1, Color.rgb(90, 40, 40));   // shouting
+            if (point) {
+                rectPx(c, nx + 2, base - 9, 4, 2, coat);                    // an arm pointing at the runner
+                rectPx(c, nx + 6, base - 9, 2, 2, skin);
+            } else if (run) {
+                rectPx(c, nx + 2 - sw, base - 9, 1, 4, shade);              // swinging arms
+                rectPx(c, nx - 3 + sw, base - 9, 1, 4, shade);
+            } else {
+                rectPx(c, nx - 3, base - 9, 1, 4, shade);
+            }
+            c.restore();
+        }
+
+        void drawGuards(Canvas c) {
+            for (Npc n : npcs) if (n.mode == GUARD) drawGuard(c, n);
+        }
+
         void drawNpcs(Canvas c) {
             int[] swing = {0, 1, 0, -1};
             for (Npc n : npcs) {
+                if (n.mode == GUARD) continue;               // drawn in front of the yard, see drawGuards
                 int nx = Math.round(n.x);
                 boolean walking = (n.mode == 1 || n.mode == 2) && state != START;      // before you start, everyone stands still
                 boolean pointing = n.pointT > 0 && !walking;
