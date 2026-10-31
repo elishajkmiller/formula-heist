@@ -374,29 +374,32 @@ public class Main extends Activity {
         };
 
         static final String[] SPR_HEAD = {
-            "....BBBBB...",
-            "...BBBBBBB..",
-            "...GGGGGCC..",
-            "...SSSSSSS..",
-            "....SSSSS...",
-            ".....SSS....",
-            ".OOOWWWWWW..",
-            ".OoOWWWWWw..",
-            ".OoOWWWWWww.",
-            ".OOOWWWWWww.",
-            ".OOOWWWWWSw.",
-            ".OoOWWWWWw..",
-            ".NNNWWWWWw..",
-            "..N.wwwwww.."
+            ".......BBBBB....",
+            "......BBBBBBB...",
+            "......BGGGGGCC..",
+            "......SSSSSSSS..",
+            ".......SSSSSs...",
+            "........SSSS....",
+            ".OOOOWWWWWWWW...",
+            ".OoooWWWWWWWw...",
+            ".OoooWWWWWWwws..",
+            ".OoooWWWWWWwws..",
+            ".OOOOWWWWWWWw...",
+            ".OoooWWWWWWWw...",
+            ".NNNNWWWWWWWw...",
+            "..NN.wwwwwwww..."
         };
         static final String[] LEGS_A = {
-            "....DD.DD...", "....DD.DD...", "....DD.DD...", "....DD.DD...", "....DD.DD...", "....KK.KK...", "...KKK.KKK.."
+            "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...",
+            "....KKKK.KKKKK..", "...KKKKK.KKKKKK."
         };
         static final String[] LEGS_B = {
-            "....DDDD....", "...DD..DD...", "..DD....DD..", "..DD....DD..", "..DD....DD..", "..KK....KK..", ".KKK....KKK."
+            "....DDDDDDDD....", "...DDD....DDD...", "..DDD......DDD..", "..DDD......DDD..", "..DDD......DDD..",
+            "..KKKK.....KKKK.", ".KKKKK.....KKKKK"
         };
         static final String[] LEGS_AIR = {
-            "....DD.DD...", "...DD..DD...", "..DD...DD...", ".DD....DD...", ".KK....KK...", "............", "............"
+            "....DDDD.DDDD...", "...DDD...DDDD...", "..DDD....DDDD...", ".DDD.....DDDD...", ".KKK.....KKKK...",
+            "................", "................"
         };
 
         void rectPx(Canvas c, float x, float yy, float rw, float rh, int col) {
@@ -615,11 +618,11 @@ public class Main extends Activity {
 
         void drawPlayer(Canvas c) {
             if (state == DEAD && stateTime < 0.2f) return;
-            int left = Math.round(playerX) - 6, top = Math.round(y) - 11;
+            int left = Math.round(playerX) - 8, top = Math.round(y) - 11;
             if (thrusting && state == PLAY && jumpDelay <= 0) {
                 int fl = 4 + rnd.nextInt(5);
-                rectPx(c, left + 1, top + 14, 3, fl, Color.rgb(255, 170, 40));
-                rectPx(c, left + 2, top + 14, 1, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
+                rectPx(c, left + 1, top + 14, 4, fl, Color.rgb(255, 170, 40));
+                rectPx(c, left + 2, top + 14, 2, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
             }
             sprite(c, SPR_HEAD, left, top);
             String[] legs = !onFloor ? LEGS_AIR : (((int) (runPhase * 2) & 1) == 0 ? LEGS_A : LEGS_B);
