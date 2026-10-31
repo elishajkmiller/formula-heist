@@ -178,7 +178,7 @@ public class Main extends Activity {
     /** One game view: physics, drawing and input in one place. */
     static class Game extends View implements Choreographer.FrameCallback {
 
-        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, BREAKIN = 4, ARCHIVE = 5, SCRATCH = 6;
+        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5;
         static final int NF = 20;           // formulas to recover
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
         static final float BUILD_TIME = 1.5f;
@@ -296,9 +296,10 @@ public class Main extends Activity {
             "TO GO IN A CIRCLE YOU MUST ACCELERATE TOWARD THE CENTER."
         };
         /** text drawn at screen resolution on top of the pixel picture */
-        static class Ov { String t; float x, y, size; int col; boolean clip; }
+        static class Ov { String t; float x, y, size, maxW; int col, align; boolean clip, ui, shadow; }
         final ArrayList<Ov> ovs = new ArrayList<>();
         final Paint ovp = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final Paint uip = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Path clipPath = new Path();
 
         void ov(String t, float gx, float gy, float gsize, int col, boolean clip) {
@@ -345,7 +346,7 @@ public class Main extends Activity {
         Sfx sfx;
         boolean ghost, outline;
         float leanPx, landT, ang, angV, settleT, finalDist;
-        boolean dragging;
+        boolean dragging, breaking;      // breaking: still outside, running at the wall
         float bonus, launchT, tipT, outX, holeY;
         boolean holeOpen;
         int bounces;
@@ -366,6 +367,7 @@ public class Main extends Activity {
             blit.setFilterBitmap(false);
             ovp.setTypeface(Typeface.create(Typeface.SERIF, Typeface.ITALIC));
             ovp.setTextAlign(Paint.Align.CENTER);
+            uip.setTypeface(Typeface.DEFAULT_BOLD);
         }
 
         void start() {
@@ -451,7 +453,8 @@ public class Main extends Activity {
             y = floorY - SH_BOT; vy = 0; dist = 0; spawnLeft = w * 0.6f; speed = 0;
             dragging = false; bonus = 0; launchT = 0; tipT = 0; onFloor = true;
             populateNpcs();
-            if (!keepState) state = BREAKIN;
+            breaking = false;
+            if (!keepState) { state = PLAY; breaking = true; tipT = 4f; }
             stateTime = 0;
         }
 
@@ -482,7 +485,7 @@ public class Main extends Activity {
                     if (archiveButtonHit(gx, gy)) {
                         archFrom = state; state = ARCHIVE; dragging = false; thrusting = false;
                     } else if (state == START) {
-                        state = BREAKIN; stateTime = 0;
+                        state = PLAY; breaking = true; stateTime = 0; tipT = 4f;
                     } else if (state == ARCHIVE) {
                         archiveTap(gx, gy);
                     } else if (state == SCRATCH) {
@@ -506,27 +509,10 @@ public class Main extends Activity {
             return true;
         }
 
-        /** he sprints across the grass and shoulders through the wall */
-        void updateBreakin(float dt) {
-            speed = Math.min(11f, 2f + stateTime * 9f);
-            float sc = speed * ppm * dt;
-            outX -= sc; bgOff += sc * 0.25f;
-            runPhase += dt * 11f;
-            y = floorY - SH_BOT; vy = 0; onFloor = true;
-            if (rnd.nextInt(3) == 0) dust(playerX - 4, floorY - 1);
-            for (int i = 0; i < NP; i++) {
-                if (pl[i] > 0) {
-                    pl[i] -= dt;
-                    px[i] += pvx[i] * dt; py[i] += pvy[i] * dt;
-                }
-            }
-            if (outX <= playerX + 8f) breach();
-        }
-
-        /** he hit the wall: bricks fly, a hole opens and the run begins inside */
+        /** he hit the wall at whatever height he was: bricks fly, a hole opens and the run goes on inside */
         void breach() {
             holeOpen = true; holeY = y;
-            state = PLAY; stateTime = 0;
+            breaking = false; stateTime = 0; spawnLeft = w * 0.8f;
             bonus = Math.max(0f, speed - 5f);
             launchT = 0f; tipT = 3f; invuln = 0.8f;
             hitstop = 0.08f; shake = 7f; flash = 0.15f;
@@ -664,15 +650,112 @@ public class Main extends Activity {
             text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, abx + abw / 2f, aby + 3, 1, Color.WHITE, 1);
         }
 
-        void silver(Canvas c, int x, int y, int cw, int chh) {
-            rectPx(c, x, y, cw, chh, Color.rgb(176, 182, 196));
-            for (int yy = 0; yy < chh; yy += 2) {
-                for (int xx = 0; xx < cw; xx += 2) {
-                    int hsh = (xx * 7 + yy * 13 + (xx / 2) * (yy / 2)) % 3;
-                    if (hsh == 1) rectPx(c, x + xx, y + yy, 2, 2, Color.rgb(160, 166, 182));
-                    else if (hsh == 2) rectPx(c, x + xx, y + yy, 2, 2, Color.rgb(192, 198, 210));
-                }
+        // ---------- the prism on every scratch card ----------
+        // An equilateral glass prism (apex 60 degrees). A white beam hits the left face at 50 degrees to
+        // the normal. Each colour is bent by Snell's law, n1 sin(a1) = n2 sin(a2), at both faces, using a
+        // Cauchy fit for BK7 glass, n = 1.5046 + 0.0042 / L^2 (L in micrometres). Violet is slowed most,
+        // so it bends most. Real glass spreads red to violet by only about 1.6 degrees, so the spread is
+        // drawn 6 times wider to make the rainbow visible; every angle is otherwise exact.
+        static final int NW = 26;
+        static final float DISP = 6f;
+        static final float PCX = 84f, PCY = 52f, PHALF = 40f;      // prism centre and half base, in a 200 x 104 card
+        static final float[] LAM = new float[NW];
+        static final int[] LCOL = new int[NW];
+        static final float[] E1 = new float[2], D0 = new float[2];
+        static final float[] E2X = new float[NW], E2Y = new float[NW], D2X = new float[NW], D2Y = new float[NW];
+        static final float[] P0 = new float[2], P1 = new float[2], P2 = new float[2];
+        static {
+            float hgt = PHALF * (float) Math.sqrt(3);
+            P0[0] = PCX; P0[1] = PCY - hgt / 2; P1[0] = PCX - PHALF; P1[1] = PCY + hgt / 2; P2[0] = PCX + PHALF; P2[1] = PCY + hgt / 2;
+            double phi = Math.toRadians(20);                        // the beam travels up and to the right at 20 degrees
+            D0[0] = (float) Math.cos(phi); D0[1] = (float) -Math.sin(phi);
+            E1[0] = (P1[0] + P0[0]) / 2; E1[1] = (P1[1] + P0[1]) / 2;  // it hits the middle of the left face
+            double nl0 = -0.8660254, nl1 = -0.5;                    // outward normal of the left face (y points down)
+            double nr0 = 0.8660254, nr1 = -0.5;                     // outward normal of the right face
+            double nMean = 1.5046 + 0.0042 / (0.55 * 0.55);
+            for (int i = 0; i < NW; i++) {
+                double lam = 400 + i * 300.0 / (NW - 1);
+                LAM[i] = (float) lam;
+                LCOL[i] = wavelengthColor(lam);
+                double um = lam / 1000.0;
+                double n = nMean + DISP * (1.5046 + 0.0042 / (um * um) - nMean);
+                double[] d1 = refract(D0[0], D0[1], nl0, nl1, 1.0 / n);
+                double[] hit = d1 == null ? null : hitFace(E1[0], E1[1], d1[0], d1[1], P0, P2);
+                double[] d2 = (d1 == null || hit == null) ? null : refract(d1[0], d1[1], -nr0, -nr1, n);
+                if (d2 == null) { E2X[i] = Float.NaN; continue; }
+                E2X[i] = (float) hit[0]; E2Y[i] = (float) hit[1];
+                D2X[i] = (float) d2[0]; D2Y[i] = (float) d2[1];
             }
+        }
+
+        /** Snell refraction. d is the unit direction, nrm the unit normal facing against d, eta = n1 / n2. */
+        static double[] refract(double dx, double dy, double nx, double ny, double eta) {
+            double cos1 = -(dx * nx + dy * ny);
+            double k = 1 - eta * eta * (1 - cos1 * cos1);
+            if (k < 0) return null;                                 // total internal reflection
+            double f = eta * cos1 - Math.sqrt(k);
+            return new double[] {eta * dx + f * nx, eta * dy + f * ny};
+        }
+
+        /** where the ray from (px, py) along (dx, dy) crosses the segment a-b, or null */
+        static double[] hitFace(double px, double py, double dx, double dy, float[] a, float[] b) {
+            double ex = b[0] - a[0], ey = b[1] - a[1];
+            double den = dx * ey - dy * ex;
+            if (Math.abs(den) < 1e-9) return null;
+            double t = ((a[0] - px) * ey - (a[1] - py) * ex) / den;
+            double u = ((a[0] - px) * dy - (a[1] - py) * dx) / den;
+            if (t <= 0 || u < 0 || u > 1) return null;
+            return new double[] {px + dx * t, py + dy * t};
+        }
+
+        static int wavelengthColor(double w) {
+            double r, g, b;
+            if (w < 440) { r = -(w - 440) / 60; g = 0; b = 1; }
+            else if (w < 490) { r = 0; g = (w - 440) / 50; b = 1; }
+            else if (w < 510) { r = 0; g = 1; b = -(w - 510) / 20; }
+            else if (w < 580) { r = (w - 510) / 70; g = 1; b = 0; }
+            else if (w < 645) { r = 1; g = -(w - 645) / 65; b = 0; }
+            else { r = 1; g = 0; b = 0; }
+            double f = w < 420 ? 0.3 + 0.7 * (w - 380) / 40 : w > 700 ? 0.3 + 0.7 * (750 - w) / 50 : 1;
+            return Color.rgb((int) (255 * Math.pow(Math.max(0, Math.min(1, r * f)), 0.8)),
+                    (int) (255 * Math.pow(Math.max(0, Math.min(1, g * f)), 0.8)),
+                    (int) (255 * Math.pow(Math.max(0, Math.min(1, b * f)), 0.8)));
+        }
+
+        /** the prism picture inside the rectangle: a white beam in, a rainbow out. sc scales the 200 x 104 card. */
+        void prismScene(Canvas c, int x, int y, int cw, int chh, float sc, float ox, float oy) {
+            c.save();
+            c.clipRect(x, y, x + cw, y + chh);
+            for (int i = 0; i < 8; i++) rectPx(c, x, y + i * chh / 8f, cw, chh / 8f + 1, Color.rgb(14 + i, 16 + i, 40 + i * 3));
+            float wd = Math.max(1f, sc * 2f);
+            float bx = x + ox, by = y + oy;
+            // the beam arriving from the left
+            float sx = E1[0] - D0[0] * 90, sy = E1[1] - D0[1] * 90;
+            line(c, bx + sx * sc, by + sy * sc, bx + E1[0] * sc, by + E1[1] * sc, Color.argb(70, 255, 255, 255), wd * 2.4f);
+            line(c, bx + sx * sc, by + sy * sc, bx + E1[0] * sc, by + E1[1] * sc, Color.WHITE, wd);
+            // the glass
+            path.reset();
+            path.moveTo(bx + P0[0] * sc, by + P0[1] * sc);
+            path.lineTo(bx + P1[0] * sc, by + P1[1] * sc);
+            path.lineTo(bx + P2[0] * sc, by + P2[1] * sc);
+            path.close();
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(150, 90, 125, 190));
+            c.drawPath(path, p);
+            // each colour inside the glass, then out the other side
+            for (int i = 0; i < NW; i++) {
+                if (Float.isNaN(E2X[i])) continue;
+                int col = LCOL[i];
+                line(c, bx + E1[0] * sc, by + E1[1] * sc, bx + E2X[i] * sc, by + E2Y[i] * sc, (col & 0xFFFFFF) | 0xA0000000, Math.max(1f, sc));
+                float fx = E2X[i] + D2X[i] * 220, fy = E2Y[i] + D2Y[i] * 220;
+                line(c, bx + E2X[i] * sc, by + E2Y[i] * sc, bx + fx * sc, by + fy * sc, col, wd);
+            }
+            // bright edges and a glint
+            line(c, bx + P0[0] * sc, by + P0[1] * sc, bx + P1[0] * sc, by + P1[1] * sc, Color.rgb(215, 235, 255), Math.max(1f, sc));
+            line(c, bx + P0[0] * sc, by + P0[1] * sc, bx + P2[0] * sc, by + P2[1] * sc, Color.rgb(170, 200, 240), Math.max(1f, sc));
+            line(c, bx + P1[0] * sc, by + P1[1] * sc, bx + P2[0] * sc, by + P2[1] * sc, Color.rgb(140, 170, 220), Math.max(1f, sc));
+            if (((int) (clock * 4) & 3) == 0) rectPx(c, bx + E1[0] * sc - 1, by + E1[1] * sc - 1, 3, 3, Color.WHITE);
+            c.restore();
         }
 
         void drawArchive(Canvas c) {
@@ -693,7 +776,7 @@ public class Main extends Activity {
                     if (fs >= 4.6f) ov(FORMD[i], r[0] + r[2] / 2f, r[1] + r[3] / 2f, fs, Color.rgb(70, 42, 28), false);
                     else text(c, "" + (i + 1), r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 60, 40), 1);
                 } else if (have) {
-                    silver(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2);
+                    prismScene(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, 0.2f, 0f, r[3] / 2f - 10f);
                     if (((int) (clock * 3) + i & 3) == 0) rectPx(c, r[0] + r[2] / 2 - 1, r[1] + r[3] / 2 - 3, 2, 6, Color.WHITE);
                     text(c, "?", r[0] + r[2] / 2f, r[1] + r[3] / 2f - 2, 1, Color.rgb(90, 96, 112), 1);
                 } else {
@@ -714,27 +797,25 @@ public class Main extends Activity {
         void drawScratch(Canvas c) {
             rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
             closeButton(c);
-            text(c, selScratched ? FNAME[selCard] : "SCRATCH IT OFF", 8, 8, 1, Color.rgb(255, 215, 120), 0);
-            // the parchment
+            text(c, selScratched ? "FORMULA RECOVERED" : "SCRATCH TO REVEAL", 8, 8, 1, Color.rgb(255, 215, 120), 0);
             rectPx(c, scx - 2, scy - 2, scw + 4, sch + 4, Color.rgb(8, 10, 20));
-            rectPx(c, scx, scy, scw, sch, Color.rgb(236, 222, 180));
-            rectPx(c, scx, scy, scw, 3, Color.rgb(196, 160, 100));
-            rectPx(c, scx, scy + sch - 3, scw, 3, Color.rgb(196, 160, 100));
-            int ink = Color.rgb(90, 60, 40);
-            text(c, FNAME[selCard], scx + scw / 2f, scy + 9, 1, Color.rgb(140, 100, 60), 1);
-            ov(FORMD[selCard], scx + scw / 2f, scy + 32, fitSize(FORMD[selCard], scw - 16, 17f), Color.rgb(70, 42, 28), !selScratched);
-            wrapText(c, FDESC[selCard], scx + scw / 2f, scy + 56, 1, ink, scw - 24);
-            // the silver layer left to scratch
-            if (!selScratched) {
+            int paper = Color.rgb(236, 222, 180);
+            if (selScratched) {
+                rectPx(c, scx, scy, scw, sch, paper);
+            } else {
+                prismScene(c, scx, scy, scw, sch, 1f, 0f, 0f);
                 for (int cy = 0; cy < mrows; cy++) {
                     for (int cx = 0; cx < mcols; cx++) {
-                        if (mask[cy * mcols + cx]) continue;
-                        int hsh = (cx * 7 + cy * 13 + cx * cy) % 3;
-                        rectPx(c, scx + cx * 4, scy + cy * 4, 4, 4, hsh == 0 ? Color.rgb(176, 182, 196) : hsh == 1 ? Color.rgb(160, 166, 182) : Color.rgb(192, 198, 210));
+                        if (mask[cy * mcols + cx]) rectPx(c, scx + cx * 4, scy + cy * 4, 4, 4, paper);
                     }
                 }
-                if (cleared < mcols * mrows * 0.15f) text(c, "SCRATCH HERE", scx + scw / 2f, scy + sch / 2f - 2, 1, Color.rgb(90, 96, 112), 1);
+                if (cleared < mcols * mrows * 0.12f) text(c, "SCRATCH HERE", scx + scw / 2f, scy + sch - 14, 1, Color.WHITE, 1);
             }
+            int ink = Color.rgb(70, 42, 28);
+            boolean clip = !selScratched;
+            uiText(FNAME[selCard], scx + scw / 2f, scy + 11, 7.5f, Color.rgb(140, 96, 56), 1, scw - 16, clip, false);
+            ov(FORMD[selCard], scx + scw / 2f, scy + 36, fitSize(FORMD[selCard], scw - 16, 17f), ink, clip);
+            wrapUi(FDESC[selCard], scx + scw / 2f, scy + 58, 6.6f, ink, scw - 20, clip, false);
             drawParticles(c);
         }
 
@@ -829,7 +910,6 @@ public class Main extends Activity {
 
             float dt = rdt;
             if (state == DEAD) { updateDead(dt); return; }
-            if (state == BREAKIN) { updateBreakin(dt); return; }
             if (state == ARCHIVE || state == SCRATCH) {
                 for (int i = 0; i < NP; i++) {
                     if (pl[i] > 0) {
@@ -910,15 +990,18 @@ public class Main extends Activity {
             if (launchT > 0) launchT -= dt;
             if (tipT > 0) tipT -= rdt;
             bonus = Math.max(0f, bonus - 4.5f * dt);
-            speed = 5f + Math.min(dist / 60f, 7f) + bonus;
+            speed = breaking ? Math.min(11f, 2f + stateTime * 9f) : 5f + Math.min(dist / 60f, 7f) + bonus;
             float scroll = speed * ppm * dt;
             outX -= scroll;
-            dist += speed * dt;
+            if (breaking && outX <= playerX + 8f) breach();
+            if (!breaking) dist += speed * dt;
             bgOff += scroll * 0.25f;
             if (onFloor && (vehicle == 0 || vehicle == QUANTUM)) runPhase += dt * 11f;     // steps at a fixed rate, they do not speed up with the world
 
-            spawnLeft -= scroll;
-            if (spawnLeft <= 0) spawn();
+            if (!breaking) {
+                spawnLeft -= scroll;
+                if (spawnLeft <= 0) spawn();
+            }
 
             for (int i = crates.size() - 1; i >= 0; i--) {
                 Crate k = crates.get(i);
@@ -1230,19 +1313,6 @@ public class Main extends Activity {
 
         // ---------- drawing (pixel art, drawn small then scaled up) ----------
 
-        static final String CH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!-+/:'^ =?";
-        static final String[] GL = {
-            "010101111101101", "110101110101110", "011100100100011", "110101101101110", "111100110100111",
-            "111100110100100", "011100101101011", "101101111101101", "111010010010111", "001001001101010",
-            "101101110101101", "100100100100111", "101111111101101", "110101101101101", "010101101101010",
-            "110101110100100", "010101101111011", "110101110101101", "011100010001110", "111010010010010",
-            "101101101101111", "101101101101010", "101101111111101", "101101010101101", "101101010010010",
-            "111001010100111",
-            "111101101101111", "010110010010111", "110001010100111", "110001010001110", "101101111001001",
-            "111100110001110", "011100111101111", "111001010010010", "111101111101111", "111101111001110",
-            "000000000000010", "000000000010100", "010010010000010", "000000111000000", "000010111010000",
-            "001001010100100", "000010000010000", "010010000000000", "010101000000000", "000000000000000", "000111000111000", "110001010000010"
-        };
 
         static final String[] SPR_HEAD = {
             "......b..bb.....",
@@ -1514,51 +1584,45 @@ public class Main extends Activity {
             c.drawRect(ix, iy, ix + Math.round(rw), iy + Math.round(rh), p);
         }
 
-        void glyphs(Canvas c, String s, int ix, int iy, int sc, int col) {
-            p.setStyle(Paint.Style.FILL);
-            p.setColor(col);
-            for (int i = 0; i < s.length(); i++) {
-                int g = CH.indexOf(s.charAt(i));
-                if (g < 0) continue;
-                String bits = GL[g];
-                for (int r = 0; r < 5; r++) {
-                    for (int k = 0; k < 3; k++) {
-                        if (bits.charAt(r * 3 + k) == '1') {
-                            int gx = ix + (i * 4 + k) * sc, gy = iy + r * sc;
-                            c.drawRect(gx, gy, gx + sc, gy + sc, p);
-                        }
-                    }
-                }
-            }
+        /**
+         * Draws UI text with a real bold font at screen resolution. sc 1 is small text, 2 is bigger, 4 is the title.
+         * align: 0 left, 1 centre, 2 right. y is the top of the text. It always shrinks to fit the screen.
+         */
+        void text(Canvas c, String s, float x, float yy, int sc, int col, int align) {
+            float maxW = align == 1 ? 2f * Math.min(x, w - x) - 4f : align == 0 ? w - x - 3f : x - 3f;
+            uiText(s, x, yy + 2.5f * sc, 7.5f * sc, col, align, maxW, false, true);
         }
 
-        /** align: 0 left, 1 centre, 2 right. y is the top of the text. */
-        void text(Canvas c, String s, float x, float yy, int sc, int col, int align) {
-            s = s.toUpperCase();
-            int tw = s.length() * 4 * sc - sc;
-            int ix = Math.round(x);
-            if (align == 1) ix -= tw / 2;
-            else if (align == 2) ix -= tw;
-            int iy = Math.round(yy);
-            glyphs(c, s, ix + sc, iy + sc, sc, Color.argb(160, 0, 0, 20));
-            glyphs(c, s, ix, iy, sc, col);
+        /** one line of UI text. y is the vertical centre. */
+        void uiText(String t, float gx, float gcy, float gsize, int col, int align, float maxW, boolean clip, boolean shadow) {
+            Ov o = new Ov();
+            o.t = t; o.x = gx; o.y = gcy; o.size = gsize; o.col = col; o.clip = clip; o.ui = true; o.align = align; o.maxW = maxW; o.shadow = shadow;
+            ovs.add(o);
+        }
+
+        /** wraps by measuring the real text width, one centred line per call to uiText */
+        void wrapUi(String s, float cx, float top, float gsize, int col, float maxW, boolean clip, boolean shadow) {
+            uip.setTextSize(gsize * unit);
+            String[] words = s.split(" ");
+            StringBuilder line = new StringBuilder();
+            float ly = top + gsize * 0.55f;
+            for (String wd : words) {
+                String trial = line.length() == 0 ? wd : line + " " + wd;
+                if (line.length() > 0 && uip.measureText(trial) > maxW * unit) {
+                    uiText(line.toString(), cx, ly, gsize, col, 1, maxW, clip, shadow);
+                    ly += gsize * 1.3f;
+                    line.setLength(0);
+                    line.append(wd);
+                } else {
+                    line.setLength(0);
+                    line.append(trial);
+                }
+            }
+            if (line.length() > 0) uiText(line.toString(), cx, ly, gsize, col, 1, maxW, clip, shadow);
         }
 
         void wrapText(Canvas c, String s, float cx, float yy, int sc, int col, int maxPx) {
-            int per = Math.max(8, maxPx / (4 * sc));
-            String[] words = s.split(" ");
-            StringBuilder line = new StringBuilder();
-            float ly = yy;
-            for (String wd : words) {
-                if (line.length() > 0 && line.length() + 1 + wd.length() > per) {
-                    text(c, line.toString(), cx, ly, sc, col, 1);
-                    ly += 7 * sc;
-                    line.setLength(0);
-                }
-                if (line.length() > 0) line.append(' ');
-                line.append(wd);
-            }
-            if (line.length() > 0) text(c, line.toString(), cx, ly, sc, col, 1);
+            wrapUi(s, cx, yy, 7.5f * sc, col, maxPx, false, true);
         }
 
         static int pal(char ch) {
@@ -1663,9 +1727,21 @@ public class Main extends Activity {
                     out.clipPath(clipPath);
                     clipped = true;
                 }
-                ovp.setTextSize(o.size * unit);
-                ovp.setColor(o.col);
-                out.drawText(o.t, o.x * unit, o.y * unit + o.size * unit * 0.34f, ovp);
+                if (o.ui) {
+                    float sz = o.size * unit;
+                    uip.setTextSize(sz);
+                    float wpx = uip.measureText(o.t);
+                    if (wpx > o.maxW * unit) { sz *= o.maxW * unit / wpx; uip.setTextSize(sz); }
+                    uip.setTextAlign(o.align == 1 ? Paint.Align.CENTER : o.align == 2 ? Paint.Align.RIGHT : Paint.Align.LEFT);
+                    if (o.shadow) uip.setShadowLayer(Math.max(1f, 0.5f * unit), 0.45f * unit, 0.45f * unit, Color.argb(220, 0, 0, 10));
+                    else uip.clearShadowLayer();
+                    uip.setColor(o.col);
+                    out.drawText(o.t, o.x * unit, o.y * unit + sz * 0.36f, uip);
+                } else {
+                    ovp.setTextSize(o.size * unit);
+                    ovp.setColor(o.col);
+                    out.drawText(o.t, o.x * unit, o.y * unit + o.size * unit * 0.34f, ovp);
+                }
                 if (clipped) out.restore();
             }
             out.restore();
@@ -1816,10 +1892,10 @@ public class Main extends Activity {
 
         void drawRoom(Canvas c, int ox, int k) {
             int kind = Math.floorMod(k, 4);
-            int oy = Math.round(ceilY) + 10, oh = Math.round(floorY) - oy;      // down to the floor line
+            int oy = Math.round(ceilY) + 14, oh = Math.round(floorY) - oy;      // down to the floor line
             // name plate
-            rectPx(c, ox + 25, ceilY + 2, RW - 50, 7, Color.rgb(16, 24, 38));
-            text(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 3, 1, Color.rgb(255, 200, 80), 1);
+            rectPx(c, ox + 25, ceilY + 2, RW - 50, 9, Color.rgb(16, 24, 38));
+            text(c, ROOM_NAMES[kind], ox + RW / 2f, ceilY + 4, 1, Color.rgb(255, 200, 80), 1);
             // frame
             rectPx(c, ox - 3, oy - 3, RW + 6, oh + 6, Color.rgb(16, 24, 38));
             rectPx(c, ox - 2, oy - 2, RW + 4, oh + 4, Color.rgb(70, 90, 120));
@@ -2233,7 +2309,7 @@ public class Main extends Activity {
                 rectPx(c, left + 2, top + 16, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
                 rectPx(c, left + 1 + rnd.nextInt(4), top + 16 + fl, 1, 2, Color.rgb(255, 150, 50));
             }
-            scientist(c, left, top, ph, onFloor && (state == PLAY || state == BREAKIN));
+            scientist(c, left, top, ph, onFloor && state == PLAY);
         }
 
         void quantumBody(Canvas c, int cy, boolean flip) {
@@ -2370,7 +2446,7 @@ public class Main extends Activity {
                 float t = 1f - bannerT / 1.2f;
                 int cx = Math.round(playerX + 14), cy = Math.round(y - 22 - t * 14);
                 rectPx(c, cx - 7, cy - 9, 14, 18, Color.rgb(8, 10, 20));
-                silver(c, cx - 6, cy - 8, 12, 16);
+                prismScene(c, cx - 6, cy - 8, 12, 16, 0.16f, -4f, 3f);
                 if (((int) (clock * 12) & 1) == 0) {
                     rectPx(c, cx - 1, cy - 12, 2, 6, Color.WHITE);
                     rectPx(c, cx - 4, cy - 10, 8, 2, Color.WHITE);

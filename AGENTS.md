@@ -19,3 +19,6 @@ NULLCORP, an evil science company, stole every theory and formula; the mission i
 
 ## Formulas (scratch-off archive)
 20 real physics formulas (FORM/FNAME/FDESC arrays in Main.java) are rolled up as parchment scrolls that appear every 140 to 260 m. Collecting one saves it (SharedPreferences "owned"); in the ARCHIVE (button bottom right on the title, aiming and death screens) tap a silver card and scratch it off with a finger; 60% scratched reveals it ("scratched" is saved). The 5x3 pixel font only has A-Z, 0-9 and . , ! - + / : ' ^ = ? so formulas must stay in those characters.
+
+## Text and the prism
+All UI text is drawn with a real bold font at screen resolution (text(), uiText(), wrapUi()) and shrinks to fit the screen; the old 3x5 pixel font is gone. Formulas use a serif italic with real symbols (FORMD). The scratch cards show a glass prism: a white beam is refracted by Snell's law with a Cauchy fit for BK7 glass, 60 degree apex, 50 degree incidence; the red to violet spread is drawn 6x wider than real glass so the rainbow is visible (preview/prism-card.png). The break-in is part of PLAY (breaking = true): you can jump and use the jetpack on the way to the wall, and the hole opens at the height you hit it.
