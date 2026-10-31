@@ -17,6 +17,9 @@ final class Npc {
     int bounces;
 }
 
+/** one quarter of the black hole: idx 0 top right, 1 bottom right, 2 bottom left, 3 top left */
+final class Piece { float x, y; int idx; }
+
 /** a stolen formula, rolled up */
 final class Scroll { float x, y; }
 

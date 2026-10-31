@@ -67,3 +67,6 @@ The wall has nine rooms in a loop (the subclasses in Room.java): mission control
 
 ## Wear and tear, and the ERROR room
 The wall has imperfections (wallWear): cracks that branch, damp stains, soot scorches, scratches and a mismatched repair panel with rust, placed by panel number so they stay put as the wall scrolls; the brick wall outside has cracks too. The tenth room is titled ERROR (its plate blinks red): a busted door hanging off its lower hinge with cracks, a missing corner the light shines through, a dead keypad, sparking wires, rubble and an occasional glitch.
+
+## Black hole and wormhole
+From about 150 m a black hole that has been cut into four quarters (Piece in Entities.java) drops one loose quarter at a time, every 60 to 110 m, lowest missing one first. A quarter that scrolls off comes back later. The four quarters show in the HUD corner (drawHoleHud). Collecting all four (holeMask == 15, per run) starts the wormhole (startWorm): 7 seconds of invulnerability with a boost of +11 m/s, all hazards cleared and nothing but twisting coin strands spawned (spawnWormCoins), with a square-ring tunnel drawn over the room (drawWorm). When it ends (endWorm) you come out 150 m further on with a clear stretch and 1.5 s of invulnerability. The next black hole starts 250 m later.

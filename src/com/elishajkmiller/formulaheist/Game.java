@@ -94,6 +94,10 @@ final class Game extends View implements Choreographer.FrameCallback {
     final ArrayList<Zapper> zappers = new ArrayList<>();
     final ArrayList<Missile> missiles = new ArrayList<>();
     final ArrayList<Crate> crates = new ArrayList<>();
+    final ArrayList<Piece> pieces = new ArrayList<>();       // loose pieces of the black hole
+    int holeMask;                                            // pieces collected this run, one bit each; all four opens the wormhole
+    float nextPiece, wormT, wormSpeed, wormPhase;            // wormT: seconds of wormhole left
+    static final float WORM_TIME = 7f;
     final ArrayList<Scroll> scrolls = new ArrayList<>();
     final ArrayList<Bolt> bolts = new ArrayList<>();
     final ArrayList<Hazard> hazards = new ArrayList<>();
@@ -351,6 +355,7 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     /** back outside on the grass, in front of NULLCORP's wall */
     void toStart(boolean keepState) {
+        pieces.clear(); holeMask = 0; nextPiece = 150; wormT = 0; wormSpeed = 0;
         coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); hazards.clear();
         nextParch = 70; bannerT = 0;
         for (int i = 0; i < NP; i++) pl[i] = 0;
@@ -1214,6 +1219,11 @@ final class Game extends View implements Choreographer.FrameCallback {
             if (buildT >= BUILD_TIME) finishBuild();
         }
         if (invuln > 0) invuln -= rdt;
+        if (wormT > 0 && state == PLAY) {
+            wormT -= rdt;
+            invuln = Math.max(invuln, 0.3f);
+            if (wormT <= 0) endWorm();
+        }
         if (hintT > 0) hintT -= rdt;
         if (veh != null) veh.tick(rdt);
         if (landT > 0) landT -= rdt;
@@ -1273,6 +1283,8 @@ final class Game extends View implements Choreographer.FrameCallback {
         if (tipT > 0) tipT -= rdt;
         bonus = Math.max(0f, bonus - 4.5f * dt);
         speed = breaking ? Math.min(5f, 2f + stateTime * 8f) : 5f + Math.min(dist / 80f, 7f) + bonus;   // outside he tops out at the speed the run starts at
+        wormSpeed += ((wormT > 0 ? 11f : 0f) - wormSpeed) * Math.min(1f, 4f * dt);       // the wormhole shoots you along
+        speed += wormSpeed;
         float scroll = speed * ppm * dt;
         outX -= scroll;
         if (breaking && outX <= playerX + 8f) breach();
@@ -1295,6 +1307,18 @@ final class Game extends View implements Choreographer.FrameCallback {
                 continue;
             }
             if (k.x < -20) crates.remove(i);
+        }
+
+        for (int i = pieces.size() - 1; i >= 0; i--) {
+            Piece pc = pieces.get(i);
+            pc.x -= scroll;
+            float dx = pc.x - playerX, dy = pc.y - y;
+            if (state == PLAY && dx * dx + dy * dy < (r + 9) * (r + 9)) {
+                pieces.remove(i);
+                collectPiece(pc.idx);
+                continue;
+            }
+            if (pc.x < -20) pieces.remove(i);
         }
 
         if (bannerT > 0) bannerT -= rdt;
@@ -1564,6 +1588,7 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     void spawn() {
         float x0 = w + 0.6f * ppm;
+        if (wormT > 0) { spawnWormCoins(x0); return; }
         if (dist >= nextCrate) {
             if (veh == null) {
                 Crate k = new Crate();
@@ -1583,6 +1608,23 @@ final class Game extends View implements Choreographer.FrameCallback {
             spawnLeft = 3f * ppm;
             nextParch = dist + 140 + rnd.nextInt(120);
             return;
+        }
+        if (holeMask != 15 && dist >= nextPiece) {          // the next missing piece of the black hole
+            int idx = -1;
+            for (int i = 0; i < 4 && idx < 0; i++) {
+                if ((holeMask >> i & 1) != 0) continue;
+                boolean loose = false;
+                for (Piece q : pieces) if (q.idx == i) loose = true;
+                if (!loose) idx = i;
+            }
+            if (idx >= 0) {
+                Piece pc = new Piece();
+                pc.x = x0; pc.y = randY(2.8f, 6.2f); pc.idx = idx;
+                pieces.add(pc);
+                nextPiece = dist + 60 + rnd.nextInt(50);
+                spawnLeft = 3f * ppm;
+                return;
+            }
         }
         // every so often a whole section of one thing: coins only, or laser rails along the floor and ceiling
         if (dist >= nextSection) {
@@ -1613,6 +1655,115 @@ final class Game extends View implements Choreographer.FrameCallback {
             missiles.add(m);
             spawnLeft = 5f * ppm;
         }
+    }
+
+    // ---------- the black hole and its wormhole ----------
+
+    void collectPiece(int idx) {
+        holeMask |= 1 << idx;
+        sfx(S_DONE); buzz(30);
+        flash = Math.max(flash, 0.12f);
+        for (int i = 0; i < 12; i++) puff(playerX, y, (rnd.nextFloat() - 0.5f) * 8f, (rnd.nextFloat() - 0.5f) * 8f, Color.rgb(190, 120, 255));
+        if (holeMask == 15) startWorm();
+    }
+
+    /** all four pieces: the hole opens and shoots you down a tunnel of coins, then puts you out further along */
+    void startWorm() {
+        wormT = WORM_TIME;
+        zappers.clear(); hazards.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); pieces.clear();
+        spawnLeft = 0;
+        flash = 0.4f; shake = 6f; invuln = WORM_TIME + 1f;
+        sfx(S_BUILD); buzz(80);
+    }
+
+    void endWorm() {
+        wormT = 0; holeMask = 0;
+        dist += 150f;                                    // the other side of the wormhole is 150 m on
+        zappers.clear(); hazards.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); pieces.clear();
+        spawnLeft = w * 0.9f; nextPiece = dist + 250; nextCrate = Math.max(nextCrate, dist + 40); nextParch = Math.max(nextParch, dist + 40);
+        nextSection = Math.max(nextSection, dist + 40);
+        invuln = 1.5f; flash = 0.5f; shake = 5f;
+        sfx(S_TELE); buzz(60);
+        for (int i = 0; i < 30; i++) puff(playerX, y, (rnd.nextFloat() - 0.2f) * 10f, (rnd.nextFloat() - 0.5f) * 10f, Color.rgb(200, 230, 255));
+    }
+
+    /** a twisting rope of three coin strands that fills the height of the room */
+    void spawnWormCoins(float x0) {
+        float mid = (floorY + ceilY) / 2f, amp = (floorY - ceilY) * 0.33f;
+        for (int i = 0; i < 12; i++)
+            for (int s = 0; s < 3; s++)
+                addCoin(x0 + i * 0.55f * ppm, mid + (float) Math.sin(i * 0.5 + s * 2.1 + wormPhase) * amp);
+        wormPhase += 6f;
+        spawnLeft = 12 * 0.55f * ppm;
+    }
+
+    /** one quarter disc: start is the angle in degrees (0 right, 90 down), r its radius, (cx, cy) the centre of the whole disc */
+    void quarter(Canvas c, float cx, float cy, float r, int start, int body, int rim) {
+        path.reset();
+        path.moveTo(cx, cy);
+        for (int a = 0; a <= 90; a += 10) {
+            double rad = Math.toRadians(start + a);
+            path.lineTo(cx + (float) Math.cos(rad) * r, cy + (float) Math.sin(rad) * r);
+        }
+        path.close();
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(body);
+        c.drawPath(path, p);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(1f);
+        p.setColor(rim);
+        c.drawPath(path, p);
+        p.setStyle(Paint.Style.FILL);
+    }
+
+    void drawPieces(Canvas c) {
+        for (Piece pc : pieces) {
+            float bob = (float) Math.sin(clock * 4 + pc.idx) * 2f;
+            int start = (pc.idx * 90 + 270) % 360;
+            double mid = Math.toRadians(start + 45);
+            float cx = pc.x - (float) Math.cos(mid) * 3f, cy = pc.y + bob - (float) Math.sin(mid) * 3f;   // so the quarter itself is centred on the piece
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(Color.argb(60 + (int) (30 * Math.sin(clock * 6)), 160, 90, 255));
+            c.drawCircle(pc.x, pc.y + bob, 12f, p);
+            quarter(c, cx, cy, 10f, start, Color.rgb(8, 4, 18), Color.rgb(190, 120, 255));
+            quarter(c, cx, cy, 5f, start, Color.rgb(0, 0, 0), Color.rgb(255, 150, 60));
+        }
+    }
+
+    /** the four quarters in the corner: dim until you have them */
+    void drawHoleHud(Canvas c, float cx, float cy) {
+        for (int i = 0; i < 4; i++) {
+            boolean have = (holeMask >> i & 1) != 0;
+            int start = (i * 90 + 270) % 360;
+            double mid = Math.toRadians(start + 45);
+            float ox = cx + (float) Math.cos(mid) * 1.5f, oy = cy + (float) Math.sin(mid) * 1.5f;
+            quarter(c, ox, oy, 6f, start, have ? Color.rgb(8, 4, 18) : Color.argb(90, 20, 20, 40), have ? Color.rgb(190, 120, 255) : Color.argb(120, 100, 100, 140));
+        }
+    }
+
+    /** the tunnel: square rings rushing out from a point ahead, speed streaks and a purple wash */
+    void drawWorm(Canvas c) {
+        float k = Math.min(1f, Math.min((WORM_TIME - wormT) / 0.6f, wormT / 0.6f));
+        if (k <= 0) return;
+        rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb((int) (215 * k), 10, 4, 30));
+        float cx = w * 0.72f, cy = (floorY + ceilY) / 2f;
+        for (int i = 0; i < 9; i++) {
+            float t = (clock * 0.9f + i / 9f) % 1f;
+            float rr = t * t * w * 0.9f + 3f;
+            float hue = (260f + t * 80f) % 360f;
+            int col = Color.HSVToColor((int) (200 * k * Math.min(1f, t * 4f)), new float[] {hue, 0.7f, 1f});
+            float hh = Math.min(rr, (floorY - ceilY) / 2f - 2f);
+            rectPx(c, cx - rr, cy - hh, rr * 2, 1, col);
+            rectPx(c, cx - rr, cy + hh, rr * 2, 1, col);
+            rectPx(c, cx - rr, cy - hh, 1, hh * 2, col);
+            rectPx(c, cx + rr, cy - hh, 1, hh * 2 + 1, col);
+        }
+        for (int i = 0; i < 26; i++) {
+            float sx = w - ((clock * 360f + i * 47f) % (w + 80f));
+            float sy = ceilY + 4 + (i * 37) % (int) (floorY - ceilY - 8);
+            rectPx(c, sx, sy, 14 + (i % 4) * 8, 1, Color.argb((int) (150 * k), 220, 230, 255));
+        }
+        if (WORM_TIME - wormT < 1.6f) text(c, "WORMHOLE", w / 2f, ceilY + 16, 2, Color.argb((int) (255 * k), 220, 190, 255), 1);
     }
 
     /** one coin pattern starting at x0: a sine wave, a block, a line or an arch. Returns its length in pixels. */
@@ -1932,8 +2083,10 @@ final class Game extends View implements Choreographer.FrameCallback {
         rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb(95, 6, 10, 24));   // push the whole backdrop back
         drawExterior(c);
         drawGuards(c);
+        if (wormT > 0) drawWorm(c);
         drawCoins(c);
         drawCrates(c);
+        drawPieces(c);
         drawScrolls(c);
         drawZappers(c);
         drawHazards(c);
@@ -2611,6 +2764,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, dim, 2);
         text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 8, 1, dim, 2);
         text(c, "BEST " + best + " M", rx, top + 16, 1, dim, 2);
+        drawHoleHud(c, rx - 7, top + 33);
     }
 
     void drawHint(Canvas c) {
