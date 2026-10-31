@@ -173,7 +173,9 @@ public class Main extends Activity {
     /** One game view: physics, drawing and input in one place. */
     static class Game extends View implements Choreographer.FrameCallback {
 
-        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3;
+        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, INTRO = 4, FLIP = 5, LAUNCH = 6;
+        static final int TOWER_TOP = 58;        // y of the slingshot platform
+        static final float MAXPULL = 34f;       // longest pull back, in pixels
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
         static final float BUILD_TIME = 1.5f;
         static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8;
@@ -240,6 +242,8 @@ public class Main extends Activity {
         Sfx sfx;
         boolean ghost, outline;
         float leanPx, landT, ang, angV, settleT, finalDist;
+        boolean seenIntro, dragging, moved;
+        float tx0, ty0, pdx, pdy, lastDx = -22f, lastDy = 14f, introT, flipT, bonus, launchT, tipT, towerX;
         int bounces;
         boolean settled;
         Vibrator vib;
@@ -285,7 +289,8 @@ public class Main extends Activity {
             floorY = h - 11;
             ceilY = 11;
             playerX = w * 0.22f;
-            if (state == START) y = floorY - SH_BOT;
+            towerX = playerX;
+            if (state == START) y = TOWER_TOP - SH_BOT;
             npcs.clear();
             for (float nx = 30; nx < w + 20; nx += 70 + rnd.nextInt(80)) addSpawn(nx);
         }
@@ -319,9 +324,10 @@ public class Main extends Activity {
             for (int i = 0; i < NP; i++) pl[i] = 0;
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
             diving = false; nextCrate = 80;
-            y = floorY - SH_BOT;
+            y = TOWER_TOP - SH_BOT;
             vy = 0; dist = 0; electrons = 0; spawnLeft = w * 0.6f;
-            state = PLAY; stateTime = 0;
+            towerX = playerX; dragging = false; pdx = pdy = 0; bonus = 0; launchT = 0; tipT = 0;
+            state = LAUNCH; stateTime = 0;
         }
 
         static final int SH_TOP = 11, SH_BOT = 12;     // scientist sprite rows above and below his centre
@@ -345,18 +351,77 @@ public class Main extends Activity {
 
         @Override
         public boolean onTouchEvent(MotionEvent e) {
+            float gx = e.getX() / unit, gy = e.getY() / unit;
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    if (state == START || (state == DEAD && stateTime > 0.7f)) reset();
-                    if (state == PLAY) press();
-                    thrusting = true;
+                    if (state == START) {
+                        if (!seenIntro) { seenIntro = true; state = INTRO; introT = 0; }
+                        else state = LAUNCH;
+                    } else if (state == INTRO) {
+                        if (introT > 0.4f) { state = FLIP; flipT = 0; sfx(S_FLIP); }
+                    } else if (state == DEAD) {
+                        if (stateTime > 0.7f) reset();
+                    } else if (state == LAUNCH) {
+                        dragging = true; moved = false; tx0 = gx; ty0 = gy; pdx = pdy = 0;
+                    } else if (state == PLAY) {
+                        press();
+                        thrusting = true;
+                    }
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (state == LAUNCH && dragging) {
+                        float dx = gx - tx0, dy = gy - ty0;
+                        float len = (float) Math.sqrt(dx * dx + dy * dy);
+                        if (len > MAXPULL) { dx *= MAXPULL / len; dy *= MAXPULL / len; len = MAXPULL; }
+                        pdx = dx; pdy = dy;
+                        if (len > 3f) moved = true;
+                    }
                     break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     thrusting = false;
+                    if (state == LAUNCH && dragging) {
+                        dragging = false;
+                        if (moved && pdx * pdx + pdy * pdy > 36f) { lastDx = pdx; lastDy = pdy; }
+                        launch();
+                    }
                     break;
             }
             return true;
+        }
+
+        /** let go of the sling: the pull sets the launch speed and angle */
+        void launch() {
+            float lvx = -lastDx / MAXPULL, lvy = -lastDy / MAXPULL;
+            y = TOWER_TOP - SH_BOT + lastDy;
+            vy = lvy * 13f;
+            bonus = Math.max(0f, lvx) * 7f;
+            launchT = 0.9f; tipT = 3f;
+            onFloor = false; jumpDelay = 0; thrusting = false;
+            state = PLAY; stateTime = 0;
+            shake = 3f;
+            sfx(S_FLIP);
+            buzz(25);
+            for (int i = 0; i < 8; i++) burst(playerX, y);
+        }
+
+        /** waiting at the sling: title, intro picture, the flip to side view, and aiming */
+        void updateLaunch(float dt) {
+            if (state == INTRO) {
+                introT += dt;
+                if (introT > 3.6f) { state = FLIP; flipT = 0; sfx(S_FLIP); }
+            } else if (state == FLIP) {
+                flipT += dt;
+                if (flipT >= 0.8f) state = LAUNCH;
+            }
+            y = TOWER_TOP - SH_BOT; vy = -1f; onFloor = !(state == LAUNCH && dragging);
+            speed = 0;
+            for (int i = 0; i < NP; i++) {
+                if (pl[i] > 0) {
+                    pl[i] -= dt;
+                    px[i] += pvx[i] * dt; py[i] += pvy[i] * dt;
+                }
+            }
         }
 
         /** jump to the mirror position on the opposite surface, gravity follows */
@@ -413,13 +478,14 @@ public class Main extends Activity {
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
 
+            boolean waiting = state == START || state == INTRO || state == FLIP || state == LAUNCH;   // the scene holds still until he runs
             float nsc = (bgOff - lastBg) * 2.4f;       // background scientists move at 60% of the floor
             lastBg = bgOff;
             npcLeft -= nsc;
             if (npcLeft <= 0) { addSpawn(w + 10); npcLeft = 60 + rnd.nextInt(110); }
             for (int i = npcs.size() - 1; i >= 0; i--) {
                 Npc n = npcs.get(i);
-                n.x += n.walk * rdt - nsc;
+                n.x += (waiting ? 0f : n.walk * rdt) - nsc;
                 if (n.pointT > 0) n.pointT -= rdt;
                 else if ((n.nextPoint -= rdt) <= 0) { n.pointT = 0.8f + rnd.nextFloat() * 1.2f; n.nextPoint = 2f + rnd.nextFloat() * 7f; }
                 if (npcs.get(i).x < -10 || npcs.get(i).x > w + 60) npcs.remove(i);
@@ -427,6 +493,7 @@ public class Main extends Activity {
 
             float dt = rdt;
             if (state == DEAD) { updateDead(dt); return; }
+            if (state == START || state == INTRO || state == FLIP || state == LAUNCH) { updateLaunch(dt); return; }
             if (state == BUILD) {
                 buildT += rdt;
                 dt = rdt * 0.15f;                           // time slows while the vehicle assembles
@@ -445,7 +512,7 @@ public class Main extends Activity {
             boolean fire = thrusting && state == PLAY && vehicle == 0 && jumpDelay <= 0;
             ay = GRAVITY * gravDir - (fire ? THRUST : 0);
             vy += ay * dt;
-            float vmin = flips() ? -VFALL : -VMAX;
+            float vmin = flips() ? -VFALL : -VMAX - (launchT > 0 ? 7f * launchT / 0.9f : 0f);
             if (vy > VFALL) vy = VFALL;
             if (vy < vmin) vy = vmin;
             y += vy * ppm * dt;
@@ -494,13 +561,12 @@ public class Main extends Activity {
                 }
             }
 
-            if (state == START) {
-                speed = 3f;
-                bgOff += speed * ppm * dt * 0.25f;
-                return;
-            }
-            speed = 5f + Math.min(dist / 60f, 7f);
+            if (launchT > 0) launchT -= dt;
+            if (tipT > 0) tipT -= rdt;
+            bonus = Math.max(0f, bonus - 4.5f * dt);
+            speed = 5f + Math.min(dist / 60f, 7f) + bonus;
             float scroll = speed * ppm * dt;
+            towerX -= scroll;
             dist += speed * dt;
             bgOff += scroll * 0.25f;
             if (onFloor && (vehicle == 0 || vehicle == QUANTUM)) runPhase += dt * 11f;     // steps at a fixed rate, they do not speed up with the world
@@ -682,6 +748,7 @@ public class Main extends Activity {
             bgOff += sc * 0.25f;
             dist += speed * dt;
             if (settled && speed > 0.3f && rnd.nextInt(3) == 0) dust(playerX - 4, floorY - 1);
+            towerX -= sc;
             for (Coin k : coins) k.x -= sc;
             for (Zapper z : zappers) z.x -= sc;
             for (Crate k : crates) k.x -= sc;
@@ -1190,10 +1257,37 @@ public class Main extends Activity {
         protected void onDraw(Canvas out) {
             if (w == 0 || bc == null) return;
             Canvas c = bc;
+            if (state == INTRO) {
+                drawTopDown(c);
+            } else if (state == FLIP) {
+                rectPx(c, 0, 0, w, h, Color.rgb(6, 8, 14));
+                float t = flipT / 0.8f;
+                boolean first = t < 0.5f;
+                float sy = first ? 1f - t / 0.5f : (t - 0.5f) / 0.5f;     // the picture tips over like a card
+                if (sy > 0.04f) {
+                    c.save();
+                    c.scale(1f, sy, w / 2f, h / 2f);
+                    if (first) drawTopDown(c); else drawScene(c);
+                    c.restore();
+                }
+            } else {
+                drawScene(c);
+            }
+            if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
+            if (state == START) drawTitle(c);
+            if (state == DEAD) drawDead(c);
+            out.save();
+            if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
+            out.drawBitmap(buf, null, dst, blit);
+            out.restore();
+        }
+
+        void drawScene(Canvas c) {
             drawBackground(c);
             drawFloor(c);
             drawNpcs(c);
             rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb(95, 6, 10, 24));   // push the whole backdrop back
+            drawTower(c);
             drawCoins(c);
             drawCrates(c);
             drawZappers(c);
@@ -1205,14 +1299,153 @@ public class Main extends Activity {
                 ring(c, playerX, y, telePulse / 0.25f);
             }
             if (state == BUILD) drawBuild(c);
+            if (state == LAUNCH) drawLaunchUi(c);
             drawHud(c);
-            if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
-            if (state == START) drawTitle(c);
-            if (state == DEAD) drawDead(c);
-            out.save();
-            if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
-            out.drawBitmap(buf, null, dst, blit);
-            out.restore();
+        }
+
+        // ---------- launch tower, sling and intro ----------
+
+        void line(Canvas c, float x0, float y0, float x1, float y1, int col, float wd) {
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(wd);
+            p.setColor(col);
+            c.drawLine(Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1), p);
+            p.setStyle(Paint.Style.FILL);
+        }
+
+        void drawTower(Canvas c) {
+            if (towerX < -60 || towerX > w + 60) return;
+            int tx = Math.round(towerX), top = TOWER_TOP, fl = Math.round(floorY);
+            // the enemy lab's launch tower
+            rectPx(c, tx - 14, top + 4, 28, fl - top - 4, Color.rgb(88, 100, 122));
+            rectPx(c, tx - 14, top + 4, 3, fl - top - 4, Color.rgb(62, 72, 92));
+            rectPx(c, tx + 11, top + 4, 3, fl - top - 4, Color.rgb(112, 126, 150));
+            for (int yy = top + 16; yy < fl - 4; yy += 14) rectPx(c, tx - 14, yy, 28, 1, Color.rgb(60, 70, 90));
+            for (int yy = top + 20; yy < fl - 12; yy += 14) {
+                for (int k = 0; k < 2; k++) {
+                    boolean lit = (((int) (clock * 1.5f) + yy / 14 + k) & 3) != 0;
+                    rectPx(c, tx - 8 + k * 10, yy, 5, 6, lit ? Color.rgb(255, 215, 100) : Color.rgb(40, 45, 60));
+                }
+            }
+            rectPx(c, tx - 20, top, 40, 4, Color.rgb(125, 140, 168));
+            rectPx(c, tx - 20, top + 4, 40, 1, Color.rgb(50, 58, 76));
+            for (int k = 0; k < 10; k++) rectPx(c, tx - 20 + k * 4, top + 5, 2, 3, Color.rgb(230, 180, 40));
+            // antenna with a blinking light
+            rectPx(c, tx + 17, top - 16, 1, 16, Color.rgb(150, 160, 180));
+            if (((int) (clock * 2) & 1) == 0) rectPx(c, tx + 16, top - 18, 3, 3, Color.rgb(255, 70, 60));
+            // slingshot
+            int wood = Color.rgb(120, 78, 44), wood2 = Color.rgb(160, 108, 64);
+            rectPx(c, tx - 2, top - 7, 4, 7, wood);
+            rectPx(c, tx - 7, top - 9, 14, 3, wood);
+            rectPx(c, tx - 7, top - 18, 3, 10, wood2);
+            rectPx(c, tx + 4, top - 18, 3, 10, wood2);
+            float pcx = playerX + ((state == LAUNCH && dragging) ? pdx : 0f);
+            float pcy = y + ((state == LAUNCH && dragging) ? pdy : 0f);
+            int band = Color.rgb(200, 70, 50);
+            if (state == START || state == LAUNCH || state == FLIP) {
+                line(c, tx - 6, top - 17, pcx - 2, pcy - 2, band, 2);
+                line(c, tx + 5, top - 17, pcx + 2, pcy - 2, band, 2);
+            } else {
+                line(c, tx - 6, top - 17, tx, top - 12, band, 2);     // slack after the launch
+                line(c, tx + 5, top - 17, tx, top - 12, band, 2);
+            }
+        }
+
+        void drawLaunchUi(Canvas c) {
+            float dx = dragging ? pdx : lastDx, dy = dragging ? pdy : lastDy;
+            float lvx = -dx / MAXPULL, lvy = -dy / MAXPULL;
+            float vx = (5f + Math.max(0f, lvx) * 7f) * ppm, vy0 = lvy * 13f * ppm;
+            // predicted path, in the frame of the ground
+            for (int i = 1; i <= 20; i++) {
+                float t = i * 0.09f;
+                float ax = playerX + vx * t, ay = (TOWER_TOP - SH_BOT) + vy0 * t + 0.5f * GRAVITY * ppm * t * t;
+                if (ay > floorY - 2 || ax > w) break;
+                rectPx(c, ax - 1, ay - 1, 2, 2, Color.argb(Math.max(60, 230 - i * 9), 255, 255, 255));
+            }
+            float ang = (float) Math.toDegrees(Math.atan2(-lvy, Math.max(0.05f, 1f + lvx)));
+            float spd = (float) Math.sqrt(lvx * lvx + lvy * lvy) * 13f;
+            int top = Math.round(ceilY) + 5;
+            if (dragging) {
+                text(c, "ANGLE " + Math.round(ang) + "   SPEED " + String.format("%.1f", spd) + " M/S", w / 2f, top, 1, Color.WHITE, 1);
+            } else {
+                text(c, "DRAG BACK AND RELEASE TO LAUNCH", w / 2f, top, 1, Color.rgb(255, 200, 80), 1);
+                text(c, "A QUICK TAP REPEATS YOUR LAST LAUNCH", w / 2f, top + 9, 1, Color.rgb(150, 190, 215), 1);
+            }
+        }
+
+        void drawTopDown(Canvas c) {
+            rectPx(c, 0, 0, w, h, Color.rgb(20, 32, 28));
+            for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(26, 42, 36));
+            for (int gy = 0; gy < h; gy += 16) rectPx(c, 0, gy, w, 1, Color.rgb(26, 42, 36));
+            int bx = Math.round(w * 0.46f), by = 16, bw = w - bx - 14, bh = h - 32;
+            // fence
+            int fence = Color.rgb(150, 150, 165);
+            for (int x = bx - 8; x < bx + bw + 8; x += 4) { rectPx(c, x, by - 8, 2, 2, fence); rectPx(c, x, by + bh + 6, 2, 2, fence); }
+            for (int yy = by - 8; yy < by + bh + 8; yy += 4) { rectPx(c, bx - 8, yy, 2, 2, fence); rectPx(c, bx + bw + 6, yy, 2, 2, fence); }
+            // roof of the enemy lab
+            rectPx(c, bx, by, bw, bh, Color.rgb(40, 50, 72));
+            rectPx(c, bx + 2, by + 2, bw - 4, bh - 4, Color.rgb(68, 80, 106));
+            int sw = (bw - 28) / 3;
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 2; j++) {
+                    int sx = bx + 8 + i * (sw + 6), sy = by + 8 + j * (bh - 44);
+                    rectPx(c, sx, sy, sw, 14, Color.rgb(30, 70, 100));
+                    rectPx(c, sx + 1, sy + 1, sw - 2, 12, Color.rgb(60, 140, 180));
+                    rectPx(c, sx + 2 + ((int) (clock * 20) + i * 9 + j * 5) % Math.max(1, sw - 6), sy + 2, 3, 10, Color.argb(90, 255, 255, 255));
+                }
+            }
+            text(c, "ENEMY LAB", bx + bw / 2f, by + bh / 2f - 4, 2, Color.rgb(205, 70, 70), 1);
+            // the hatch you are breaking in through
+            int hx = bx + 6, hy = by + bh / 2 + 10;
+            rectPx(c, hx, hy, 14, 10, Color.rgb(30, 34, 46));
+            rectPx(c, hx + 1, hy + 1, 12, 8, Color.rgb(90, 96, 110));
+            if (((int) (clock * 3) & 1) == 0) rectPx(c, hx + 5, hy + 4, 4, 2, Color.rgb(255, 70, 60));
+            // searchlights sweeping from two corners
+            for (int k = 0; k < 2; k++) {
+                float cx = k == 0 ? bx : bx + bw, cy = k == 0 ? by : by + bh;
+                float a = clock * (k == 0 ? 0.9f : -0.8f) + k * 2.1f;
+                path.reset();
+                path.moveTo(cx, cy);
+                path.lineTo(cx + (float) Math.cos(a - 0.18) * 80, cy + (float) Math.sin(a - 0.18) * 80);
+                path.lineTo(cx + (float) Math.cos(a + 0.18) * 80, cy + (float) Math.sin(a + 0.18) * 80);
+                path.close();
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.argb(46, 255, 245, 160));
+                c.drawPath(path, p);
+            }
+            // patrolling scientists in white coats
+            for (int i = 0; i < 5; i++) {
+                float t = (clock * 0.07f + i * 0.2f) % 1f;
+                float px0, py0;
+                float per = t * 4f;
+                int rx0 = bx + 6, ry0 = by + 6, rw = bw - 12, rh = bh - 12;
+                if (per < 1f) { px0 = rx0 + rw * per; py0 = ry0; }
+                else if (per < 2f) { px0 = rx0 + rw; py0 = ry0 + rh * (per - 1f); }
+                else if (per < 3f) { px0 = rx0 + rw * (3f - per); py0 = ry0 + rh; }
+                else { px0 = rx0; py0 = ry0 + rh * (4f - per); }
+                rectPx(c, px0 - 2, py0 - 2, 5, 5, Color.rgb(8, 10, 20));
+                rectPx(c, px0 - 1, py0 - 1, 3, 3, Color.rgb(245, 247, 252));
+                rectPx(c, px0, py0, 1, 1, Color.rgb(110, 70, 40));
+            }
+            // your launch tower, seen from above, and the way in
+            int tx = Math.round(w * 0.13f), ty = Math.round(h * 0.66f);
+            rectPx(c, tx - 11, ty - 11, 22, 22, Color.rgb(46, 54, 70));
+            rectPx(c, tx - 9, ty - 9, 18, 18, Color.rgb(112, 126, 150));
+            rectPx(c, tx - 1, ty - 1, 3, 8, Color.rgb(120, 78, 44));
+            rectPx(c, tx - 6, ty - 8, 3, 8, Color.rgb(160, 108, 64));
+            rectPx(c, tx + 4, ty - 8, 3, 8, Color.rgb(160, 108, 64));
+            rectPx(c, tx - 6, ty + 1, 13, 2, Color.rgb(120, 78, 44));
+            int shown = 3 + ((int) (clock * 9) % 14);
+            for (int i = 0; i < shown; i++) {
+                float f = i / 16f;
+                float ax = tx + 14 + (hx - tx - 18) * f, ay = ty + (hy + 5 - ty) * f - (float) Math.sin(f * Math.PI) * 8;
+                rectPx(c, ax, ay, 2, 2, Color.argb(220, 255, 255, 255));
+            }
+            // briefing
+            text(c, "THE ENEMY LAB STOLE", 10, 22, 1, Color.WHITE, 0);
+            text(c, "THE FORMULA.", 10, 31, 1, Color.WHITE, 0);
+            text(c, "BREAK IN.", 10, 44, 2, Color.rgb(255, 200, 80), 0);
+            if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO CONTINUE", 10, h - 16, 1, Color.rgb(150, 190, 215), 0);
         }
 
         void drawBackground(Canvas c) {
@@ -1672,7 +1905,8 @@ public class Main extends Activity {
             float cyc = runPhase * 0.2f;
             int ph = ((int) (cyc * 4)) & 3;
             boolean thr = thrusting && state == PLAY && jumpDelay <= 0;
-            int left = Math.round(playerX) - 8, top = Math.round(y) - SH_TOP;
+            float aimX = (state == LAUNCH && dragging) ? pdx : 0f, aimY = (state == LAUNCH && dragging) ? pdy : 0f;
+            int left = Math.round(playerX + aimX) - 8, top = Math.round(y + aimY) - SH_TOP;
 
             if (thr) {
                 int fl = 7 + rnd.nextInt(6);
@@ -1796,6 +2030,9 @@ public class Main extends Activity {
         int Color_;
 
         void drawHint(Canvas c) {
+            if (tipT > 0 && state == PLAY && vehicle == 0) {
+                text(c, "HOLD TO FIRE THE JETPACK", w / 2f, ceilY + 28, 1, Color.WHITE, 1);
+            }
             if (hintT > 0 && state == PLAY && vehicle != 0) {
                 text(c, VNAME[vehicle], w / 2f, ceilY + 28, 1, Color.WHITE, 1);
                 text(c, VHINT[vehicle], w / 2f, ceilY + 38, 1, Color.rgb(120, 235, 255), 1);
@@ -1804,7 +2041,7 @@ public class Main extends Activity {
 
         void drawTitle(Canvas c) {
             text(c, "THRUST LAB", w / 2f, h * 0.26f, 4, Color.WHITE, 1);
-            text(c, "TAP TO JUMP, THEN HOLD IN THE AIR TO FIRE THE JETPACK", w / 2f, h * 0.26f + 30, 1, Color.rgb(120, 235, 255), 1);
+            text(c, "BREAK INTO THE ENEMY LAB", w / 2f, h * 0.26f + 30, 1, Color.rgb(120, 235, 255), 1);
             if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO START", w / 2f, h * 0.26f + 44, 1, Color.rgb(255, 200, 80), 1);
         }
 
