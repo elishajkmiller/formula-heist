@@ -75,7 +75,7 @@ public class Main extends Activity {
     /** Short synthesized sound effects, no audio files. */
     static class Sfx {
         static final int RATE = 22050;
-        final AudioTrack[] tr = new AudioTrack[8];
+        final AudioTrack[] tr = new AudioTrack[9];
 
         Sfx() {
             try {
@@ -86,6 +86,7 @@ public class Main extends Activity {
                 tr[Game.S_FLIP] = mk(tone(700, 250, 130, 0.5f, 0f, true));
                 tr[Game.S_WARN] = mk(tone(820, 820, 90, 0.4f, 0f, true));
                 tr[Game.S_DONE] = mk(tone(500, 1400, 260, 0.6f, 0f, true));
+                tr[Game.S_TELE] = mk(tone(1800, 250, 150, 0.5f, 0.15f, true));
                 tr[Game.S_BUILD] = mk(build());
             } catch (Throwable t) { }
         }
@@ -151,11 +152,11 @@ public class Main extends Activity {
     static class Game extends View implements Choreographer.FrameCallback {
 
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3;
-        static final int STOMPER = 1, INVERTER = 2;
+        static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
         static final float BUILD_TIME = 1.5f;
-        static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7;
-        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER"};
-        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY."};
+        static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8;
+        static final String[] VNAME = {"", "SPRING STOMPER", "GRAVITY INVERTER", "QUANTUM ENTANGLER"};
+        static final String[] VHINT = {"", "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP.", "TAP TO FLIP GRAVITY.", "TAP TO TELEPORT TO YOUR TWIN ON THE OTHER SIDE."};
 
         static final float GRAVITY = 22f;       // m/s^2, game gravity (Earth is 9.8)
         static final float THRUST = 38f;        // m/s^2 from the pack, net 16 up
@@ -209,8 +210,9 @@ public class Main extends Activity {
         boolean thrusting, onFloor, running;
         int vehicle, gravDir = 1;
         boolean diving;
-        float invuln, squash, flash, shake, hitstop, hintT, nextCrate, lastCoinSfx, unit = 1f;
+        float teleFromY, telePulse, invuln, squash, flash, shake, hitstop, hintT, nextCrate, lastCoinSfx, unit = 1f;
         Sfx sfx;
+        boolean ghost;
         Vibrator vib;
         float jumpDelay, y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
         int electrons, best;
@@ -271,7 +273,10 @@ public class Main extends Activity {
 
         float hBot() { return vehicle == 0 ? 0.62f * ppm : hhVeh(vehicle); }
 
-        static int hhVeh(int v) { return v == STOMPER ? 10 : 6; }
+        static int hhVeh(int v) { return v == STOMPER ? 10 : v == QUANTUM ? 12 : 6; }
+
+        /** vehicles that stick to a surface and switch which one gravity points at */
+        boolean flips() { return vehicle == INVERTER || vehicle == QUANTUM; }
 
         void sfx(int id) { if (sfx != null) sfx.play(id); }
 
@@ -297,6 +302,21 @@ public class Main extends Activity {
             return true;
         }
 
+        /** jump to the mirror position on the opposite surface, gravity follows */
+        void teleport() {
+            teleFromY = y;
+            for (int i = 0; i < 12; i++) burst(playerX, y);
+            y = ceilY + floorY - y;
+            gravDir = -gravDir;
+            vy = 0;
+            telePulse = 0.25f;
+            shake = Math.max(shake, 1.5f);
+            flash = 0.05f;
+            sfx(S_TELE);
+            buzz(15);
+            for (int i = 0; i < 12; i++) burst(playerX, y);
+        }
+
         void press() {
             if (vehicle == INVERTER) {
                 gravDir = -gravDir;
@@ -305,6 +325,8 @@ public class Main extends Activity {
                 sfx(S_FLIP);
                 buzz(15);
                 for (int i = 0; i < 10; i++) burst(playerX, y);
+            } else if (vehicle == QUANTUM) {
+                teleport();
             } else if (vehicle == STOMPER) {
                 if (!onFloor && squash <= 0) { vy = VFALL; diving = true; sfx(S_FLIP); }
             } else if (onFloor) {
@@ -343,6 +365,7 @@ public class Main extends Activity {
             if (invuln > 0) invuln -= rdt;
             if (hintT > 0) hintT -= rdt;
             if (squash > 0) squash -= rdt;
+            if (telePulse > 0) telePulse -= rdt;
             boolean playing = state == PLAY || state == BUILD;
             float r = vehicle == 0 ? 0.3f * ppm : (vehicle == STOMPER ? 8f : 7f);
 
@@ -351,7 +374,7 @@ public class Main extends Activity {
             boolean fire = thrusting && state == PLAY && vehicle == 0 && jumpDelay <= 0;
             ay = GRAVITY * gravDir - (fire ? THRUST : 0);
             vy += ay * dt;
-            float vmin = vehicle == INVERTER ? -VFALL : -VMAX;
+            float vmin = flips() ? -VFALL : -VMAX;
             if (vy > VFALL) vy = VFALL;
             if (vy < vmin) vy = vmin;
             y += vy * ppm * dt;
@@ -363,7 +386,7 @@ public class Main extends Activity {
                     if (vehicle == INVERTER && vy < -6f) { shake = Math.max(shake, 2f); sfx(S_STOMP); for (int i = 0; i < 6; i++) burst(playerX, y - 6); }
                     vy = 0;
                 }
-                if (vehicle == INVERTER) onFloor = true;
+                if (flips()) onFloor = true;
             }
             if (y > hi) {
                 y = hi;
@@ -414,7 +437,7 @@ public class Main extends Activity {
             float scroll = speed * ppm * dt;
             dist += speed * dt;
             bgOff += scroll * 0.25f;
-            if (onFloor && vehicle == 0) runPhase += speed * dt * 2.2f;
+            if (onFloor && (vehicle == 0 || vehicle == QUANTUM)) runPhase += speed * dt * 2.2f;
 
             spawnLeft -= scroll;
             if (spawnLeft <= 0) spawn();
@@ -578,7 +601,7 @@ public class Main extends Activity {
             if (dist >= nextCrate) {
                 if (vehicle == 0) {
                     Crate k = new Crate();
-                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(2);
+                    k.x = x0; k.y = randY(3f, 6f); k.type = 1 + rnd.nextInt(3);
                     crates.add(k);
                     spawnLeft = 4f * ppm;
                     nextCrate = dist + 220 + rnd.nextInt(150);
@@ -718,7 +741,25 @@ public class Main extends Activity {
             "......UUUUUUUU......"
         };
 
+        static final String[] BOARD = {
+            "..mMMMMMMMMMMMMMMm..",
+            "...mmmmmmmmmmmmmm...",
+            "..UU............UU.."
+        };
+        /** the scientist standing on a board with two linked orbs, padded to the vehicle width */
+        static final String[] QUANT = quant();
+
+        static String[] quant() {
+            String[] out = new String[SPR_HEAD.length + LEGS_A.length + BOARD.length];
+            int n = 0;
+            for (String r : SPR_HEAD) out[n++] = ".." + r + "..";
+            for (String r : LEGS_A) out[n++] = ".." + r + "..";
+            for (String r : BOARD) out[n++] = r;
+            return out;
+        }
+
         static String[] vehRows(int type, boolean compressed) {
+            if (type == QUANTUM) return QUANT;
             if (type == INVERTER) return POD;
             String[] legs = compressed ? LEGS_STOMP_C : LEGS_STOMP;
             String[] out = Arrays.copyOf(BODY_STOMP, BODY_STOMP.length + legs.length);
@@ -813,7 +854,7 @@ public class Main extends Activity {
                 for (int k = 0; k < row.length(); k++) {
                     int col = pal(row.charAt(k));
                     if (col == 0) continue;
-                    p.setColor(col);
+                    p.setColor(ghost ? Color.argb(110, 120, 235, 255) : col);
                     c.drawRect(left + k, top + r, left + k + 1, top + r + 1, p);
                 }
             }
@@ -831,6 +872,10 @@ public class Main extends Activity {
             drawMissiles(c);
             drawParticles(c);
             drawPlayer(c);
+            if (telePulse > 0) {
+                ring(c, playerX, teleFromY, telePulse / 0.25f);
+                ring(c, playerX, y, telePulse / 0.25f);
+            }
             if (state == BUILD) drawBuild(c);
             drawHud(c);
             if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
@@ -977,7 +1022,39 @@ public class Main extends Activity {
             sprite(c, legs, left, top + SPR_HEAD.length);
         }
 
+        void quantumBody(Canvas c, int cy, boolean flip) {
+            int left = Math.round(playerX) - 10, top = cy - 12;
+            if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
+            int ph = ((int) (runPhase * 0.28f * 4)) & 3;
+            String[] legs = ph == 0 ? LEGS_A : ph == 2 ? LEGS_B : LEGS_M;
+            sprite(c, SPR_HEAD, left + 2, top);
+            sprite(c, legs, left + 2, top + SPR_HEAD.length);
+            sprite(c, BOARD, left, top + SPR_HEAD.length + LEGS_A.length);
+            if (flip) c.restore();
+        }
+
+        void ring(Canvas c, float cx, float cy, float t) {
+            int rr = (int) ((1f - t) * 18) + 2;
+            int col = Color.argb((int) (t * 4 * 255 > 255 ? 255 : t * 4 * 255), 120, 235, 255);
+            rectPx(c, cx - rr, cy - rr, rr * 2, 1, col);
+            rectPx(c, cx - rr, cy + rr, rr * 2, 1, col);
+            rectPx(c, cx - rr, cy - rr, 1, rr * 2, col);
+            rectPx(c, cx + rr, cy - rr, 1, rr * 2 + 1, col);
+        }
+
+        void drawQuantum(Canvas c) {
+            int cy = Math.round(y), gy = Math.round(ceilY + floorY - y);
+            for (int yy = Math.min(cy, gy) + 14; yy < Math.max(cy, gy) - 14; yy += 4) {
+                if (rnd.nextInt(5) > 0) rectPx(c, playerX, yy, 1, 2, Color.argb(120, 120, 235, 255));
+            }
+            ghost = true;
+            quantumBody(c, gy, gravDir > 0);     // the entangled twin on the other side
+            ghost = false;
+            quantumBody(c, cy, gravDir < 0);
+        }
+
         void drawVehicle(Canvas c) {
+            if (vehicle == QUANTUM) { drawQuantum(c); return; }
             int left = Math.round(playerX) - 10;
             int hh = hhVeh(vehicle);
             int cy = Math.round(y);
@@ -1021,7 +1098,7 @@ public class Main extends Activity {
                     }
                 }
             }
-            if (buildT > BUILD_TIME * 0.9f) {
+            if (buildT > BUILD_TIME * 0.9f && buildType != QUANTUM) {
                 int headTop = top + (buildType == STOMPER ? 2 : 3);
                 sprite(c, HEAD_ONLY, left, headTop);
             }
