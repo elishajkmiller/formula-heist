@@ -503,7 +503,7 @@ public class Main extends Activity {
             float scroll = speed * ppm * dt;
             dist += speed * dt;
             bgOff += scroll * 0.25f;
-            if (onFloor && (vehicle == 0 || vehicle == QUANTUM)) runPhase += speed * dt * 2.2f;
+            if (onFloor && (vehicle == 0 || vehicle == QUANTUM)) runPhase += dt * 11f;     // steps at a fixed rate, they do not speed up with the world
 
             spawnLeft -= scroll;
             if (spawnLeft <= 0) spawn();
@@ -822,7 +822,7 @@ public class Main extends Activity {
             "..NN.wwwwwww...."
         };
         static final String[] SPR_HEAD_B = {
-            "......b..bb.....",
+            ".......b..bb....",
             ".....bBbBBBb....",
             "....bBBBBBBBBb..",
             "....BBBSSSSSSS..",
@@ -831,7 +831,7 @@ public class Main extends Activity {
             "....BsSSEESEESs.",
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
-            "..P..saaaaaaaa..",
+            "..P..saaannaaa..",
             ".hOOowwWWWWW....",
             ".hOOowxxxxSS....",
             ".OOOowxxxxSN....",
@@ -860,7 +860,7 @@ public class Main extends Activity {
             "..NN.wwwwwww...."
         };
         static final String[] SPR_RUN3 = {
-            "......b..bb.....",
+            ".......b..bb....",
             ".....bBbBBBb....",
             "....bBBBBBBBBb..",
             "....BBBSSSSSSS..",
@@ -869,7 +869,7 @@ public class Main extends Activity {
             "....BsSSEESEESs.",
             "..P.BsSaSSSSsSS.",
             "..P.Bsaaeeeeeaa.",
-            "..P..saaaaaaaa..",
+            "..P..saaannaaa..",
             ".hOOowwWWWWW....",
             ".hOOowxxxxSS....",
             ".OOOowxxxxSN....",
@@ -877,6 +877,26 @@ public class Main extends Activity {
             ".hOOowwWWWWW....",
             ".NNNNwwwwwww....",
             "..NN.wwwwwww...."
+        };
+        /** skin over the top row of the eyes, drawn on top of the head for a blink */
+        static final String[] SPR_BLINK = {
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "........SSSSS...",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................"
         };
         /** upper body per run phase: same outline, shading and tie shift so the torso seems to turn */
         static final String[][] SPR_RUN = {SPR_HEAD, SPR_HEAD_B, SPR_RUN2, SPR_RUN3};
@@ -1617,6 +1637,7 @@ public class Main extends Activity {
             outlined(c, legs, left, top + SPR_HEAD.length);
             leanPx = lean;
             outlined(c, body, left + dx, top + dy);
+            if ((clock % 2.8f) < 0.12f) sprite(c, SPR_BLINK, left + dx, top + dy);
             leanPx = 0;
         }
 
