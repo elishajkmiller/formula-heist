@@ -1927,24 +1927,24 @@ public class Main extends Activity {
             "................",
             ".....bBBBBBBb...",
             "....bBBBBBBBBb..",
-            "...BBBBBBSSSSBB.",
-            "...BSFFFFFFFFSB.",
-            "...BSFEeSSEeFSB.",
-            "...BSFEESSEEFSB.",
-            "...BsSSBBBBSSsB.",
-            "....ssSSeeSSss.."
+            "....BBBBBSSSSB..",
+            "....BSFFFFFFSB..",
+            "....BSFEeSEeFB..",
+            "....BSFEESEEFB..",
+            "....BsSBBBBSsB..",
+            ".....sSSeeSSs..."
         };
         static final String[] HEAD_M_B = {
             "................",
             "................",
             ".....bBBBBBBb...",
             "....bBBBBBBBBb..",
-            "...BBBBBBSSSSBB.",
-            "...BSFFFFFFFFSB.",
-            "...BSFEeSSEeFSB.",
-            "...BSFEESSEEFSB.",
-            "...BsSSBBBBSSsB.",
-            "....ssSSnnSSss.."
+            "....BBBBBSSSSB..",
+            "....BSFFFFFFSB..",
+            "....BSFEeSEeFB..",
+            "....BSFEESEEFB..",
+            "....BsSBBBBSsB..",
+            ".....sSSnnSSs..."
         };
         static final String[] HEAD_F = {
             "................",
@@ -1976,7 +1976,7 @@ public class Main extends Activity {
          * replaces the collar and tie, and her hair falls over the back shoulder. The chest itself is a separate
          * sprite (BUST) so it can jiggle.
          */
-        static String[] femaleBody(String[] body) {
+        static String[] femaleBody(String[] body, int phase) {
             char[][] r = new char[body.length][];
             for (int i = 0; i < body.length; i++) r[i] = body[i].toCharArray();
             for (int i = 3; i >= 1; i--) {                  // lower the arm by one row
@@ -1990,6 +1990,9 @@ public class Main extends Activity {
                 else if (r[1][c] == 't') r[1][c] = 'W';
             }
             for (int i = 0; i < 4; i++) r[i][4] = 'B';
+            // loose ends of hair flutter behind her, a row lower on each step (see the running girl reference)
+            int fl = new int[] {0, 1, 2, 1}[phase & 3];
+            for (int i = fl; i < fl + 2 && i < 5; i++) if (r[i][3] == 'O' || r[i][3] == 'o' || r[i][3] == 'h' || r[i][3] == '.') r[i][3] = 'B';
             String[] out = new String[body.length];
             for (int i = 0; i < body.length; i++) out[i] = new String(r[i]);
             return out;
@@ -2023,7 +2026,12 @@ public class Main extends Activity {
         }
 
         /** the chest sits a little lower or higher than its rest place as it springs after the body */
-        int bustPx() { return Math.max(-1, Math.min(1, Math.round(bustOff))); }
+        static final int[] STEP_BUST = {-1, 0, 1, 0};     // the chest rides up and down with the four run frames
+
+        int bustPx() {
+            int step = onFloor && state == PLAY ? STEP_BUST[((int) (runPhase * 0.2f * 4)) & 3] : 0;
+            return Math.max(-1, Math.min(1, Math.round(bustOff) + step));
+        }
 
         /** draw the chest at the sprite's top left; only the free edges get an outline so it does not cut into the coat */
         void drawBust(Canvas c, int left, int top) {
@@ -2048,7 +2056,7 @@ public class Main extends Activity {
             int ph = ((int) (runPhase * 0.2f * 4)) & 3;
             if (ph != lastPh) {
                 lastPh = ph;
-                if (onFloor) bustV += ((ph & 1) == 0 ? 1 : -1) * 16f;
+                if (onFloor) bustV += ((ph & 1) == 0 ? 1 : -1) * 30f;
             }
             bustV += (-400f * bustOff - 16f * bustV) * dt;
             bustOff = Math.max(-2f, Math.min(2f, bustOff + bustV * dt));
@@ -2060,10 +2068,11 @@ public class Main extends Activity {
                 boolean alt = (k & 1) == 1;      // the second and fourth step have the mouth open
                 String[] head = female ? (alt ? HEAD_F_B : HEAD_F) : (alt ? HEAD_M_B : HEAD_M);
                 String[] body = Arrays.copyOfRange(MALE[k], HEAD_ROWS, MALE[k].length);
-                if (female) body = femaleBody(body);
+                if (female) body = femaleBody(body, k);
                 for (int i = 0; i < HEAD_ROWS; i++) SPR_RUN[k][i] = head[i];
                 for (int i = 0; i < body.length; i++) SPR_RUN[k][HEAD_ROWS + i] = body[i];
             }
+            SPR_BLINK[6] = female ? "......SS..SS...." : ".......SS.SS....";     // the lids cover wherever this face's eyes are
             // the vehicle cockpits show just the face, without the hose or the long hair outside the glass
             for (int i = 0; i < HEAD_ROWS; i++) HEAD_ONLY[i] = ("...." + SPR_HEAD[i].substring(4)).replace('P', '.');
             for (int i = 0; i < SPR_HEAD.length; i++) QUANT[i] = ".." + SPR_HEAD[i] + "..";
