@@ -2,3 +2,4 @@ build/
 dist/
 tools/*.jar
 tools/aapt2
+debug.keystore
