@@ -1995,7 +1995,7 @@ public class Main extends Activity {
             "............Bb.."
         };
 
-        static final String[] BUST = {"WW.", "WWW", "WWw", "ww."};
+        static final String[] BUST = {"WW.", "WWw", "ww."};      // small, on the upper chest just under the collar
 
         void drawHairBack(Canvas c, int left, int top) {
             if (female) outlined(c, HAIR_BACK, left, top);
@@ -2007,7 +2007,7 @@ public class Main extends Activity {
         /** draw the chest at the sprite's top left; only the free edges get an outline so it does not cut into the coat */
         void drawBust(Canvas c, int left, int top) {
             if (!female) return;
-            int x = left + 11, y = top + 11 + bustPx();
+            int x = left + 11, y = top + 10 + bustPx();
             float lp = leanPx;
             leanPx = 0;
             outline = true;
