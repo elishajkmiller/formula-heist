@@ -188,7 +188,7 @@ public class Main extends Activity {
 
         // ---------- constants ----------
 
-        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5;
+        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6;
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
         static final int NF = 20;                // formulas to recover
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
@@ -206,6 +206,24 @@ public class Main extends Activity {
 
         static final int[] COATS = {Color.rgb(235, 240, 248), Color.rgb(190, 215, 240), Color.rgb(205, 205, 215)};
         static final int[] HAIRS = {Color.rgb(110, 70, 40), Color.rgb(30, 30, 40), Color.rgb(170, 170, 180), Color.rgb(190, 90, 50)};
+
+        // ---------- outfit store ----------
+
+        static final String[] ONAME = {"LAB COAT", "FIRE RED", "OCEAN BLUE", "NIGHT SHIFT", "GOLD RUSH", "PINK STORM", "HAZMAT", "STEALTH"};
+        static final int[] OCOST = {0, 25, 25, 40, 40, 60, 60, 100};      // electrons
+        /** sprite letters an outfit recolours, in the order of the colours below */
+        static final char[] OKEYS = {'W', 'w', 'x', 'D', 'd', 'O', 'o', 'h', 't', 'V'};
+        static final int[][] OPAL = {
+            null,
+            new int[] {Color.rgb(220, 70, 60), Color.rgb(170, 45, 45), Color.rgb(130, 35, 40), Color.rgb(60, 40, 50), Color.rgb(90, 60, 70), Color.rgb(250, 200, 70), Color.rgb(190, 140, 40), Color.rgb(255, 230, 120), Color.rgb(255, 220, 80), Color.rgb(235, 235, 240)},
+            new int[] {Color.rgb(90, 160, 240), Color.rgb(60, 120, 200), Color.rgb(45, 90, 160), Color.rgb(30, 40, 80), Color.rgb(50, 66, 110), Color.rgb(240, 240, 250), Color.rgb(170, 175, 195), Color.rgb(255, 255, 255), Color.rgb(255, 255, 255), Color.rgb(200, 230, 255)},
+            new int[] {Color.rgb(70, 72, 86), Color.rgb(50, 52, 64), Color.rgb(38, 40, 52), Color.rgb(24, 26, 36), Color.rgb(40, 44, 60), Color.rgb(120, 235, 255), Color.rgb(60, 150, 170), Color.rgb(200, 250, 255), Color.rgb(120, 235, 255), Color.rgb(160, 170, 190)},
+            new int[] {Color.rgb(245, 205, 90), Color.rgb(205, 160, 55), Color.rgb(165, 120, 40), Color.rgb(70, 50, 30), Color.rgb(100, 76, 46), Color.rgb(70, 70, 80), Color.rgb(40, 40, 50), Color.rgb(110, 110, 125), Color.rgb(120, 40, 40), Color.rgb(255, 245, 220)},
+            new int[] {Color.rgb(255, 140, 190), Color.rgb(215, 100, 150), Color.rgb(170, 75, 120), Color.rgb(90, 50, 110), Color.rgb(125, 80, 150), Color.rgb(120, 235, 255), Color.rgb(60, 150, 170), Color.rgb(200, 250, 255), Color.rgb(255, 255, 255), Color.rgb(255, 230, 245)},
+            new int[] {Color.rgb(235, 225, 70), Color.rgb(195, 185, 45), Color.rgb(150, 140, 35), Color.rgb(215, 205, 55), Color.rgb(245, 235, 90), Color.rgb(200, 200, 205), Color.rgb(140, 140, 150), Color.rgb(240, 240, 245), Color.rgb(40, 40, 40), Color.rgb(235, 225, 70)},
+            new int[] {Color.rgb(40, 40, 46), Color.rgb(28, 28, 34), Color.rgb(20, 20, 26), Color.rgb(20, 20, 26), Color.rgb(34, 34, 42), Color.rgb(70, 70, 80), Color.rgb(40, 40, 50), Color.rgb(100, 100, 115), Color.rgb(200, 50, 50), Color.rgb(60, 62, 70)}
+        };
+        static final int[] OVR = new int[128];     // the equipped outfit's colours, looked up by pal()
 
         // ---------- text data: death-card facts and the 20 formulas ----------
 
@@ -354,6 +372,11 @@ public class Main extends Activity {
         int bounces;
         float ang, angV, settleT, finalDist;
 
+        // outfit store
+        int bank, outfitsOwned = 1, outfit, storeFrom, sbx, sby, sbw, sbh;   // bank: electrons kept across runs
+        float storeMsgT;
+        String storeMsg = "";
+
         // formula archive
         int ownedMask, scratchedMask;                // bit i set: formula i recovered / scratched off
         int archFrom, selCard, mcols, mrows, cleared;
@@ -367,12 +390,27 @@ public class Main extends Activity {
         Vibrator vib;
         float lastCoinSfx, lastScratchSfx;
 
+        void saveStore() {
+            prefs.edit().putInt("bank", bank).putInt("outfits", outfitsOwned).putInt("outfit", outfit).apply();
+        }
+
+        /** make the sprites use an outfit's colours (0 is the plain lab coat) */
+        static void applyOutfit(int idx) {
+            java.util.Arrays.fill(OVR, 0);
+            if (idx <= 0 || OPAL[idx] == null) return;
+            for (int i = 0; i < OKEYS.length; i++) OVR[OKEYS[i]] = OPAL[idx][i];
+        }
+
         Game(Context c) {
             super(c);
             prefs = c.getSharedPreferences("jetlab", Context.MODE_PRIVATE);
             best = prefs.getInt("best", 0);
             ownedMask = prefs.getInt("owned", 0);
             scratchedMask = prefs.getInt("scratched", 0);
+            bank = prefs.getInt("bank", 0);
+            outfitsOwned = prefs.getInt("outfits", 1) | 1;
+            outfit = prefs.getInt("outfit", 0);
+            applyOutfit(outfit);
             p.setAntiAlias(false);
             blit.setFilterBitmap(false);
             ovp.setTypeface(Typeface.create(Typeface.SERIF, Typeface.ITALIC));
@@ -393,6 +431,7 @@ public class Main extends Activity {
             running = false;
             Choreographer.getInstance().removeFrameCallback(this);
             thrusting = false;
+            saveStore();
             if (sfx != null) { sfx.release(); sfx = null; }
         }
 
@@ -409,7 +448,8 @@ public class Main extends Activity {
             floorY = h - 11;
             ceilY = 11;
             playerX = w * 0.22f;
-            abw = 66; abh = 11; abx = w - abw - 4; aby = h - 12;
+            abw = 76; abh = 11; abx = w - abw - 4; aby = h - 12;
+            sbw = 62; sbh = 11; sbx = 4; sby = h - 12;
             cbw = 36; cbh = 11; cbx = w - cbw - 4; cby = 3;
             scw = Math.min(200, w - 24); sch = 104; scx = (w - scw) / 2; scy = 24;
             if (state == START) toStart(true);
@@ -494,7 +534,11 @@ public class Main extends Activity {
             float gx = e.getX() / unit, gy = e.getY() / unit;
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    if (archiveButtonHit(gx, gy)) {
+                    if (storeButtonHit(gx, gy)) {
+                        storeFrom = state; state = STORE; thrusting = false;
+                    } else if (state == STORE) {
+                        storeTap(gx, gy);
+                    } else if (archiveButtonHit(gx, gy)) {
                         archFrom = state; state = ARCHIVE; dragging = false; thrusting = false;
                     } else if (state == START) {
                         state = PLAY; breaking = true; stateTime = 0; tipT = 4f;
@@ -572,6 +616,76 @@ public class Main extends Activity {
             pvy[k] = (rnd.nextFloat() - 0.4f) * 5f * ppm;
             pl[k] = 0.45f;
             pcol[k] = Color.rgb(200 + rnd.nextInt(40), 205 + rnd.nextInt(40), 220);
+        }
+
+        // ---------- outfit store: spend electrons on new looks ----------
+
+        boolean storeButtonHit(float gx, float gy) {
+            if (!(state == START || (state == DEAD && stateTime > 0.3f))) return false;
+            return gx >= sbx && gx < sbx + sbw && gy >= sby && gy < sby + sbh;
+        }
+
+        void drawStoreButton(Canvas c) {
+            rectPx(c, sbx, sby, sbw, sbh, Color.rgb(8, 10, 20));
+            rectPx(c, sbx + 1, sby + 1, sbw - 2, sbh - 2, Color.rgb(44, 54, 82));
+            text(c, "OUTFITS E- " + bank, sbx + sbw / 2f, sby + 3, 1, Color.WHITE, 1);
+        }
+
+        /** x, y, width, height of outfit card i: four across, two down */
+        int[] storeRect(int i) {
+            int cw = (w - 12) / 4;
+            return new int[] {6 + (i % 4) * cw, 22 + (i / 4) * 60, cw - 3, 58};
+        }
+
+        void storeTap(float gx, float gy) {
+            if (closeHit(gx, gy)) { state = storeFrom; saveStore(); return; }
+            for (int i = 0; i < ONAME.length; i++) {
+                int[] r = storeRect(i);
+                if (gx < r[0] || gx >= r[0] + r[2] || gy < r[1] || gy >= r[1] + r[3]) continue;
+                if ((outfitsOwned >> i & 1) != 0) {
+                    outfit = i; applyOutfit(i); saveStore();
+                    sfx(S_COIN);
+                } else if (bank >= OCOST[i]) {
+                    bank -= OCOST[i]; outfitsOwned |= 1 << i; outfit = i; applyOutfit(i); saveStore();
+                    flash = 0.15f; sfx(S_DONE); buzz(30);
+                    for (int k = 0; k < 30; k++) confetti(r[0] + r[2] / 2f, r[1] + 20);
+                } else {
+                    storeMsg = "NEED " + (OCOST[i] - bank) + " MORE E-"; storeMsgT = 1.6f;
+                    shake = 2f; sfx(S_WARN);
+                }
+                return;
+            }
+        }
+
+        void drawStore(Canvas c) {
+            rectPx(c, 0, 0, w, h, Color.rgb(16, 20, 34));
+            for (int gx = 0; gx < w; gx += 16) rectPx(c, gx, 0, 1, h, Color.rgb(20, 26, 42));
+            text(c, "OUTFIT STORE", 8, 5, 1, Color.rgb(255, 215, 120), 0);
+            text(c, "E- " + bank, 8, 13, 1, Color.rgb(120, 235, 255), 0);
+            if (storeMsgT > 0) text(c, storeMsg, w / 2f, 9, 1, Color.rgb(255, 120, 100), 1);
+            closeButton(c);
+            for (int i = 0; i < ONAME.length; i++) {
+                int[] r = storeRect(i);
+                boolean own = (outfitsOwned >> i & 1) != 0, on = outfit == i;
+                rectPx(c, r[0], r[1], r[2], r[3], on ? Color.rgb(255, 200, 80) : own ? Color.rgb(90, 100, 130) : Color.rgb(8, 10, 20));
+                rectPx(c, r[0] + 1, r[1] + 1, r[2] - 2, r[3] - 2, Color.rgb(28, 34, 52));
+                // the scientist wearing it, drawn twice as big
+                applyOutfit(i);
+                c.save();
+                c.translate(r[0] + 6, r[1] + 6);
+                c.scale(2f, 2f);
+                outlined(c, LEGS_A, 0, SPR_HEAD.length);
+                outlined(c, SPR_HEAD, 0, 0);
+                c.restore();
+                applyOutfit(outfit);
+                int tx = r[0] + 42, tw = r[2] - 44;
+                wrapOut(c, ONAME[i], tx + tw / 2f, r[1] + 6, 1, Color.WHITE, tw, false);
+                String st = on ? "WORN" : own ? "OWNED" : OCOST[i] + " E-";
+                int sc = on ? Color.rgb(255, 215, 120) : own ? Color.rgb(150, 190, 215) : bank >= OCOST[i] ? Color.rgb(120, 255, 160) : Color.rgb(255, 130, 110);
+                textOut(c, st, tx + tw / 2f, r[1] + r[3] - 12, 1, sc, 1, false);
+            }
+            text(c, "TAP AN OUTFIT TO BUY IT OR WEAR IT", w / 2f, h - 7, 1, Color.rgb(150, 190, 215), 1);
+            drawParticles(c);
         }
 
         // ---------- archive: the recovered formulas, scratch off to reveal ----------
@@ -659,7 +773,9 @@ public class Main extends Activity {
             boolean fresh = (ownedMask & ~scratchedMask) != 0;
             rectPx(c, abx, aby, abw, abh, Color.rgb(8, 10, 20));
             rectPx(c, abx + 1, aby + 1, abw - 2, abh - 2, fresh && ((int) (clock * 3) & 1) == 0 ? Color.rgb(130, 100, 30) : Color.rgb(44, 54, 82));
-            text(c, "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF, abx + abw / 2f, aby + 3, 1, Color.WHITE, 1);
+            String label = "FORMULAS " + Integer.bitCount(ownedMask) + "/" + NF;
+            if (fresh && ((int) (clock * 1.6f) & 1) == 0) label = "NEW CARD WAITING";
+            text(c, label, abx + abw / 2f, aby + 3, 1, Color.WHITE, 1);
         }
 
         // ---------- the prism on every scratch card ----------
@@ -926,7 +1042,7 @@ public class Main extends Activity {
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
 
-            boolean waiting = state == START || state == ARCHIVE || state == SCRATCH;   // the scene holds still until he runs
+            boolean waiting = state == START || state == ARCHIVE || state == SCRATCH || state == STORE;   // the scene holds still until he runs
             float nsc = (bgOff - lastBg) * 2.4f;       // background scientists move at 60% of the floor
             lastBg = bgOff;
             npcLeft -= nsc;
@@ -941,7 +1057,8 @@ public class Main extends Activity {
 
             float dt = rdt;
             if (state == DEAD) { updateDead(dt); return; }
-            if (state == ARCHIVE || state == SCRATCH) {
+            if (state == ARCHIVE || state == SCRATCH || state == STORE) {
+                if (storeMsgT > 0) storeMsgT -= dt;
                 for (int i = 0; i < NP; i++) {
                     if (pl[i] > 0) {
                         pl[i] -= dt;
@@ -1063,7 +1180,7 @@ public class Main extends Activity {
                 c.x -= scroll;
                 float dx = c.x - playerX, dy = c.y - y;
                 if (!c.taken && dx * dx + dy * dy < (r + 0.22f * ppm) * (r + 0.22f * ppm)) {
-                    c.taken = true; electrons++;
+                    c.taken = true; electrons++; bank++;
                     if (clock - lastCoinSfx > 0.06f) { sfx(S_COIN); lastCoinSfx = clock; }
                 }
                 if (c.x < -ppm || c.taken) coins.remove(i);
@@ -1164,6 +1281,7 @@ public class Main extends Activity {
             buzz(120);
             fact = FACTS[rnd.nextInt(FACTS.length)];
             finalDist = dist;
+            saveStore();
             int score = (int) dist;
             if (score > best) {
                 best = score;
@@ -1714,6 +1832,8 @@ public class Main extends Activity {
         }
 
         static int pal(char ch) {
+            int ov = ch < 128 ? OVR[ch] : 0;
+            if (ov != 0) return ov;
             switch (ch) {
                 case 'B': return Color.rgb(80, 50, 30);
                 case 'b': return Color.rgb(135, 90, 55);
@@ -1785,13 +1905,14 @@ public class Main extends Activity {
             if (w == 0 || bc == null) return;
             Canvas c = bc;
             ovs.clear();
-            if (state == ARCHIVE) drawArchive(c);
+            if (state == STORE) drawStore(c);
+            else if (state == ARCHIVE) drawArchive(c);
             else if (state == SCRATCH) drawScratch(c);
             else drawScene(c);
             if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
-            if (state == START || state == DEAD) drawArchiveButton(c);
+            if (state == START || state == DEAD) { drawArchiveButton(c); drawStoreButton(c); }
             out.save();
             if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);
@@ -2561,10 +2682,7 @@ public class Main extends Activity {
             text(c, electrons + " ELECTRONS   " + Integer.bitCount(ownedMask) + "/" + NF + " FORMULAS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
             wrapText(c, fact, w / 2f, h * 0.18f + 50, 1, Color.rgb(210, 220, 235), (int) (w * 0.7f));
             if (((int) (clock * 2) & 1) == 0) {
-                text(c, "TAP TO TRY AGAIN", w / 2f, h * 0.84f, 1, Color.rgb(255, 200, 80), 1);
-            }
-            if ((ownedMask & ~scratchedMask) != 0 && ((int) (clock * 3) & 1) == 0) {
-                text(c, "A NEW CARD IS WAITING IN THE ARCHIVE", w / 2f, h * 0.84f - 10, 1, Color.rgb(255, 215, 120), 1);
+                text(c, "TAP TO CONTINUE", w / 2f, 106, 2, Color.rgb(255, 200, 80), 1);
             }
         }
     }

@@ -25,3 +25,6 @@ UI text is a small 3x5 pixel font (CH/GL in Main.java: A-Z, 0-9 and . , ! - + / 
 
 ## Code map (src/com/example/jetlab/Main.java)
 Main (Activity, fullscreen, pause/resume) and Game (the View). Game is organised in labelled sections: constants and text data, game state (grouped by drawing, world, particles, run, break-in, vehicles, death, archive, sound), touch input, archive and prism helpers, physics (update loop, death ragdoll), vehicles, spawning, drawing, the yard and wall, rooms, player and vehicle sprites, HUD and screens, and the pixel font. Sfx synthesizes the sounds on a background thread. Build with ./build.sh; nothing outside Main.java and tools/ is needed.
+
+## Outfit store
+Electrons you collect are banked across runs (prefs "bank"). The OUTFITS button (bottom left on the title and death screens) opens the store: 8 outfits (ONAME/OCOST/OPAL), each recolours the scientist's sprite letters W w x (coat), D d (pants), O o h (jetpack), t (tie), V (collar) through the OVR table that pal() checks first. Tap a card to buy it or wear it; owned outfits and the worn one are saved. The archive button (bottom right) blinks "NEW CARD WAITING" when there is an unscratched card, and the death screen says "TAP TO CONTINUE".
