@@ -2242,16 +2242,23 @@ public class Main extends Activity {
                     path.lineTo(Math.round(ax + (bx - ax) * t + nx * j), Math.round(ay2 + (by - ay2) * t + ny * j));
                 }
                 path.lineTo(Math.round(bx), Math.round(by));
+                // a soft glow: a wide faint halo, then a tighter one, around the bright core
                 p.setStyle(Paint.Style.STROKE);
                 p.setStrokeJoin(Paint.Join.MITER);
-                p.setStrokeWidth(4);
-                p.setColor(Color.argb(70, 120, 200, 255));
+                p.setStrokeWidth(9);
+                p.setColor(Color.argb(26, 110, 190, 255));
+                c.drawPath(path, p);
+                p.setStrokeWidth(5);
+                p.setColor(Color.argb(60, 130, 210, 255));
                 c.drawPath(path, p);
                 p.setStrokeWidth(1);
                 p.setColor(Color.rgb(230, 250, 255));
                 c.drawPath(path, p);
+                int pulse = 24 + (int) (14 * Math.sin(clock * 9));
                 for (int e = 0; e < 2; e++) {
                     float nxp = e == 0 ? ax : bx, nyp = e == 0 ? ay2 : by;
+                    rectPx(c, nxp - 7, nyp - 7, 14, 14, Color.argb(pulse, 255, 220, 120));
+                    rectPx(c, nxp - 5, nyp - 5, 10, 10, Color.argb(pulse + 14, 255, 220, 120));
                     rectPx(c, nxp - 4, nyp - 4, 8, 8, Color.rgb(90, 100, 120));
                     rectPx(c, nxp - 3, nyp - 3, 6, 6, Color.rgb(60, 70, 90));
                     rectPx(c, nxp - 2, nyp - 2, 4, 4, Color.rgb(255, 200, 80));
