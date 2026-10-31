@@ -136,3 +136,52 @@ final class Laser extends Hazard {
         }
     }
 }
+
+/**
+ * A long stretch of beams along the floor and the ceiling, taking turns: the floor beam is on, then
+ * both are off for a beat, then the ceiling beam is on. Fly to the safe side as they swap.
+ */
+final class LaserRails extends Hazard {
+    static final float BEAM = 8f;           // how far a beam reaches into the room, in pixels
+
+    LaserRails(float x, float len, float start) { super(x, 0, len, start); }
+
+    boolean floorOn() { return phase % 3f < 1.3f; }
+    boolean ceilOn() { float t = phase % 3f; return t >= 1.5f && t < 2.8f; }
+    boolean floorWarn() { float t = phase % 3f; return t >= 2.6f; }
+    boolean ceilWarn() { float t = phase % 3f; return t >= 1.2f && t < 1.5f; }
+
+    void update(Game g, float dt) {
+        if (x < g.w + 10) phase += dt;       // the cycle starts when it comes on screen
+    }
+
+    boolean hits(Game g, float r) {
+        if (g.playerX < x || g.playerX > x + w) return false;
+        if (floorOn() && g.y + r > g.floorY - BEAM) return true;
+        return ceilOn() && g.y - r < g.ceilY + BEAM;
+    }
+
+    private void beam(Game g, Canvas c, boolean floor, boolean on, boolean warn) {
+        int x0 = Math.max(0, Math.round(x)), x1 = Math.min(g.w, Math.round(x + w));
+        if (x1 <= x0) return;
+        int base = Math.round(floor ? g.floorY : g.ceilY);
+        int by = floor ? base - 6 : base + 3;                                // top of the 3 px beam
+        for (int sx = Math.round(x); sx < x + w; sx += 24) {                  // an emitter every 24 px
+            if (sx < -6 || sx > g.w) continue;
+            g.rectPx(c, sx - 1, floor ? base - 8 : base, 3, 8, Color.rgb(8, 10, 22));
+            g.rectPx(c, sx, floor ? base - 7 : base + 1, 1, 6, Color.rgb(96, 104, 130));
+        }
+        if (on) {
+            g.rectPx(c, x0, by - 2, x1 - x0, 7, Color.argb(70, 255, 70, 60));
+            g.rectPx(c, x0, by, x1 - x0, 3, Color.rgb(255, 90, 80));
+            g.rectPx(c, x0, by + 1, x1 - x0, 1, Color.WHITE);
+        } else if (warn && ((int) (g.clock * 10) & 1) == 0) {
+            for (int sx = x0 - (x0 % 4); sx < x1; sx += 4) g.rectPx(c, sx, by + 1, 2, 1, Color.rgb(255, 120, 110));
+        }
+    }
+
+    void draw(Game g, Canvas c) {
+        beam(g, c, true, floorOn(), floorWarn());
+        beam(g, c, false, ceilOn(), ceilWarn());
+    }
+}
