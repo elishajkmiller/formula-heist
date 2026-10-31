@@ -2241,11 +2241,16 @@ final class Game extends View implements Choreographer.FrameCallback {
             rectPx(c, nx - 2 + sw, base - 1, 2, 1, Color.rgb(30, 30, 40));
             rectPx(c, nx - sw, base - 1, 2, 1, Color.rgb(30, 30, 40));
             // coat
-            rectPx(c, nx - 3, base - 10, 6, 6, coat);
-            rectPx(c, nx - 3, base - 10, 1, 6, shade);
-            if (n.female) {                               // the lab coat flares out like a dress
+            if (n.female) {                               // curvy: a full chest, a narrow waist and wide hips
+                rectPx(c, nx - 3, base - 10, 6, 3, coat);
+                rectPx(c, f > 0 ? nx + 3 : nx - 4, base - 9, 1, 2, coat);     // the bust, on the side she faces
+                rectPx(c, nx - 2, base - 7, 4, 1, coat);
                 rectPx(c, nx - 4, base - 6, 8, 2, coat);
+                rectPx(c, nx - 3, base - 10, 1, 3, shade);
                 rectPx(c, nx - 4, base - 6, 1, 2, shade);
+            } else {
+                rectPx(c, nx - 3, base - 10, 6, 6, coat);
+                rectPx(c, nx - 3, base - 10, 1, 6, shade);
             }
             // far arm swings with the walk
             rectPx(c, nx - f * 3 - sw * f, base - 9, 1, 4, shade);
