@@ -1959,16 +1959,15 @@ public class Main extends Activity {
             "...BBbSSPPSSbBB."
         };
 
-        /** the torso rows for the female: hair over the back of the shoulder and down the front, a rounded chest */
+        /** the torso rows for the female: hair over the back of the shoulder and a fuller rounded chest, lit on top and shaded underneath */
         static String[] femaleBody(String[] body) {
             char[][] r = new char[body.length][];
             for (int i = 0; i < body.length; i++) r[i] = body[i].toCharArray();
-            for (int i = 0; i < 4; i++) {
-                r[i][4] = 'B';
-                if (r[i][12] == '.') r[i][12] = 'B';
-                if (r[i][13] == '.') r[i][13] = 'B';
-            }
-            r[1][11] = 'W'; r[2][11] = 'W'; r[3][11] = 'w'; r[4][11] = 'w';
+            for (int i = 0; i < 4; i++) r[i][4] = 'B';
+            r[1][11] = 'W'; r[1][12] = 'W';
+            r[2][11] = 'W'; r[2][12] = 'W'; r[2][13] = 'W';
+            r[3][11] = 'W'; r[3][12] = 'W'; r[3][13] = 'w';
+            r[4][11] = 'w'; r[4][12] = 'w';
             String[] out = new String[body.length];
             for (int i = 0; i < body.length; i++) out[i] = new String(r[i]);
             return out;
