@@ -945,6 +945,7 @@ public class Main extends Activity {
                 c.translate(r[0] + 6, r[1] + 3);
                 c.scale(2f, 2f);
                 outlined(c, LEGS_A, 0, SPR_HEAD.length);
+                drawHairTail(c, 0, 0);
                 drawHairBack(c, 0, 0);
                 outlined(c, SPR_HEAD, 0, 0);
                 drawBust(c, 0, 0);
@@ -1988,10 +1989,6 @@ public class Main extends Activity {
                 if (r[1][c] == 'V') r[1][c] = 'S';
                 else if (r[1][c] == 't') r[1][c] = 'W';
             }
-            for (int i = 0; i < 4; i++) r[i][4] = 'B';
-            // loose ends of hair flutter behind her, a row lower on each step (see the running girl reference)
-            int fl = new int[] {0, 1, 2, 1}[phase & 3];
-            for (int i = fl; i < fl + 2 && i < 5; i++) if (r[i][3] == 'O' || r[i][3] == 'o' || r[i][3] == 'h' || r[i][3] == '.') r[i][3] = 'B';
             String[] out = new String[body.length];
             for (int i = 0; i < body.length; i++) out[i] = new String(r[i]);
             return out;
@@ -2039,10 +2036,47 @@ public class Main extends Activity {
             return new String[][] {HAIR_BACK, f1, f2, f1};
         }
 
+        /** her hair down the back: it hangs behind the pack and past the waist, and swings with the same four frames */
+        static final String[] HAIR_TAIL = {
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "BB..............",
+            "BB..............",
+            "BBb.............",
+            "BB..............",
+            "BBB.............",
+            ".BBBb...........",
+            ".BBBb...........",
+            "..BBb...........",
+            "..Bb............",
+            "...b............"
+        };
+        static final String[][] TAIL_FRAMES = tailFrames();
+
+        static String[][] tailFrames() {
+            String[] f1 = shiftRows(HAIR_TAIL, 13, -1);
+            String[] f2 = shiftRows(shiftRows(HAIR_TAIL, 12, -1), 15, -1);
+            return new String[][] {HAIR_TAIL, f1, f2, f1};
+        }
+
+        int hairFrame() { return onFloor && state == PLAY ? ((int) (runPhase * 0.2f * 4)) & 3 : ((int) (clock * 6)) & 3; }
+
+        /** drawn first, behind the body and the pack */
+        void drawHairTail(Canvas c, int left, int top) {
+            if (female) outlined(c, TAIL_FRAMES[hairFrame()], left, top);
+        }
+
         void drawHairBack(Canvas c, int left, int top) {
             if (!female) return;
-            int f = onFloor && state == PLAY ? ((int) (runPhase * 0.2f * 4)) & 3 : ((int) (clock * 6)) & 3;
-            outlined(c, HAIR_FRAMES[f], left, top);
+            outlined(c, HAIR_FRAMES[hairFrame()], left, top);
         }
 
         /** the chest sits a little lower or higher than its rest place as it springs after the body */
@@ -2996,6 +3030,7 @@ public class Main extends Activity {
             leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
             leanPx = lean;
+            drawHairTail(c, left + dx, top + dy);
             drawHairBack(c, left + dx, top + dy);
             outlined(c, body, left + dx, top + dy);
             drawBust(c, left + dx, top + dy);
@@ -3026,6 +3061,7 @@ public class Main extends Activity {
             c.rotate(ang, playerX, y);
             leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
+            drawHairTail(c, left, top);
             drawHairBack(c, left, top);
             outlined(c, flop ? SPR_HEAD_B : SPR_HEAD, left, top);
             drawBust(c, left, top);
