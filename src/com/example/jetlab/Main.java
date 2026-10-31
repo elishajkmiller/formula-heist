@@ -64,7 +64,7 @@ public class Main extends Activity {
     static class Coin { float x, y; boolean taken; }
 
     /** a background scientist who watches the player and points */
-    static class Npc { float x, phase, pointT, nextPoint; int coat, hair; }
+    static class Npc { float x, phase, pointT, nextPoint, walk; int coat, hair, mode, face; }
 
     static class Crate { float x, y; int type; }
 
@@ -284,15 +284,31 @@ public class Main extends Activity {
             playerX = w * 0.22f;
             if (state == START) y = floorY - SH;
             npcs.clear();
-            for (float nx = 30; nx < w + 20; nx += 45 + rnd.nextInt(80)) addNpc(nx);
+            for (float nx = 30; nx < w + 20; nx += 70 + rnd.nextInt(80)) addSpawn(nx);
         }
 
-        void addNpc(float nx) {
+        /** mode: 0 stands alone, 1 walks left, 2 walks right, 3 stands in a group */
+        Npc addNpc(float nx, int mode, int face) {
             Npc n = new Npc();
             n.x = nx; n.phase = rnd.nextFloat() * 6f;
-            n.nextPoint = 0.5f + rnd.nextFloat() * 6f;
+            n.mode = mode; n.face = face;
+            n.walk = mode == 1 ? -28f : mode == 2 ? 38f : 0f;
+            n.nextPoint = mode == 1 || mode == 2 ? 1e9f : 0.5f + rnd.nextFloat() * 7f;
             n.coat = rnd.nextInt(COATS.length); n.hair = rnd.nextInt(HAIRS.length);
             npcs.add(n);
+            return n;
+        }
+
+        void addSpawn(float nx) {
+            int r = rnd.nextInt(10);
+            if (r < 3) addNpc(nx, 0, 1);
+            else if (r < 5) addNpc(nx, 1, -1);
+            else if (r < 7) addNpc(nx, 2, 1);
+            else {
+                int cnt = 2 + rnd.nextInt(3);
+                float mid = (cnt - 1) / 2f;
+                for (int i = 0; i < cnt; i++) addNpc(nx + i * 10, 3, i < mid ? 1 : i > mid ? -1 : (rnd.nextBoolean() ? 1 : -1));
+            }
         }
 
         void reset() {
@@ -397,13 +413,13 @@ public class Main extends Activity {
             float nsc = (bgOff - lastBg) * 2.4f;       // background scientists move at 60% of the floor
             lastBg = bgOff;
             npcLeft -= nsc;
-            if (npcLeft <= 0) { addNpc(w + 10); npcLeft = 40 + rnd.nextInt(110); }
+            if (npcLeft <= 0) { addSpawn(w + 10); npcLeft = 60 + rnd.nextInt(110); }
             for (int i = npcs.size() - 1; i >= 0; i--) {
                 Npc n = npcs.get(i);
-                n.x -= nsc;
+                n.x += n.walk * rdt - nsc;
                 if (n.pointT > 0) n.pointT -= rdt;
                 else if ((n.nextPoint -= rdt) <= 0) { n.pointT = 0.8f + rnd.nextFloat() * 1.2f; n.nextPoint = 2f + rnd.nextFloat() * 7f; }
-                if (npcs.get(i).x < -10) npcs.remove(i);
+                if (npcs.get(i).x < -10 || npcs.get(i).x > w + 60) npcs.remove(i);
             }
 
             float dt = rdt;
@@ -1287,39 +1303,51 @@ public class Main extends Activity {
         }
 
         void drawNpcs(Canvas c) {
+            int[] swing = {0, 1, 0, -1};
             for (Npc n : npcs) {
                 int nx = Math.round(n.x);
-                boolean hop = ((int) (clock * 5 + n.phase) & 3) == 0;   // little excited hop
-                int base = Math.round(floorY) - (hop ? 1 : 0);
-                int f = playerX >= n.x ? 1 : -1;
+                boolean walking = n.mode == 1 || n.mode == 2;
+                boolean pointing = n.pointT > 0 && !walking;
+                boolean lookUp = !walking && (pointing || n.mode == 0);
+                boolean chatting = n.mode == 3 && !pointing;
+                int wp = ((int) (clock * 6 + n.phase)) & 3;
+                int sw = walking ? swing[wp] : 0;
+                int f = walking ? (n.mode == 2 ? 1 : -1) : (lookUp ? (playerX >= n.x ? 1 : -1) : n.face);
+                boolean hop = n.mode == 0 && ((int) (clock * 5 + n.phase) & 3) == 0;
+                int base = Math.round(floorY) - (hop || (walking && (wp & 1) == 1) ? 1 : 0);
                 int coat = COATS[n.coat];
+                int skin = Color.rgb(240, 200, 160), shade = Color.rgb(170, 180, 200);
                 rectPx(c, nx - 4, floorY - 1, 8, 1, Color.argb(70, 0, 0, 0));
-                // legs and shoes
-                rectPx(c, nx - 2, base - 4, 2, 4, Color.rgb(50, 60, 100));
-                rectPx(c, nx, base - 4, 2, 4, Color.rgb(50, 60, 100));
-                rectPx(c, nx - 2, base - 1, 2, 1, Color.rgb(30, 30, 40));
-                rectPx(c, nx, base - 1, 2, 1, Color.rgb(30, 30, 40));
+                // legs and shoes (they scissor when walking)
+                rectPx(c, nx - 2 + sw, base - 4, 2, 4, Color.rgb(50, 60, 100));
+                rectPx(c, nx - sw, base - 4, 2, 4, Color.rgb(50, 60, 100));
+                rectPx(c, nx - 2 + sw, base - 1, 2, 1, Color.rgb(30, 30, 40));
+                rectPx(c, nx - sw, base - 1, 2, 1, Color.rgb(30, 30, 40));
                 // coat
                 rectPx(c, nx - 3, base - 10, 6, 6, coat);
-                rectPx(c, nx - 3, base - 10, 1, 6, Color.rgb(170, 180, 200));
-                // arm hanging
-                rectPx(c, nx - f * 3, base - 9, 1, 4, Color.rgb(170, 180, 200));
-                // head, looking up: lenses sit high and the mouth hangs open
-                rectPx(c, nx - 2, base - 15, 5, 5, Color.rgb(240, 200, 160));
+                rectPx(c, nx - 3, base - 10, 1, 6, shade);
+                // far arm swings with the walk
+                rectPx(c, nx - f * 3 - sw * f, base - 9, 1, 4, shade);
+                // head: looking up puts the lenses high; otherwise they sit level
+                rectPx(c, nx - 2, base - 15, 5, 5, skin);
                 rectPx(c, nx - 2, base - 15, 5, 2, HAIRS[n.hair]);
-                rectPx(c, nx + (f > 0 ? 0 : -1), base - 14, 1, 1, Color.rgb(120, 235, 255));
-                rectPx(c, nx + (f > 0 ? 1 : 0), base - 14, 1, 1, Color.rgb(120, 235, 255));
-                if (n.pointT > 0) rectPx(c, nx + (f > 0 ? 1 : 0), base - 12, 1, 1, Color.rgb(90, 50, 50));
+                int ey = lookUp ? base - 14 : base - 13;
+                rectPx(c, nx + (f > 0 ? 0 : -1), ey, 1, 1, Color.rgb(120, 235, 255));
+                rectPx(c, nx + (f > 0 ? 1 : 0), ey, 1, 1, Color.rgb(120, 235, 255));
+                boolean talk = pointing || (chatting && ((int) (clock * 4 + n.phase) & 1) == 0);
+                if (talk) rectPx(c, nx + (f > 0 ? 1 : 0), base - 12, 1, 1, Color.rgb(90, 50, 50));
                 float sx = nx + f * 2, sy = base - 9;
-                if (n.pointT <= 0) {
-                    rectPx(c, sx, sy, 1, 4, Color.rgb(170, 180, 200));
-                    continue;
+                if (pointing) {
+                    float ang = (float) Math.atan2(y - sy, playerX - sx);
+                    float cs = (float) Math.cos(ang), sn = (float) Math.sin(ang);
+                    for (int i = 0; i <= 4; i++) rectPx(c, sx + cs * i, sy + sn * i, 2, 2, coat);
+                    rectPx(c, sx + cs * 5, sy + sn * 5, 2, 2, skin);
+                } else if (chatting && ((int) (clock * 2 + n.phase) & 3) == 0) {
+                    rectPx(c, sx + f, sy - 2, 1, 3, coat);      // gesturing mid conversation
+                    rectPx(c, sx + f, sy - 3, 2, 2, skin);
+                } else {
+                    rectPx(c, sx + sw * f, sy, 1, 4, shade);
                 }
-                // arm pointing at the player
-                float ang = (float) Math.atan2(y - sy, playerX - sx);
-                float cs = (float) Math.cos(ang), sn = (float) Math.sin(ang);
-                for (int i = 0; i <= 4; i++) rectPx(c, sx + cs * i, sy + sn * i, 2, 2, coat);
-                rectPx(c, sx + cs * 5, sy + sn * 5, 2, 2, Color.rgb(240, 200, 160));
             }
         }
 
