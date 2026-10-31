@@ -178,9 +178,8 @@ public class Main extends Activity {
     /** One game view: physics, drawing and input in one place. */
     static class Game extends View implements Choreographer.FrameCallback {
 
-        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, LAUNCH = 4, FLY = 5, MISS = 6, ARCHIVE = 7, SCRATCH = 8;
+        static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, BREAKIN = 4, ARCHIVE = 5, SCRATCH = 6;
         static final int NF = 20;           // formulas to recover
-        static final float MAXPULL = 34f;       // longest pull back, in pixels
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3;
         static final float BUILD_TIME = 1.5f;
         static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9;
@@ -346,8 +345,8 @@ public class Main extends Activity {
         Sfx sfx;
         boolean ghost, outline;
         float leanPx, landT, ang, angV, settleT, finalDist;
-        boolean dragging, moved;
-        float tx0, ty0, pdx, pdy, lastDx = -22f, lastDy = 14f, bonus, launchT, tipT, outX, slingX, slingY, flyVx, holeY;
+        boolean dragging;
+        float bonus, launchT, tipT, outX, holeY;
         boolean holeOpen;
         int bounces;
         boolean settled;
@@ -398,11 +397,10 @@ public class Main extends Activity {
             floorY = h - 11;
             ceilY = 11;
             playerX = w * 0.22f;
-            slingY = floorY - 50f;
             abw = 66; abh = 11; abx = w - abw - 4; aby = h - 12;
             cbw = 36; cbh = 11; cbx = w - cbw - 4; cby = 3;
             scw = Math.min(200, w - 24); sch = 104; scx = (w - scw) / 2; scy = 24;
-            if (state == START) toLaunch(true);
+            if (state == START) toStart(true);
             populateNpcs();
         }
 
@@ -437,23 +435,23 @@ public class Main extends Activity {
 
         void reset() {
             electrons = 0;
-            toLaunch(false);
+            toStart(false);
         }
 
-        /** back outside on the ground, in front of the wall, ready to aim */
-        void toLaunch(boolean keepState) {
+        /** back outside on the grass, in front of NULLCORP's wall */
+        void toStart(boolean keepState) {
             coins.clear(); zappers.clear(); missiles.clear(); crates.clear(); scrolls.clear();
             nextParch = 70; bannerT = 0;
             for (int i = 0; i < NP; i++) pl[i] = 0;
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
             diving = false; nextCrate = 80; thrusting = false;
             settled = false; settleT = 0; ang = 0; angV = 0;
-            outX = playerX + 120f; slingX = playerX; holeOpen = false;
+            outX = Math.min(playerX + 140f, w - 40f); holeOpen = false;
             bgOff = 20f - (outX + 10f); lastBg = bgOff;     // mission control sits just inside the wall
-            y = slingY; vy = 0; dist = 0; spawnLeft = w * 0.6f; speed = 0;
-            dragging = false; pdx = pdy = 0; bonus = 0; launchT = 0; tipT = 0;
+            y = floorY - SH_BOT; vy = 0; dist = 0; spawnLeft = w * 0.6f; speed = 0;
+            dragging = false; bonus = 0; launchT = 0; tipT = 0; onFloor = true;
             populateNpcs();
-            if (!keepState) state = LAUNCH;
+            if (!keepState) state = BREAKIN;
             stateTime = 0;
         }
 
@@ -484,102 +482,57 @@ public class Main extends Activity {
                     if (archiveButtonHit(gx, gy)) {
                         archFrom = state; state = ARCHIVE; dragging = false; thrusting = false;
                     } else if (state == START) {
-                        state = LAUNCH;
+                        state = BREAKIN; stateTime = 0;
                     } else if (state == ARCHIVE) {
                         archiveTap(gx, gy);
                     } else if (state == SCRATCH) {
                         scratchDown(gx, gy);
                     } else if (state == DEAD) {
                         if (stateTime > 0.7f) reset();
-                    } else if (state == LAUNCH) {
-                        dragging = true; moved = false; tx0 = gx; ty0 = gy; pdx = pdy = 0;
                     } else if (state == PLAY) {
                         press();
                         thrusting = true;
                     }
                     break;
                 case MotionEvent.ACTION_MOVE:
-                    if (state == SCRATCH && dragging) {
-                        scratchAt(gx, gy);
-                    } else if (state == LAUNCH && dragging) {
-                        float dx = gx - tx0, dy = gy - ty0;
-                        float len = (float) Math.sqrt(dx * dx + dy * dy);
-                        if (len > MAXPULL) { dx *= MAXPULL / len; dy *= MAXPULL / len; len = MAXPULL; }
-                        float maxDown = floorY - SH_BOT - slingY;
-                        if (dy > maxDown) dy = maxDown;
-                        pdx = dx; pdy = dy;
-                        if (len > 3f) moved = true;
-                    }
+                    if (state == SCRATCH && dragging) scratchAt(gx, gy);
                     break;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     thrusting = false;
                     if (state == SCRATCH) dragging = false;
-                    if (state == LAUNCH && dragging) {
-                        dragging = false;
-                        if (moved && pdx * pdx + pdy * pdy > 36f) { lastDx = pdx; lastDy = pdy; }
-                        launch();
-                    }
                     break;
             }
             return true;
         }
 
-        /** let go of the spring: the stretch sets the launch speed and angle */
-        void launch() {
-            float lvx = Math.max(0.12f, -lastDx / MAXPULL), lvy = -lastDy / MAXPULL;
-            y = slingY; vy = lvy * 20f;
-            flyVx = lvx * 20f * ppm;
-            onFloor = false; jumpDelay = 0; thrusting = false;
-            state = FLY; stateTime = 0;
-            shake = 2f;
-            sfx(S_FLIP);
-            buzz(25);
-            for (int i = 0; i < 8; i++) burst(playerX, y);
-        }
-
-        /** flying across the yard: the world slides past at his launch speed */
-        void updateFly(float dt) {
-            vy += GRAVITY * dt;
-            y += vy * ppm * dt;
-            float sc = flyVx * dt;
-            outX -= sc; slingX -= sc; bgOff += sc * 0.25f;
+        /** he sprints across the grass and shoulders through the wall */
+        void updateBreakin(float dt) {
+            speed = Math.min(11f, 2f + stateTime * 9f);
+            float sc = speed * ppm * dt;
+            outX -= sc; bgOff += sc * 0.25f;
+            runPhase += dt * 11f;
+            y = floorY - SH_BOT; vy = 0; onFloor = true;
+            if (rnd.nextInt(3) == 0) dust(playerX - 4, floorY - 1);
             for (int i = 0; i < NP; i++) {
                 if (pl[i] > 0) {
                     pl[i] -= dt;
                     px[i] += pvx[i] * dt; py[i] += pvy[i] * dt;
                 }
             }
-            if (y > floorY - SH_BOT) {
-                y = floorY - SH_BOT;
-                startMiss();
-                return;
-            }
-            if (outX <= playerX + 6f) breach();
+            if (outX <= playerX + 8f) breach();
         }
 
         /** he hit the wall: bricks fly, a hole opens and the run begins inside */
         void breach() {
             holeOpen = true; holeY = y;
             state = PLAY; stateTime = 0;
-            bonus = Math.min(8f, Math.max(0f, flyVx / ppm - 5f));
-            launchT = 0.6f; tipT = 3f; invuln = 0.8f;
-            vy *= 0.75f; onFloor = false;
+            bonus = Math.max(0f, speed - 5f);
+            launchT = 0f; tipT = 3f; invuln = 0.8f;
             hitstop = 0.08f; shake = 7f; flash = 0.15f;
             sfx(S_HIT);
             buzz(50);
             for (int i = 0; i < 40; i++) debris(playerX + 8, y);
-        }
-
-        /** fell short on the grass: a quick tumble, then try again */
-        void startMiss() {
-            state = MISS; stateTime = 0;
-            speed = Math.max(2f, flyVx / ppm * 0.7f);
-            ang = 0; angV = 500f; bounces = 1; settled = false; settleT = 0;
-            vy = -3f;
-            shake = 3f;
-            sfx(S_STOMP);
-            for (int i = 0; i < 8; i++) dust(playerX, floorY - 2);
         }
 
         int randomUnowned() {
@@ -626,7 +579,7 @@ public class Main extends Activity {
         // ---------- archive: the recovered formulas, scratch off to reveal ----------
 
         boolean archiveButtonHit(float gx, float gy) {
-            if (!(state == START || state == LAUNCH || (state == DEAD && stateTime > 0.3f))) return false;
+            if (!(state == START || (state == DEAD && stateTime > 0.3f))) return false;
             return gx >= abx && gx < abx + abw && gy >= aby && gy < aby + abh;
         }
 
@@ -795,9 +748,9 @@ public class Main extends Activity {
             pcol[k] = cols[rnd.nextInt(cols.length)];
         }
 
-        /** waiting at the sling: title screen and aiming */
-        void updateLaunch(float dt) {
-            y = slingY; vy = -1f; onFloor = !(state == LAUNCH && dragging);
+        /** title screen: he stands on the grass facing the wall */
+        void updateStart(float dt) {
+            y = floorY - SH_BOT; vy = 0; onFloor = true;
             speed = 0;
             for (int i = 0; i < NP; i++) {
                 if (pl[i] > 0) {
@@ -861,7 +814,7 @@ public class Main extends Activity {
             if (shake > 0) shake = Math.max(0f, shake - 30f * rdt);
             if (hitstop > 0) { hitstop -= rdt; return; }   // freeze for a moment on a big hit
 
-            boolean waiting = state == START || state == LAUNCH || state == ARCHIVE || state == SCRATCH;   // the scene holds still until he runs
+            boolean waiting = state == START || state == ARCHIVE || state == SCRATCH;   // the scene holds still until he runs
             float nsc = (bgOff - lastBg) * 2.4f;       // background scientists move at 60% of the floor
             lastBg = bgOff;
             npcLeft -= nsc;
@@ -875,12 +828,8 @@ public class Main extends Activity {
             }
 
             float dt = rdt;
-            if (state == DEAD || state == MISS) {
-                updateDead(dt);
-                if (state == MISS && stateTime > 1.7f) toLaunch(false);
-                return;
-            }
-            if (state == FLY) { updateFly(dt); return; }
+            if (state == DEAD) { updateDead(dt); return; }
+            if (state == BREAKIN) { updateBreakin(dt); return; }
             if (state == ARCHIVE || state == SCRATCH) {
                 for (int i = 0; i < NP; i++) {
                     if (pl[i] > 0) {
@@ -890,7 +839,7 @@ public class Main extends Activity {
                 }
                 return;
             }
-            if (state == START || state == LAUNCH) { updateLaunch(dt); return; }
+            if (state == START) { updateStart(dt); return; }
             if (state == BUILD) {
                 buildT += rdt;
                 dt = rdt * 0.15f;                           // time slows while the vehicle assembles
@@ -963,7 +912,7 @@ public class Main extends Activity {
             bonus = Math.max(0f, bonus - 4.5f * dt);
             speed = 5f + Math.min(dist / 60f, 7f) + bonus;
             float scroll = speed * ppm * dt;
-            outX -= scroll; slingX -= scroll;
+            outX -= scroll;
             dist += speed * dt;
             bgOff += scroll * 0.25f;
             if (onFloor && (vehicle == 0 || vehicle == QUANTUM)) runPhase += dt * 11f;     // steps at a fixed rate, they do not speed up with the world
@@ -1159,7 +1108,7 @@ public class Main extends Activity {
             bgOff += sc * 0.25f;
             dist += speed * dt;
             if (settled && speed > 0.3f && rnd.nextInt(3) == 0) dust(playerX - 4, floorY - 1);
-            outX -= sc; slingX -= sc;
+            outX -= sc;
             for (Coin k : coins) k.x -= sc;
             for (Zapper z : zappers) z.x -= sc;
             for (Crate k : crates) k.x -= sc;
@@ -1690,7 +1639,7 @@ public class Main extends Activity {
             if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
-            if (state == START || state == LAUNCH || state == DEAD) drawArchiveButton(c);
+            if (state == START || state == DEAD) drawArchiveButton(c);
             out.save();
             if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);
@@ -1728,7 +1677,6 @@ public class Main extends Activity {
             drawNpcs(c);
             rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb(95, 6, 10, 24));   // push the whole backdrop back
             drawExterior(c);
-            drawLauncher(c);
             drawCoins(c);
             drawCrates(c);
             drawScrolls(c);
@@ -1741,7 +1689,6 @@ public class Main extends Activity {
                 ring(c, playerX, y, telePulse / 0.25f);
             }
             if (state == BUILD) drawBuild(c);
-            if (state == LAUNCH) drawLaunchUi(c);
             drawHud(c);
         }
 
@@ -1817,75 +1764,6 @@ public class Main extends Activity {
             }
             rectPx(c, ox, 0, 1, fl, Color.rgb(205, 125, 95));
             rectPx(c, ox + th - 1, 0, 1, fl, Color.rgb(110, 60, 48));
-        }
-
-        /** a coil-spring catapult planted in the grass: stretch the springs to store energy */
-        void drawLauncher(Canvas c) {
-            if (slingX < -40 || slingX > w + 40) return;
-            int sx = Math.round(slingX), fl = Math.round(floorY), fy = Math.round(slingY);
-            int wood = Color.rgb(120, 78, 44), wood2 = Color.rgb(160, 108, 64);
-            rectPx(c, sx - 3, fy + 8, 6, fl - fy - 8, wood);
-            rectPx(c, sx - 8, fl - 3, 16, 3, Color.rgb(80, 80, 92));
-            rectPx(c, sx - 9, fy + 6, 18, 3, wood);
-            rectPx(c, sx - 9, fy - 8, 3, 16, wood2);
-            rectPx(c, sx + 6, fy - 8, 3, 16, wood2);
-            boolean aiming = (state == LAUNCH && dragging);
-            float pcx = playerX + (aiming ? pdx : 0f), pcy = y + (aiming ? pdy : 0f);
-            boolean taut = state == START || state == LAUNCH;
-            for (int k = 0; k < 2; k++) {
-                float ax = k == 0 ? sx - 8 : sx + 7, ay = fy - 7;
-                float bx = taut ? pcx + (k == 0 ? -2 : 2) : sx, by = taut ? pcy - 2 : fy - 2;
-                spring(c, ax, ay, bx, by);
-            }
-        }
-
-        /** a zigzag coil between two points */
-        void spring(Canvas c, float x0, float y0, float x1, float y1) {
-            float dx = x1 - x0, dy = y1 - y0;
-            float len = (float) Math.sqrt(dx * dx + dy * dy);
-            if (len < 1f) return;
-            float nx = -dy / len, ny = dx / len;
-            int coils = Math.max(4, (int) (len / 3));
-            float amp = Math.max(1.2f, 3.2f - len / 22f);
-            float lx = x0, ly = y0;
-            for (int i = 1; i <= coils; i++) {
-                float t = i / (float) coils;
-                float side = (i & 1) == 0 ? amp : -amp;
-                if (i == coils) side = 0;
-                float cx = x0 + dx * t + nx * side, cy = y0 + dy * t + ny * side;
-                line(c, lx, ly, cx, cy, Color.rgb(205, 210, 225), 1);
-                lx = cx; ly = cy;
-            }
-        }
-
-        void drawLaunchUi(Canvas c) {
-            float dx = dragging ? pdx : lastDx, dy = dragging ? pdy : lastDy;
-            float lvx = Math.max(0.12f, -dx / MAXPULL), lvy = -dy / MAXPULL;
-            float vx = lvx * 20f * ppm, vy0 = lvy * 20f * ppm;
-            // predicted path over the yard, ending where he meets the wall or the grass
-            for (int i = 1; i <= 40; i++) {
-                float t = i * 0.05f;
-                float ax = playerX + vx * t, ay = slingY + vy0 * t + 0.5f * GRAVITY * ppm * t * t;
-                if (ay > floorY - 2) break;
-                if (ax >= outX) {
-                    rectPx(c, outX - 3, ay - 3, 7, 1, Color.rgb(255, 80, 70));
-                    rectPx(c, outX, ay - 6, 1, 13, Color.rgb(255, 80, 70));
-                    break;
-                }
-                rectPx(c, ax - 1, ay - 1, 2, 2, Color.argb(Math.max(70, 235 - i * 5), 255, 255, 255));
-            }
-            float spd = (float) Math.sqrt(lvx * lvx + lvy * lvy) * 20f;
-            float ang = (float) Math.toDegrees(Math.atan2(-lvy, lvx));
-            int top = Math.round(ceilY) + 5;
-            if (dragging) {
-                float stretch = (float) Math.sqrt(pdx * pdx + pdy * pdy) / ppm;
-                float kj = 0.5f * 70f * spd * spd / 1000f;
-                text(c, "STRETCH " + String.format("%.1f", stretch) + " M   ENERGY " + String.format("%.1f", kj) + " KJ", w / 2f, top, 1, Color.WHITE, 1);
-                text(c, "ANGLE " + Math.round(ang) + "   SPEED " + String.format("%.1f", spd) + " M/S", w / 2f, top + 9, 1, Color.rgb(120, 235, 255), 1);
-            } else {
-                text(c, "STRETCH THE SPRINGS AND RELEASE", w / 2f, top, 1, Color.rgb(255, 200, 80), 1);
-                text(c, "A QUICK TAP REPEATS YOUR LAST SHOT", w / 2f, top + 9, 1, Color.rgb(150, 190, 215), 1);
-            }
         }
 
         void drawBackground(Canvas c) {
@@ -2338,7 +2216,7 @@ public class Main extends Activity {
         }
 
         void drawPlayer(Canvas c) {
-            if (state == DEAD || state == MISS) { drawRagdoll(c); return; }
+            if (state == DEAD) { drawRagdoll(c); return; }
             if (state == PLAY && invuln > 0 && ((int) (clock * 14) & 1) == 0) return;
             if (vehicle != 0 && state == PLAY) { drawVehicle(c); return; }
             if (state == BUILD && buildT > BUILD_TIME * 0.9f) return;
@@ -2346,8 +2224,7 @@ public class Main extends Activity {
             float cyc = runPhase * 0.2f;
             int ph = ((int) (cyc * 4)) & 3;
             boolean thr = thrusting && state == PLAY && jumpDelay <= 0;
-            float aimX = (state == LAUNCH && dragging) ? pdx : 0f, aimY = (state == LAUNCH && dragging) ? pdy : 0f;
-            int left = Math.round(playerX + aimX) - 8, top = Math.round(y + aimY) - SH_TOP;
+            int left = Math.round(playerX) - 8, top = Math.round(y) - SH_TOP;
 
             if (thr) {
                 int fl = 7 + rnd.nextInt(6);
@@ -2356,7 +2233,7 @@ public class Main extends Activity {
                 rectPx(c, left + 2, top + 16, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
                 rectPx(c, left + 1 + rnd.nextInt(4), top + 16 + fl, 1, 2, Color.rgb(255, 150, 50));
             }
-            scientist(c, left, top, ph, onFloor && state == PLAY);
+            scientist(c, left, top, ph, onFloor && (state == PLAY || state == BREAKIN));
         }
 
         void quantumBody(Canvas c, int cy, boolean flip) {
@@ -2494,7 +2371,7 @@ public class Main extends Activity {
                 text(c, "SCRATCH IT OFF IN THE ARCHIVE", w / 2f, ceilY + 68, 1, Color.rgb(150, 190, 215), 1);
             }
             if (tipT > 0 && state == PLAY && vehicle == 0) {
-                text(c, "HOLD TO FIRE THE JETPACK", w / 2f, ceilY + 28, 1, Color.WHITE, 1);
+                text(c, "TAP TO JUMP, THEN HOLD TO FIRE THE JETPACK", w / 2f, ceilY + 28, 1, Color.WHITE, 1);
             }
             if (hintT > 0 && state == PLAY && vehicle != 0) {
                 text(c, VNAME[vehicle], w / 2f, ceilY + 28, 1, Color.WHITE, 1);
