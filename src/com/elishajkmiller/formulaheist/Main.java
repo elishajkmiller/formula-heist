@@ -64,10 +64,21 @@ public class Main extends Activity {
             tv.setPadding(24, 24, 24, 24);
             ScrollView sv = new ScrollView(this);
             sv.addView(tv);
-            new AlertDialog.Builder(this).setTitle("LAST CRASH").setView(sv)
+            final String text = tv.getText().toString();
+            tv.setTextIsSelectable(true);
+            final AlertDialog dlg = new AlertDialog.Builder(this).setTitle("LAST CRASH").setView(sv)
+                    .setNeutralButton("COPY", null)
                     .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface d, int w) { f.delete(); }
                     }).show();
+            // COPY puts the whole trace on the clipboard and keeps the box open
+            dlg.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", text));
+                    android.widget.Toast.makeText(Main.this, "COPIED", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
         } catch (Throwable x) { f.delete(); }
     }
 
