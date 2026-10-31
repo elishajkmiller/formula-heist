@@ -1476,8 +1476,8 @@ public class Main extends Activity {
             }
         }
 
-        static final int[] BOB = {0, 1, 0, 1};     // body sinks on each step, like a shuffle
-        static final int[] LEAN = {0, 1, 0, 1};
+        static final int[] BOB = {0, 0, 0, 0};     // upper body holds still while running so the pixels stay put
+        static final int[] LEAN = {0, 0, 0, 0};
 
         /**
          * Legs first, then the upper body. On the ground he shuffles (body dips, arm pumps).
@@ -1491,7 +1491,7 @@ public class Main extends Activity {
             int dy = 0, dx = 0;
             if (onFloor) {
                 legs = ph == 0 ? LEGS_A : ph == 1 ? LEGS_B : ph == 2 ? LEGS_M : LEGS_C;
-                lean = run ? 1 : 0;
+                lean = 0;
                 if (run) {
                     dy = BOB[ph]; dx = LEAN[ph];
                     if ((ph & 1) == 1) body = SPR_HEAD_B;
@@ -1499,14 +1499,14 @@ public class Main extends Activity {
                 }
             } else if (thr) {
                 legs = ((int) (clock * 10) & 1) == 0 ? LEGS_AIR : LEGS_AIR2;
-                lean = 2;
+                lean = 1;
                 dy = ((int) (clock * 30)) & 1;
             } else if (vy * gravDir < 0) {
                 legs = LEGS_AIR;
-                lean = 1;
+                lean = 0;
             } else {
                 legs = ((int) (clock * 6) & 1) == 0 ? LEGS_FALL1 : LEGS_FALL2;
-                lean = -1;
+                lean = 0;
             }
             leanPx = 0;
             outlined(c, legs, left, top + SPR_HEAD.length);
@@ -1521,7 +1521,7 @@ public class Main extends Activity {
             if (vehicle != 0 && state == PLAY) { drawVehicle(c); return; }
             if (state == BUILD && buildT > BUILD_TIME * 0.9f) return;
 
-            float cyc = runPhase * 0.4f;
+            float cyc = runPhase * 0.2f;
             int ph = ((int) (cyc * 4)) & 3;
             boolean thr = thrusting && state == PLAY && jumpDelay <= 0;
             int left = Math.round(playerX) - 8, top = Math.round(y) - SH;
@@ -1539,7 +1539,7 @@ public class Main extends Activity {
         void quantumBody(Canvas c, int cy, boolean flip) {
             int left = Math.round(playerX) - 10, top = cy - 15;
             if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
-            int ph = ((int) (runPhase * 0.4f * 4)) & 3;
+            int ph = ((int) (runPhase * 0.2f * 4)) & 3;
             scientist(c, left + 2, top, ph, true);
             outlined(c, BOARD, left, top + SPR_HEAD.length + LEGS_A.length);
             if (flip) c.restore();
