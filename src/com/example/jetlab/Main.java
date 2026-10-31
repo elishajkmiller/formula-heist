@@ -1130,7 +1130,7 @@ public class Main extends Activity {
                 case 'b': return Color.rgb(135, 90, 55);
                 case 'E': return Color.rgb(30, 30, 45);
                 case 'n': return Color.rgb(150, 70, 70);
-                case 'h': return Color.rgb(165, 175, 140);
+                case 'h': return Color.rgb(255, 135, 85);
                 case 'x': return Color.rgb(150, 160, 185);
                 case 'd': return Color.rgb(78, 92, 140);
                 case 'L': return Color.rgb(95, 95, 108);
@@ -1139,13 +1139,13 @@ public class Main extends Activity {
                 case 'S': return Color.rgb(240, 200, 160);
                 case 'G': return Color.rgb(50, 60, 80);
                 case 'C': return Color.rgb(120, 235, 255);
-                case 'O': return Color.rgb(120, 130, 100);
+                case 'O': return Color.rgb(225, 80, 40);
                 case 'a': return Color.rgb(170, 140, 115);
                 case 'r': return Color.rgb(230, 120, 140);
                 case 'X': return Color.rgb(60, 40, 40);
                 case 'e': return Color.rgb(255, 255, 255);
                 case 'P': return Color.rgb(210, 170, 60);
-                case 'o': return Color.rgb(80, 90, 70);
+                case 'o': return Color.rgb(150, 45, 25);
                 case 'N': return Color.rgb(120, 125, 140);
                 case 'W': return Color.rgb(240, 244, 250);
                 case 'w': return Color.rgb(195, 203, 220);
