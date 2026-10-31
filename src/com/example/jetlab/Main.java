@@ -3,18 +3,13 @@ package com.example.jetlab;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Shader;
-import android.graphics.Typeface;
 import android.os.Bundle;
-import android.text.Layout;
-import android.text.StaticLayout;
-import android.text.TextPaint;
 import android.view.Choreographer;
 import android.view.MotionEvent;
 import android.view.View;
@@ -93,10 +88,12 @@ public class Main extends Activity {
         };
 
         final Random rnd = new Random();
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        final TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        final Paint p = new Paint();
+        final Paint blit = new Paint();
         final Path path = new Path();
-        final RectF rect = new RectF();
+        final RectF dst = new RectF();
+        Bitmap buf;
+        Canvas bc;
         final SharedPreferences prefs;
 
         final ArrayList<Coin> coins = new ArrayList<>();
@@ -121,7 +118,8 @@ public class Main extends Activity {
             super(c);
             prefs = c.getSharedPreferences("jetlab", Context.MODE_PRIVATE);
             best = prefs.getInt("best", 0);
-            tp.setTypeface(Typeface.MONOSPACE);
+            p.setAntiAlias(false);
+            blit.setFilterBitmap(false);
         }
 
         void start() {
@@ -139,10 +137,15 @@ public class Main extends Activity {
 
         @Override
         protected void onSizeChanged(int nw, int nh, int ow, int oh) {
-            w = nw; h = nh;
-            ppm = h / 9f;
-            floorY = h - 0.7f * ppm;
-            ceilY = 0.7f * ppm;
+            // the game is drawn on a 144 pixel tall canvas and scaled up with no smoothing
+            h = 144;
+            w = Math.max(160, Math.round(nw * 144f / nh));
+            ppm = 16f;
+            buf = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            bc = new Canvas(buf);
+            dst.set(0, 0, nw, nh);
+            floorY = h - 11;
+            ceilY = 11;
             playerX = w * 0.22f;
             if (state == START) y = floorY - 0.62f * ppm;
         }
@@ -350,11 +353,136 @@ public class Main extends Activity {
             coins.add(c);
         }
 
-        // ---------- drawing ----------
+        // ---------- drawing (pixel art, drawn small then scaled up) ----------
+
+        static final String CH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!-+/:'^ ";
+        static final String[] GL = {
+            "010101111101101", "110101110101110", "011100100100011", "110101101101110", "111100110100111",
+            "111100110100100", "011100101101011", "101101111101101", "111010010010111", "001001001101010",
+            "101101110101101", "100100100100111", "101111111101101", "110101101101101", "010101101101010",
+            "110101110100100", "010101101111011", "110101110101101", "011100010001110", "111010010010010",
+            "101101101101111", "101101101101010", "101101111111101", "101101010101101", "101101010010010",
+            "111001010100111",
+            "111101101101111", "010110010010111", "110001010100111", "110001010001110", "101101111001001",
+            "111100110001110", "011100111101111", "111001010010010", "111101111101111", "111101111001110",
+            "000000000000010", "000000000010100", "010010010000010", "000000111000000", "000010111010000",
+            "001001010100100", "000010000010000", "010010000000000", "010101000000000", "000000000000000"
+        };
+
+        static final String[] SPR_HEAD = {
+            "....BBBBB...",
+            "...BBBBBBB..",
+            "...GGGGGCC..",
+            "...SSSSSSS..",
+            "....SSSSS...",
+            ".....SSS....",
+            ".OOOWWWWWW..",
+            ".OoOWWWWWw..",
+            ".OoOWWWWWww.",
+            ".OOOWWWWWww.",
+            ".OOOWWWWWSw.",
+            ".OoOWWWWWw..",
+            ".NNNWWWWWw..",
+            "..N.wwwwww.."
+        };
+        static final String[] LEGS_A = {
+            "....DD.DD...", "....DD.DD...", "....DD.DD...", "....DD.DD...", "....DD.DD...", "....KK.KK...", "...KKK.KKK.."
+        };
+        static final String[] LEGS_B = {
+            "....DDDD....", "...DD..DD...", "..DD....DD..", "..DD....DD..", "..DD....DD..", "..KK....KK..", ".KKK....KKK."
+        };
+        static final String[] LEGS_AIR = {
+            "....DD.DD...", "...DD..DD...", "..DD...DD...", ".DD....DD...", ".KK....KK...", "............", "............"
+        };
+
+        void rectPx(Canvas c, float x, float yy, float rw, float rh, int col) {
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(col);
+            int ix = Math.round(x), iy = Math.round(yy);
+            c.drawRect(ix, iy, ix + Math.round(rw), iy + Math.round(rh), p);
+        }
+
+        void glyphs(Canvas c, String s, int ix, int iy, int sc, int col) {
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(col);
+            for (int i = 0; i < s.length(); i++) {
+                int g = CH.indexOf(s.charAt(i));
+                if (g < 0) continue;
+                String bits = GL[g];
+                for (int r = 0; r < 5; r++) {
+                    for (int k = 0; k < 3; k++) {
+                        if (bits.charAt(r * 3 + k) == '1') {
+                            int gx = ix + (i * 4 + k) * sc, gy = iy + r * sc;
+                            c.drawRect(gx, gy, gx + sc, gy + sc, p);
+                        }
+                    }
+                }
+            }
+        }
+
+        /** align: 0 left, 1 centre, 2 right. y is the top of the text. */
+        void text(Canvas c, String s, float x, float yy, int sc, int col, int align) {
+            s = s.toUpperCase();
+            int tw = s.length() * 4 * sc - sc;
+            int ix = Math.round(x);
+            if (align == 1) ix -= tw / 2;
+            else if (align == 2) ix -= tw;
+            int iy = Math.round(yy);
+            glyphs(c, s, ix + sc, iy + sc, sc, Color.argb(160, 0, 0, 20));
+            glyphs(c, s, ix, iy, sc, col);
+        }
+
+        void wrapText(Canvas c, String s, float cx, float yy, int sc, int col, int maxPx) {
+            int per = Math.max(8, maxPx / (4 * sc));
+            String[] words = s.split(" ");
+            StringBuilder line = new StringBuilder();
+            float ly = yy;
+            for (String wd : words) {
+                if (line.length() > 0 && line.length() + 1 + wd.length() > per) {
+                    text(c, line.toString(), cx, ly, sc, col, 1);
+                    ly += 7 * sc;
+                    line.setLength(0);
+                }
+                if (line.length() > 0) line.append(' ');
+                line.append(wd);
+            }
+            if (line.length() > 0) text(c, line.toString(), cx, ly, sc, col, 1);
+        }
+
+        static int pal(char ch) {
+            switch (ch) {
+                case 'B': return Color.rgb(110, 70, 40);
+                case 'S': return Color.rgb(240, 200, 160);
+                case 'G': return Color.rgb(50, 60, 80);
+                case 'C': return Color.rgb(120, 235, 255);
+                case 'O': return Color.rgb(240, 120, 50);
+                case 'o': return Color.rgb(170, 80, 40);
+                case 'N': return Color.rgb(120, 125, 140);
+                case 'W': return Color.rgb(240, 244, 250);
+                case 'w': return Color.rgb(180, 190, 210);
+                case 'D': return Color.rgb(50, 60, 100);
+                case 'K': return Color.rgb(30, 30, 40);
+                default: return 0;
+            }
+        }
+
+        void sprite(Canvas c, String[] rows, int left, int top) {
+            p.setStyle(Paint.Style.FILL);
+            for (int r = 0; r < rows.length; r++) {
+                String row = rows[r];
+                for (int k = 0; k < row.length(); k++) {
+                    int col = pal(row.charAt(k));
+                    if (col == 0) continue;
+                    p.setColor(col);
+                    c.drawRect(left + k, top + r, left + k + 1, top + r + 1, p);
+                }
+            }
+        }
 
         @Override
-        protected void onDraw(Canvas c) {
-            if (w == 0) return;
+        protected void onDraw(Canvas out) {
+            if (w == 0 || bc == null) return;
+            Canvas c = bc;
             drawBackground(c);
             drawFloor(c);
             drawCoins(c);
@@ -365,67 +493,58 @@ public class Main extends Activity {
             drawHud(c);
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
+            out.drawBitmap(buf, null, dst, blit);
         }
 
         void drawBackground(Canvas c) {
-            p.setStyle(Paint.Style.FILL);
-            p.setShader(new LinearGradient(0, 0, 0, h, Color.rgb(14, 22, 40), Color.rgb(24, 40, 62), Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, h, p);
-            p.setShader(null);
-
-            // slow periodic-table tiles
+            int bands = 12;
+            for (int i = 0; i < bands; i++) {
+                float t = i / (float) (bands - 1);
+                int col = Color.rgb((int) (14 + 10 * t), (int) (22 + 18 * t), (int) (40 + 22 * t));
+                rectPx(c, 0, i * h / (float) bands, w, h / (float) bands + 1, col);
+            }
             float step = 2.2f * ppm;
             int first = (int) Math.floor(bgOff / step);
             float frac = bgOff - first * step;
-            tp.setTextAlign(Paint.Align.CENTER);
-            tp.setTextSize(0.55f * ppm);
             for (int k = -1; k < w / step + 2; k++) {
                 int idx = first + k;
                 int m = Math.floorMod(idx * 7 + 3, 11);
-                float tx = k * step - frac + step / 2, ty = (1.4f + (m % 5) * 1.2f) * ppm;
-                p.setColor(Color.argb(34, 120, 200, 255));
-                rect.set(tx - 0.8f * ppm, ty - 0.8f * ppm, tx + 0.8f * ppm, ty + 0.8f * ppm);
-                c.drawRoundRect(rect, 8, 8, p);
-                tp.setColor(Color.argb(80, 170, 220, 255));
-                c.drawText(SYM[Math.floorMod(idx, SYM.length)], tx, ty + 0.2f * ppm, tp);
+                int tx = Math.round(k * step - frac + step / 2), ty = Math.round((1.4f + (m % 5) * 1.2f) * ppm);
+                int half = 12;
+                rectPx(c, tx - half, ty - half, half * 2, half * 2, Color.rgb(36, 62, 96));
+                rectPx(c, tx - half + 1, ty - half + 1, half * 2 - 2, half * 2 - 2, Color.rgb(24, 42, 70));
+                text(c, SYM[Math.floorMod(idx, SYM.length)], tx, ty - 2, 1, Color.rgb(90, 150, 200), 1);
             }
-            // ceiling pipe
-            p.setColor(Color.rgb(36, 50, 72));
-            c.drawRect(0, 0, w, ceilY, p);
-            p.setColor(Color.rgb(70, 190, 200));
-            c.drawRect(0, ceilY - 3, w, ceilY, p);
+            // ceiling pipe with rivets
+            rectPx(c, 0, 0, w, ceilY, Color.rgb(36, 50, 72));
+            rectPx(c, 0, ceilY - 3, w, 3, Color.rgb(70, 190, 200));
+            rectPx(c, 0, ceilY - 4, w, 1, Color.rgb(30, 100, 120));
+            float off = (dist * ppm) % 24;
+            for (int x = -24; x < w + 24; x += 24) rectPx(c, x - off, 3, 2, 2, Color.rgb(90, 110, 140));
         }
 
         void drawFloor(Canvas c) {
-            p.setColor(Color.rgb(30, 40, 58));
-            c.drawRect(0, floorY, w, h, p);
-            p.setColor(Color.rgb(70, 190, 200));
-            c.drawRect(0, floorY, w, floorY + 3, p);
-            // meter ruler, aligned with the player's distance
-            p.setStrokeWidth(2);
-            tp.setTextSize(0.32f * ppm);
-            tp.setColor(Color.rgb(140, 190, 210));
+            rectPx(c, 0, floorY, w, h - floorY, Color.rgb(30, 40, 58));
+            rectPx(c, 0, floorY, w, 3, Color.rgb(70, 190, 200));
+            rectPx(c, 0, floorY + 3, w, 1, Color.rgb(30, 100, 120));
             int m0 = (int) Math.floor(dist - playerX / ppm);
-            for (int m = m0; m < dist + (w - playerX) / ppm + 1; m++) {
-                if (m < 0) continue;
+            for (int m = Math.max(0, m0); m < dist + (w - playerX) / ppm + 1; m++) {
                 float x = playerX + (m - dist) * ppm;
                 boolean ten = m % 10 == 0;
-                p.setColor(Color.rgb(90, 150, 175));
-                c.drawLine(x, floorY + 3, x, floorY + (ten ? 0.28f : 0.14f) * ppm, p);
-                if (ten) c.drawText(m + " m", x, floorY + 0.55f * ppm, tp);
+                rectPx(c, x, floorY + 4, 1, ten ? 5 : 3, Color.rgb(90, 150, 175));
+                if (ten) text(c, m + " M", x, floorY + 11, 1, Color.rgb(140, 190, 210), 1);
             }
         }
 
         void drawCoins(Canvas c) {
-            p.setStyle(Paint.Style.FILL);
+            int[][] orbit = {{4, 0}, {0, 4}, {-4, 0}, {0, -4}};
             for (Coin k : coins) {
-                float a = clock * 4f + k.x * 0.01f;
-                p.setColor(Color.argb(60, 80, 220, 255));
-                c.drawCircle(k.x, k.y, 0.26f * ppm, p);
-                p.setColor(Color.rgb(120, 235, 255));
-                c.drawCircle(k.x, k.y, 0.09f * ppm, p);
-                p.setColor(Color.rgb(255, 255, 255));
-                c.drawCircle(k.x + (float) Math.cos(a) * 0.2f * ppm, k.y + (float) Math.sin(a) * 0.2f * ppm, 0.045f * ppm, p);
+                int cx = Math.round(k.x), cy = Math.round(k.y);
+                rectPx(c, cx - 3, cy - 1, 7, 3, Color.argb(90, 80, 220, 255));
+                rectPx(c, cx - 1, cy - 3, 3, 7, Color.argb(90, 80, 220, 255));
+                rectPx(c, cx - 1, cy - 1, 3, 3, Color.rgb(120, 235, 255));
+                int[] o = orbit[((int) (clock * 8 + k.x * 0.05f) & 3)];
+                rectPx(c, cx + o[0], cy + o[1], 1, 1, Color.WHITE);
             }
         }
 
@@ -435,172 +554,101 @@ public class Main extends Activity {
                 float ax = z.x - hx, ay2 = z.y - hy, bx = z.x + hx, by = z.y + hy;
                 float nx = -hy / (z.len / 2), ny = hx / (z.len / 2);
                 path.reset();
-                path.moveTo(ax, ay2);
-                int segs = 7;
+                path.moveTo(Math.round(ax), Math.round(ay2));
+                int segs = 6;
                 for (int i = 1; i < segs; i++) {
-                    float t = i / (float) segs, j = (rnd.nextFloat() - 0.5f) * 0.4f * ppm;
-                    path.lineTo(ax + (bx - ax) * t + nx * j, ay2 + (by - ay2) * t + ny * j);
+                    float t = i / (float) segs, j = (rnd.nextInt(5) - 2) * 1.5f;
+                    path.lineTo(Math.round(ax + (bx - ax) * t + nx * j), Math.round(ay2 + (by - ay2) * t + ny * j));
                 }
-                path.lineTo(bx, by);
+                path.lineTo(Math.round(bx), Math.round(by));
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeJoin(Paint.Join.ROUND);
-                p.setStrokeWidth(0.22f * ppm);
-                p.setColor(Color.argb(60, 120, 200, 255));
+                p.setStrokeJoin(Paint.Join.MITER);
+                p.setStrokeWidth(4);
+                p.setColor(Color.argb(70, 120, 200, 255));
                 c.drawPath(path, p);
-                p.setStrokeWidth(0.07f * ppm);
+                p.setStrokeWidth(1);
                 p.setColor(Color.rgb(230, 250, 255));
                 c.drawPath(path, p);
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(Color.rgb(90, 100, 120));
-                c.drawCircle(ax, ay2, 0.2f * ppm, p);
-                c.drawCircle(bx, by, 0.2f * ppm, p);
-                p.setColor(Color.rgb(255, 200, 80));
-                c.drawCircle(ax, ay2, 0.09f * ppm, p);
-                c.drawCircle(bx, by, 0.09f * ppm, p);
+                for (int e = 0; e < 2; e++) {
+                    float nxp = e == 0 ? ax : bx, nyp = e == 0 ? ay2 : by;
+                    rectPx(c, nxp - 4, nyp - 4, 8, 8, Color.rgb(90, 100, 120));
+                    rectPx(c, nxp - 3, nyp - 3, 6, 6, Color.rgb(60, 70, 90));
+                    rectPx(c, nxp - 2, nyp - 2, 4, 4, Color.rgb(255, 200, 80));
+                }
             }
         }
 
         void drawMissiles(Canvas c) {
             for (Missile m : missiles) {
                 if (!m.flying) {
-                    boolean on = ((int) (m.warn * 8)) % 2 == 0;
-                    if (on) {
-                        float wx = w - 0.7f * ppm;
-                        p.setStyle(Paint.Style.FILL);
-                        p.setColor(Color.rgb(255, 90, 60));
-                        path.reset();
-                        path.moveTo(wx, m.y - 0.35f * ppm);
-                        path.lineTo(wx + 0.5f * ppm, m.y + 0.3f * ppm);
-                        path.lineTo(wx - 0.5f * ppm, m.y + 0.3f * ppm);
-                        path.close();
-                        c.drawPath(path, p);
-                        tp.setColor(Color.WHITE);
-                        tp.setTextSize(0.4f * ppm);
-                        tp.setTextAlign(Paint.Align.CENTER);
-                        c.drawText("!", wx, m.y + 0.26f * ppm, tp);
+                    if (((int) (m.warn * 8)) % 2 == 0) {
+                        float wx = w - 12;
+                        rectPx(c, wx - 6, m.y - 6, 12, 12, Color.rgb(255, 90, 60));
+                        rectPx(c, wx - 5, m.y - 5, 10, 10, Color.rgb(160, 40, 30));
+                        text(c, "!", wx - 1, m.y - 3, 1, Color.WHITE, 1);
                     }
                 } else {
-                    // alpha particle: a helium nucleus, two protons and two neutrons
-                    p.setStyle(Paint.Style.FILL);
-                    p.setColor(Color.argb(70, 255, 120, 70));
-                    c.drawCircle(m.x + 0.6f * ppm, m.y, 0.32f * ppm, p);
-                    c.drawCircle(m.x + 1.1f * ppm, m.y, 0.22f * ppm, p);
-                    float rr = 0.12f * ppm;
-                    p.setColor(Color.rgb(255, 80, 70));
-                    c.drawCircle(m.x - rr, m.y - rr, rr * 1.2f, p);
-                    c.drawCircle(m.x + rr, m.y + rr, rr * 1.2f, p);
-                    p.setColor(Color.rgb(200, 205, 215));
-                    c.drawCircle(m.x + rr, m.y - rr, rr * 1.2f, p);
-                    c.drawCircle(m.x - rr, m.y + rr, rr * 1.2f, p);
+                    // alpha particle: two protons and two neutrons
+                    int mx = Math.round(m.x), my = Math.round(m.y);
+                    rectPx(c, mx + 4, my - 3, 10, 6, Color.argb(70, 255, 120, 70));
+                    rectPx(c, mx + 14, my - 2, 8, 4, Color.argb(40, 255, 120, 70));
+                    rectPx(c, mx - 4, my - 4, 4, 4, Color.rgb(255, 80, 70));
+                    rectPx(c, mx, my, 4, 4, Color.rgb(255, 80, 70));
+                    rectPx(c, mx, my - 4, 4, 4, Color.rgb(200, 205, 215));
+                    rectPx(c, mx - 4, my, 4, 4, Color.rgb(200, 205, 215));
                 }
             }
         }
 
         void drawParticles(Canvas c) {
-            p.setStyle(Paint.Style.FILL);
             for (int i = 0; i < NP; i++) {
                 if (pl[i] <= 0) continue;
                 float a = Math.min(1f, pl[i] * 2f);
-                p.setColor(Color.argb((int) (a * 255), 255, state == DEAD ? 120 : 190, 60));
-                c.drawCircle(px[i], py[i], 0.09f * ppm * (0.4f + a), p);
+                int sz = a > 0.6f ? 3 : 2;
+                rectPx(c, px[i], py[i], sz, sz, Color.argb((int) (a * 255), 255, state == DEAD ? 120 : (a > 0.6f ? 230 : 150), 60));
             }
         }
 
         void drawPlayer(Canvas c) {
-            float u = ppm, cx = playerX, cy = y;
-            p.setStyle(Paint.Style.FILL);
             if (state == DEAD && stateTime < 0.2f) return;
-            // flame
+            int left = Math.round(playerX) - 6, top = Math.round(y) - 11;
             if (thrusting && state == PLAY) {
-                float fl = (0.45f + rnd.nextFloat() * 0.3f) * u;
-                path.reset();
-                path.moveTo(cx - 0.42f * u, cy + 0.22f * u);
-                path.lineTo(cx - 0.22f * u, cy + 0.22f * u);
-                path.lineTo(cx - 0.32f * u, cy + 0.22f * u + fl);
-                path.close();
-                p.setColor(Color.rgb(255, 170, 40));
-                c.drawPath(path, p);
+                int fl = 4 + rnd.nextInt(5);
+                rectPx(c, left + 1, top + 14, 3, fl, Color.rgb(255, 170, 40));
+                rectPx(c, left + 2, top + 14, 1, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
             }
-            // legs
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(0.13f * u);
-            p.setColor(Color.rgb(50, 60, 90));
-            float sw = onFloor ? (float) Math.sin(runPhase * 6.28f) * 0.18f * u : -0.1f * u;
-            c.drawLine(cx - 0.08f * u, cy + 0.22f * u, cx - 0.1f * u + sw, cy + 0.6f * u, p);
-            c.drawLine(cx + 0.08f * u, cy + 0.22f * u, cx + 0.1f * u - sw, cy + 0.6f * u, p);
-            p.setStyle(Paint.Style.FILL);
-            // jetpack tank
-            p.setColor(Color.rgb(240, 120, 50));
-            rect.set(cx - 0.44f * u, cy - 0.3f * u, cx - 0.2f * u, cy + 0.22f * u);
-            c.drawRoundRect(rect, 6, 6, p);
-            // lab coat
-            p.setColor(Color.rgb(240, 244, 250));
-            rect.set(cx - 0.24f * u, cy - 0.35f * u, cx + 0.22f * u, cy + 0.26f * u);
-            c.drawRoundRect(rect, 8, 8, p);
-            // head and goggles
-            p.setColor(Color.rgb(240, 200, 160));
-            c.drawCircle(cx + 0.02f * u, cy - 0.52f * u, 0.2f * u, p);
-            p.setColor(Color.rgb(60, 70, 90));
-            c.drawRect(cx - 0.12f * u, cy - 0.6f * u, cx + 0.24f * u, cy - 0.5f * u, p);
-            p.setColor(Color.rgb(120, 235, 255));
-            c.drawCircle(cx + 0.14f * u, cy - 0.55f * u, 0.07f * u, p);
+            sprite(c, SPR_HEAD, left, top);
+            String[] legs = !onFloor ? LEGS_AIR : (((int) (runPhase * 2) & 1) == 0 ? LEGS_A : LEGS_B);
+            sprite(c, legs, left, top + SPR_HEAD.length);
         }
 
         void drawHud(Canvas c) {
-            tp.setTextAlign(Paint.Align.LEFT);
-            tp.setTextSize(0.42f * ppm);
-            tp.setColor(Color.WHITE);
-            float x = 0.4f * ppm, yy = ceilY + 0.6f * ppm;
-            c.drawText(String.format("%d m", (int) dist), x, yy, tp);
-            tp.setColor(Color.rgb(120, 235, 255));
-            c.drawText("e- " + electrons, x, yy + 0.55f * ppm, tp);
-            tp.setTextAlign(Paint.Align.RIGHT);
-            tp.setColor(Color.rgb(170, 200, 220));
-            tp.setTextSize(0.34f * ppm);
-            float rx = w - 0.4f * ppm;
-            c.drawText(String.format("v  %+.1f m/s", -vy), rx, yy - 0.08f * ppm, tp);
-            c.drawText(String.format("a  %+.1f m/s²", -ay), rx, yy + 0.32f * ppm, tp);
-            c.drawText(String.format("best %d m", best), rx, yy + 0.72f * ppm, tp);
+            int top = Math.round(ceilY) + 4;
+            text(c, (int) dist + " M", 6, top, 2, Color.WHITE, 0);
+            text(c, "E- " + electrons, 6, top + 14, 1, Color.rgb(120, 235, 255), 0);
+            int rx = w - 6;
+            Color_ = Color.rgb(170, 200, 220);
+            text(c, String.format("V %+.1f M/S", -vy), rx, top, 1, Color_, 2);
+            text(c, String.format("A %+.1f M/S^2", -ay), rx, top + 8, 1, Color_, 2);
+            text(c, "BEST " + best + " M", rx, top + 16, 1, Color_, 2);
         }
+        int Color_;
 
         void drawTitle(Canvas c) {
-            tp.setTextAlign(Paint.Align.CENTER);
-            tp.setColor(Color.WHITE);
-            tp.setTextSize(1.1f * ppm);
-            tp.setFakeBoldText(true);
-            c.drawText("THRUST LAB", w / 2f, h * 0.38f, tp);
-            tp.setFakeBoldText(false);
-            tp.setTextSize(0.4f * ppm);
-            tp.setColor(Color.rgb(120, 235, 255));
-            c.drawText("hold to fire the jetpack, let go to fall", w / 2f, h * 0.38f + 0.9f * ppm, tp);
-            tp.setColor(Color.rgb(200, 215, 230));
-            c.drawText("tap to start", w / 2f, h * 0.38f + 1.55f * ppm, tp);
+            text(c, "THRUST LAB", w / 2f, h * 0.26f, 4, Color.WHITE, 1);
+            text(c, "HOLD TO FIRE THE JETPACK, LET GO TO FALL", w / 2f, h * 0.26f + 30, 1, Color.rgb(120, 235, 255), 1);
+            if (((int) (clock * 2) & 1) == 0) text(c, "TAP TO START", w / 2f, h * 0.26f + 44, 1, Color.rgb(255, 200, 80), 1);
         }
 
         void drawDead(Canvas c) {
             p.setStyle(Paint.Style.FILL);
             p.setColor(Color.argb(170, 8, 12, 24));
             c.drawRect(0, 0, w, h, p);
-            tp.setTextAlign(Paint.Align.CENTER);
-            tp.setColor(Color.WHITE);
-            tp.setTextSize(0.9f * ppm);
-            c.drawText((int) dist + " m", w / 2f, h * 0.28f, tp);
-            tp.setTextSize(0.4f * ppm);
-            tp.setColor(Color.rgb(120, 235, 255));
-            c.drawText(electrons + " electrons   best " + best + " m", w / 2f, h * 0.28f + 0.8f * ppm, tp);
-            tp.setColor(Color.rgb(210, 220, 235));
-            tp.setTextSize(0.36f * ppm);
-            int bw = (int) (w * 0.6f);
-            StaticLayout sl = StaticLayout.Builder.obtain(fact, 0, fact.length(), tp, bw)
-                    .setAlignment(Layout.Alignment.ALIGN_CENTER).build();
-            c.save();
-            c.translate((w - bw) / 2f, h * 0.28f + 1.5f * ppm);
-            sl.draw(c);
-            c.restore();
-            if (stateTime > 0.7f) {
-                tp.setColor(Color.rgb(255, 200, 80));
-                tp.setTextSize(0.4f * ppm);
-                c.drawText("tap to try again", w / 2f, h * 0.85f, tp);
+            text(c, (int) dist + " M", w / 2f, h * 0.18f, 4, Color.WHITE, 1);
+            text(c, electrons + " ELECTRONS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
+            wrapText(c, fact, w / 2f, h * 0.18f + 50, 1, Color.rgb(210, 220, 235), (int) (w * 0.7f));
+            if (stateTime > 0.7f && ((int) (clock * 2) & 1) == 0) {
+                text(c, "TAP TO TRY AGAIN", w / 2f, h * 0.84f, 1, Color.rgb(255, 200, 80), 1);
             }
         }
     }
