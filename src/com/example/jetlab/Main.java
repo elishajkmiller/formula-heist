@@ -550,7 +550,7 @@ public class Main extends Activity {
         void collectScroll(int idx) {
             ownedMask |= 1 << idx;
             saveFormulas();
-            bannerIdx = idx; bannerT = 3.2f;
+            bannerIdx = idx; bannerT = 1.2f;
             flash = 0.12f;
             sfx(S_DONE);
             buzz(30);
@@ -2366,9 +2366,15 @@ public class Main extends Activity {
 
         void drawHint(Canvas c) {
             if (bannerT > 0 && state == PLAY) {
-                text(c, "FORMULA RECOVERED", w / 2f, ceilY + 50, 1, Color.rgb(255, 215, 120), 1);
-                text(c, FNAME[bannerIdx], w / 2f, ceilY + 59, 1, Color.WHITE, 1);
-                text(c, "SCRATCH IT OFF IN THE ARCHIVE", w / 2f, ceilY + 68, 1, Color.rgb(150, 190, 215), 1);
+                // a silver scratch card pops up and rises, with no words so nothing is given away
+                float t = 1f - bannerT / 1.2f;
+                int cx = Math.round(playerX + 14), cy = Math.round(y - 22 - t * 14);
+                rectPx(c, cx - 7, cy - 9, 14, 18, Color.rgb(8, 10, 20));
+                silver(c, cx - 6, cy - 8, 12, 16);
+                if (((int) (clock * 12) & 1) == 0) {
+                    rectPx(c, cx - 1, cy - 12, 2, 6, Color.WHITE);
+                    rectPx(c, cx - 4, cy - 10, 8, 2, Color.WHITE);
+                }
             }
             if (tipT > 0 && state == PLAY && vehicle == 0) {
                 text(c, "TAP TO JUMP, THEN HOLD TO FIRE THE JETPACK", w / 2f, ceilY + 28, 1, Color.WHITE, 1);
