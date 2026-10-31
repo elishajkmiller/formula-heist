@@ -107,11 +107,14 @@ final class Sfx {
      * A short looping chiptune, made here so there is no audio file: A minor, 128 bpm, eight bars
      * of Am F C G twice. A square-wave arpeggio over a triangle bass and a noise hat.
      */
+    static final double BEAT = 60.0 / 128.0;
+    static final float[] ROOTS = {110.00f, 87.31f, 130.81f, 98.00f};   // A2 F2 C3 G2, one per bar
+
     static short[] song() {
-        double beat = 60.0 / 128.0, step = beat / 4;
+        double beat = BEAT, step = beat / 4;
         int bars = 8, steps = bars * 16;
         int n = (int) (steps * step * RATE);
-        float[] roots = {110.00f, 87.31f, 130.81f, 98.00f};
+        float[] roots = ROOTS;
         float[][] arp = {{440.00f, 523.25f, 659.25f}, {349.23f, 440.00f, 523.25f}, {523.25f, 659.25f, 783.99f}, {392.00f, 493.88f, 587.33f}};
         int[] pattern = {0, 1, 2, 1, 0, 1, 2, 1, 2, 1, 0, 1, 2, 1, 0, 2};
         short[] d = new short[n];
@@ -139,7 +142,8 @@ final class Sfx {
 
     /**
      * The jetpack roar: low-passed noise with a deep rumble under it and a fast random flutter,
-     * like a flame. Made as a seamless loop (the tail is crossfaded into the head).
+     * like a flame, and a soft hum on A2 so the roar has a pitch the music can move.
+     * Made as a seamless loop (the tail is crossfaded into the head; the hum fits whole cycles).
      */
     static short[] jet() {
         int n = RATE * 1200 / 1000, x = RATE * 80 / 1000;
@@ -164,10 +168,16 @@ final class Sfx {
             peak = Math.max(peak, Math.abs(v));
         }
         short[] d = new short[n];
+        double ph;
         for (int i = 0; i < n; i++) {
             double v = f[i];
             if (i < x) { double k = i / (double) x; v = v * k + f[n + i] * (1 - k); }
-            d[i] = (short) (v / peak * 32767 * 0.45);
+            // the hum: a buzzy tone on A2 (110 Hz, 132 whole cycles in 1.2 s), harmonics up to 550 Hz
+            // so a phone speaker can still hear the note
+            ph = 2 * Math.PI * 110 * i / RATE;
+            double hum = 0;
+            for (int k = 1; k <= 5; k++) hum += Math.sin(ph * k) / k;
+            d[i] = (short) ((v / peak * 0.36 + hum * 0.11) * 32767);
         }
         return d;
     }
@@ -231,7 +241,7 @@ final class Sfx {
                         vol = target > vol ? Math.min(target, vol + 0.25f) : Math.max(target, vol - 0.12f);   // in over ~40 ms, out over ~80 ms
                         t.setVolume(vol * gain);
                     }
-                    float want = Math.max(0.5f, Math.min(2f, rate));
+                    float want = Math.max(0.5f, Math.min(2f, this == jetLoop ? musicPitch() : rate));
                     if (Math.abs(want - cur) > 0.002f) {
                         cur += (want - cur) * 0.3f;
                         t.setPlaybackRate((int) (RATE * cur));
@@ -248,14 +258,29 @@ final class Sfx {
     volatile boolean alive = true;
     final Loop jetLoop = new Loop("jet", 0.5f), scratchLoop = new Loop("scratch", 0.35f);
 
+    /**
+     * The roar's playback rate that puts its A2 hum on the root of the chord the music is playing now,
+     * read from the music track's play head. 1 when the music is off.
+     */
+    float musicPitch() {
+        AudioTrack m = music;
+        if (m == null || !musicWanted || songLen == 0) return 1f;
+        try {
+            int pos = m.getPlaybackHeadPosition() % songLen;
+            int bar = (int) (pos / (double) RATE / (BEAT * 4));
+            return ROOTS[bar % 4] / ROOTS[0];
+        } catch (Throwable e) { return 1f; }
+    }
+
     /** turn the jetpack roar on or off */
     void setJet(boolean on) { jetLoop.set(on, 1f); }
 
     /** the rising scratch tone; rate 1 at the start of a card up to 2 (an octave) when it reveals */
     void setScratch(boolean on, float rate) { scratchLoop.set(on, rate); }
 
-    AudioTrack music;
-    boolean musicWanted;
+    volatile AudioTrack music;
+    volatile boolean musicWanted;
+    volatile int songLen;
 
     /** start or pause the background music; the track is built the first time on the audio thread */
     void setMusic(final boolean on) {
@@ -271,6 +296,7 @@ final class Sfx {
                                 music = mk(d);
                                 music.setLoopPoints(0, d.length, -1);
                                 music.setVolume(0.55f);
+                                songLen = d.length;
                             }
                             if (musicWanted) music.play();
                         } else if (music != null) {
