@@ -239,7 +239,9 @@ public class Main extends Activity {
         float teleFromY, telePulse, invuln, squash, flash, shake, hitstop, hintT, nextCrate, lastCoinSfx, unit = 1f;
         Sfx sfx;
         boolean ghost, outline;
-        float leanPx, landT;
+        float leanPx, landT, ang, angV, settleT, finalDist;
+        int bounces;
+        boolean settled;
         Vibrator vib;
         float jumpDelay, y, vy, ay, dist, speed, bgOff, spawnLeft, stateTime, clock, runPhase;
         int electrons, best;
@@ -424,6 +426,7 @@ public class Main extends Activity {
             }
 
             float dt = rdt;
+            if (state == DEAD) { updateDead(dt); return; }
             if (state == BUILD) {
                 buildT += rdt;
                 dt = rdt * 0.15f;                           // time slows while the vehicle assembles
@@ -496,12 +499,6 @@ public class Main extends Activity {
                 bgOff += speed * ppm * dt * 0.25f;
                 return;
             }
-            if (state == DEAD) {
-                speed = Math.max(0f, speed - 14f * dt);
-                bgOff += speed * ppm * dt * 0.25f;
-                return;
-            }
-
             speed = 5f + Math.min(dist / 60f, 7f);
             float scroll = speed * ppm * dt;
             dist += speed * dt;
@@ -625,12 +622,79 @@ public class Main extends Activity {
             sfx(S_HIT);
             buzz(120);
             fact = FACTS[rnd.nextInt(FACTS.length)];
+            finalDist = dist;
             int score = (int) dist;
             if (score > best) {
                 best = score;
                 prefs.edit().putInt("best", best).apply();
             }
             for (int i = 0; i < 30; i++) burst(playerX, y);
+            // ragdoll: popped up, tumbling forward
+            vehicle = 0; gravDir = 1; thrusting = false;
+            vy = -6f; ang = 0; angV = 640f; bounces = 0; settled = false; settleT = 0;
+        }
+
+        /** a spark kicked up where he drags along the floor */
+        void dust(float dx, float dy) {
+            int k = pNext++ % NP;
+            px[k] = dx; py[k] = dy;
+            pvx[k] = (-speed * 0.5f + (rnd.nextFloat() - 0.3f) * 3f) * ppm;
+            pvy[k] = -rnd.nextFloat() * 4f * ppm;
+            pl[k] = 0.3f + rnd.nextFloat() * 0.3f;
+        }
+
+        /** after a zap: bounce a few times, faceplant, then get dragged along the floor */
+        void updateDead(float dt) {
+            vy += GRAVITY * dt;
+            if (vy > VFALL) vy = VFALL;
+            y += vy * ppm * dt;
+            float hb = SH - 4f * settleT;               // lying flat he sits lower than standing
+            float hi = floorY - hb;
+            if (y > hi) {
+                y = hi;
+                if (vy > 3f && bounces < 3) {
+                    vy = -vy * 0.55f;
+                    bounces++;
+                    angV *= 0.65f;
+                    shake = Math.max(shake, 2.5f);
+                    sfx(S_STOMP);
+                    for (int i = 0; i < 6; i++) dust(playerX, floorY - 2);
+                } else {
+                    vy = 0;
+                    if (!settled) {
+                        settled = true;
+                        shake = Math.max(shake, 3f);
+                        sfx(S_STOMP);
+                        for (int i = 0; i < 10; i++) dust(playerX, floorY - 2);
+                    }
+                }
+            }
+            if (!settled) {
+                ang += angV * dt;
+            } else {
+                float target = 90f + 360f * Math.round((ang - 90f) / 360f);   // face down
+                ang += (target - ang) * Math.min(1f, 10f * dt);
+                settleT = Math.min(1f, settleT + dt * 5f);
+            }
+            // the world slows down while he is dragged along the floor
+            speed = Math.max(0f, speed - (settled ? 6f : 2f) * dt);
+            float sc = speed * ppm * dt;
+            bgOff += sc * 0.25f;
+            dist += speed * dt;
+            if (settled && speed > 0.3f && rnd.nextInt(3) == 0) dust(playerX - 4, floorY - 1);
+            for (Coin k : coins) k.x -= sc;
+            for (Zapper z : zappers) z.x -= sc;
+            for (Crate k : crates) k.x -= sc;
+            for (int i = missiles.size() - 1; i >= 0; i--) {
+                Missile m = missiles.get(i);
+                if (m.flying) { m.x -= (speed + 9f) * ppm * dt; if (m.x < -ppm) missiles.remove(i); }
+            }
+            for (int i = 0; i < NP; i++) {
+                if (pl[i] > 0) {
+                    pl[i] -= dt;
+                    px[i] += pvx[i] * dt; py[i] += pvy[i] * dt;
+                }
+            }
         }
 
         void burst(float bx, float by) {
@@ -1499,8 +1563,29 @@ public class Main extends Activity {
             leanPx = 0;
         }
 
+        void drawRagdoll(Canvas c) {
+            int left = Math.round(playerX) - 8, top = Math.round(y) - SH;
+            boolean sliding = settled && speed > 0.3f;
+            boolean flop = ((int) (clock * (sliding ? 9 : 12)) & 1) == 0;
+            String[] legs = flop ? LEGS_AIR : LEGS_AIR2;
+            if (settled && !sliding) legs = ((int) (clock * 2) & 3) == 0 ? LEGS_FALL2 : LEGS_FALL1;   // twitch when he stops
+            c.save();
+            c.rotate(ang, playerX, y);
+            leanPx = 0;
+            outlined(c, legs, left, top + SPR_HEAD.length);
+            outlined(c, flop ? SPR_HEAD_B : SPR_HEAD, left, top);
+            c.restore();
+            if (settled && !sliding) {
+                // dizzy stars circling his head
+                for (int i = 0; i < 3; i++) {
+                    double a = clock * 5 + i * 2.094;
+                    rectPx(c, playerX + 12 + (float) Math.cos(a) * 7, y - 3 + (float) Math.sin(a) * 3, 2, 2, Color.rgb(255, 230, 90));
+                }
+            }
+        }
+
         void drawPlayer(Canvas c) {
-            if (state == DEAD && stateTime < 0.2f) return;
+            if (state == DEAD) { drawRagdoll(c); return; }
             if (state == PLAY && invuln > 0 && ((int) (clock * 14) & 1) == 0) return;
             if (vehicle != 0 && state == PLAY) { drawVehicle(c); return; }
             if (state == BUILD && buildT > BUILD_TIME * 0.9f) return;
@@ -1620,7 +1705,7 @@ public class Main extends Activity {
 
         void drawHud(Canvas c) {
             int top = Math.round(ceilY) + 4;
-            text(c, (int) dist + " M", 6, top, 2, Color.WHITE, 0);
+            text(c, (int) (state == DEAD ? finalDist : dist) + " M", 6, top, 2, Color.WHITE, 0);
             text(c, "E- " + electrons, 6, top + 14, 1, Color.rgb(120, 235, 255), 0);
             int rx = w - 6;
             Color_ = Color.rgb(170, 200, 220);
@@ -1645,13 +1730,16 @@ public class Main extends Activity {
         }
 
         void drawDead(Canvas c) {
+            float fade = Math.max(0f, Math.min(1f, (stateTime - 1.2f) / 0.4f));
+            if (fade <= 0f) return;
             p.setStyle(Paint.Style.FILL);
-            p.setColor(Color.argb(170, 8, 12, 24));
+            p.setColor(Color.argb((int) (170 * fade), 8, 12, 24));
             c.drawRect(0, 0, w, h, p);
-            text(c, (int) dist + " M", w / 2f, h * 0.18f, 4, Color.WHITE, 1);
+            if (stateTime < 1.5f) return;
+            text(c, (int) finalDist + " M", w / 2f, h * 0.18f, 4, Color.WHITE, 1);
             text(c, electrons + " ELECTRONS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
             wrapText(c, fact, w / 2f, h * 0.18f + 50, 1, Color.rgb(210, 220, 235), (int) (w * 0.7f));
-            if (stateTime > 0.7f && ((int) (clock * 2) & 1) == 0) {
+            if (((int) (clock * 2) & 1) == 0) {
                 text(c, "TAP TO TRY AGAIN", w / 2f, h * 0.84f, 1, Color.rgb(255, 200, 80), 1);
             }
         }
