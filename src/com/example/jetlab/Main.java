@@ -2990,8 +2990,9 @@ public class Main extends Activity {
                 if (pl[i] <= 0) continue;
                 float a = Math.min(1f, pl[i] * 2f);
                 int sz = a > 0.6f ? 3 : 2;
-                if (pcol[i] != 0) rectPx(c, px[i], py[i], sz, sz, (pcol[i] & 0xFFFFFF) | ((int) (a * 255) << 24));
-                else rectPx(c, px[i], py[i], sz, sz, Color.argb((int) (a * 255), 255, state == DEAD ? 120 : (a > 0.6f ? 230 : 150), 60));
+                float py1 = Math.min(py[i], floorY - sz);           // sparks land on the ground, not under it
+                if (pcol[i] != 0) rectPx(c, px[i], py1, sz, sz, (pcol[i] & 0xFFFFFF) | ((int) (a * 255) << 24));
+                else rectPx(c, px[i], py1, sz, sz, Color.argb((int) (a * 255), 255, state == DEAD ? 120 : (a > 0.6f ? 230 : 150), 60));
             }
         }
 
@@ -3080,11 +3081,22 @@ public class Main extends Activity {
             int left = Math.round(playerX) - 8, top = Math.round(y) - SH_TOP;
 
             if (thr) {
-                int fl = 7 + rnd.nextInt(6);
-                rectPx(c, left, top + 16, 6, fl, Color.rgb(255, 150, 50));
-                rectPx(c, left + 1, top + 16, 4, Math.max(1, fl - 2), Color.rgb(255, 215, 90));
-                rectPx(c, left + 2, top + 16, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
-                rectPx(c, left + 1 + rnd.nextInt(4), top + 16 + fl, 1, 2, Color.rgb(255, 150, 50));
+                int ground = Math.round(floorY), fy = top + 16, room = ground - fy;
+                if (room > 0) {
+                    // the flame stops at the ground instead of running through it
+                    int fl = Math.min(room, 7 + rnd.nextInt(6));
+                    rectPx(c, left, fy, 6, fl, Color.rgb(255, 150, 50));
+                    rectPx(c, left + 1, fy, 4, Math.max(1, fl - 2), Color.rgb(255, 215, 90));
+                    rectPx(c, left + 2, fy, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
+                    if (fl == room) {
+                        // it splashes out along the ground and kicks up sparks
+                        rectPx(c, left - 4, ground - 1, 14, 1, Color.rgb(255, 190, 80));
+                        rectPx(c, left - 2, ground - 2, 10, 1, Color.rgb(255, 240, 170));
+                        if (rnd.nextInt(2) == 0) dust(left + 3, ground - 2);
+                    } else {
+                        rectPx(c, left + 1 + rnd.nextInt(4), fy + fl, 1, 2, Color.rgb(255, 150, 50));
+                    }
+                }
             }
             scientist(c, left, top, ph, onFloor && state == PLAY);
         }
