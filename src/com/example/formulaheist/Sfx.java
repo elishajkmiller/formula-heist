@@ -17,14 +17,14 @@ final class Sfx {
 
     Sfx() {
         try {
-            tr[Game.S_JUMP] = mk(tone(200, 560, 120, 0.5f, 0f, true));
+            tr[Game.S_JUMP] = mk(tone(220, 440, 120, 0.5f, 0f, true));        // A3 up to A4
             tr[Game.S_COIN] = mk(tone(900, 1500, 70, 0.4f, 0f, false));
             tr[Game.S_HIT] = mk(tone(160, 30, 380, 0.9f, 0.6f, false));
-            tr[Game.S_STOMP] = mk(tone(140, 40, 170, 0.9f, 0.35f, false));
-            tr[Game.S_FLIP] = mk(tone(700, 250, 130, 0.5f, 0f, true));
+            tr[Game.S_STOMP] = mk(tone(110, 27.5f, 170, 0.9f, 0.35f, false));  // A2 down to A0
+            tr[Game.S_FLIP] = mk(tone(880, 220, 130, 0.5f, 0f, true));         // A5 down to A3
             tr[Game.S_WARN] = mk(tone(820, 820, 90, 0.4f, 0f, true));
             tr[Game.S_DONE] = mk(tone(500, 1400, 260, 0.6f, 0f, true));
-            tr[Game.S_TELE] = mk(tone(1800, 250, 150, 0.5f, 0.15f, true));
+            tr[Game.S_TELE] = mk(tone(1760, 220, 150, 0.5f, 0.15f, true));     // A6 down to A3
             tr[Game.S_SCRATCH] = mk(tone(2600, 1400, 35, 0.22f, 0.85f, false));
             tr[Game.S_BUILD] = mk(build());
             tr[Game.S_FANFARE] = mk(fanfare());
@@ -105,7 +105,7 @@ final class Sfx {
 
     /**
      * A short looping chiptune, made here so there is no audio file: A minor, 128 bpm, eight bars
-     * of Am F C G twice. A square-wave arpeggio and a noise hat, no bass: the jetpack hum plays the roots.
+     * of Am F C G twice. A square-wave arpeggio and a noise hat, no bass: the jetpack tone plays the roots.
      */
     static final double BEAT = 60.0 / 128.0;
     static final float[] ROOTS = {110.00f, 87.31f, 130.81f, 98.00f};   // A2 F2 C3 G2, one per bar
@@ -135,45 +135,155 @@ final class Sfx {
     }
 
     /**
-     * The jetpack roar: low-passed noise with a deep rumble under it and a fast random flutter,
-     * like a flame, and a soft hum on A2 so the roar has a pitch the music can move.
-     * Made as a seamless loop (the tail is crossfaded into the head; the hum fits whole cycles).
+     * The sound of jetpack type 0..7 (the JETPACKS tab order) or vehicle 8..13 (Vehicle.KINDS order
+     * plus 8), a 1.2 s seamless loop.
+     * Each is a noise part and a tone part, normalised apart and then mixed. Every tone is a
+     * whole number of cycles in 1.2 s (110 Hz = 132 cycles), so only the noise needs the tail
+     * crossfaded into the head. The tones are tuned to A, so the playback rate can put them
+     * on the music's chord root.
      */
-    static short[] jet() {
-        int n = RATE * 1200 / 1000, x = RATE * 80 / 1000;
-        float[] f = new float[n + x];
-        Random r = new Random(11);
-        // two low-pass filters on the same noise: a body around 450 Hz and a deep rumble around 80 Hz
-        double a1 = 1 - Math.exp(-2 * Math.PI * 450 / RATE), a2 = 1 - Math.exp(-2 * Math.PI * 80 / RATE);
-        double l1 = 0, l2 = 0, flut = 1, flutT = 1, peak = 1e-9, cr = 0, lastW = 0;
-        for (int i = 0; i < f.length; i++) {
-            double w = r.nextDouble() * 2 - 1;
-            l1 += (w - l1) * a1;
-            l2 += (w - l2) * a2;
+    static short[] jet(int type) {
+        int n = RATE * 1200 / 1000, x = RATE * 80 / 1000, m = n + x;
+        float[] nz = new float[m], tn = new float[m];
+        Random r = new Random(11 + type);
+        double a80 = lp(80), a300 = lp(300), a450 = lp(450), a1200 = lp(1200), a1500 = lp(1500);
+        double l80 = 0, l300 = 0, l450 = 0, l1200 = 0, l1500 = 0, lastW = 0, flut = 1, flutT = 1, cr = 0;
+        double[] arp = {440, 660, 880, 1320, 880, 660};
+        for (int i = 0; i < m; i++) {
+            double t = i / (double) RATE, w = r.nextDouble() * 2 - 1, P = 2 * Math.PI * t;
+            l80 += (w - l80) * a80; l300 += (w - l300) * a300; l450 += (w - l450) * a450;
+            l1200 += (w - l1200) * a1200; l1500 += (w - l1500) * a1500;
             if (i % (RATE / 30) == 0) flutT = 0.7 + 0.3 * r.nextDouble();   // a new flicker level 30 times a second
             flut += (flutT - flut) * 0.004;
-            // quiet crackle: about 40 tiny pops a second, each a few ms of high-passed noise that dies away
-            if (r.nextDouble() < 40.0 / RATE) cr = 0.06 + 0.1 * r.nextDouble();
-            double crackle = (w - lastW) * cr;
-            cr *= 0.93;
+            double hi = w - l1500;                                          // noise above 1.5 kHz
+            double a = 0, b = 0;
+            switch (type) {
+                default:
+                case 0: {   // ROCKET: a flame roar, rumble and crackle over a buzzy A2
+                    if (r.nextDouble() < 40.0 / RATE) cr = 0.06 + 0.1 * r.nextDouble();
+                    a = (l450 * 1.4 + l80 * 5.0) * flut + (w - lastW) * cr;
+                    cr *= 0.93;
+                    b = saw(P * 110, 5);
+                    break;
+                }
+                case 1: {   // PULSE JET: chugs 15 times a second, a hollow square on A1
+                    double pulse = Math.exp(-((t * 15) % 1.0) * 6);
+                    a = (l300 * 2 + l80 * 4) * pulse;
+                    b = (Math.sin(P * 55) + Math.sin(P * 165) / 3 + Math.sin(P * 275) / 5 + Math.sin(P * 385) / 7) * (0.4 + 0.6 * pulse);
+                    break;
+                }
+                case 2: {   // STEAM: a hiss with a kettle whistle on A5
+                    a = hi * flut * (0.85 + 0.15 * Math.sin(P * 5));
+                    double ph = P * 880 + 0.6 * Math.sin(P * 5);
+                    b = Math.sin(ph) + 0.3 * Math.sin(ph * 2);
+                    break;
+                }
+                case 3: {   // ION: a clean electric whine, A4 with its octave and a soft A2 under it
+                    a = hi * 0.5;
+                    b = (Math.sin(P * 440) + 0.5 * Math.sin(P * 880) + 0.25 * Math.sin(P * 1320) + 0.6 * Math.sin(P * 110))
+                            * (0.85 + 0.15 * Math.sin(P * 10));
+                    break;
+                }
+                case 4: {   // DARK MATTER: a deep A1 whose brightness wobbles 2.5 times a second
+                    a = l80;
+                    double bright = 1 + 5 * (0.5 + 0.5 * Math.sin(P * 2.5)), s = 0;
+                    for (int k = 1; k <= 12; k++) s += Math.sin(P * 55 * k) / k * Math.exp(-(k - 1) / bright);
+                    b = s;
+                    break;
+                }
+                case 5: {   // FUSION: a big bright roar on A2 and A3 with the fifth on top
+                    a = (l1200 + l450 * 1.4 + l80 * 4) * flut;
+                    b = saw(P * 110, 10) + 0.5 * saw(P * 220, 6) + 0.3 * Math.sin(P * 330);
+                    break;
+                }
+                case 6: {   // PLASMA: a harsh narrow-pulse buzz on A2 with electric zaps
+                    if (r.nextDouble() < 25.0 / RATE) cr = 0.5 + 0.5 * r.nextDouble();
+                    a = hi * (0.25 + cr);
+                    cr *= 0.997;                                            // each zap lasts about 15 ms
+                    double ph = (t * 110) % 1.0;
+                    b = (ph < 0.15 ? 1 : -0.18) + 0.4 * saw(P * 220, 8);
+                    break;
+                }
+                case 7: {   // PHOTON: a sparkling A arpeggio, root fifth octave, over a soft A3
+                    int note = (int) (t / 0.1) % arp.length;
+                    double u = (t % 0.1) / 0.1;
+                    double env = Math.min(1, u * 30) * Math.exp(-u * 4);
+                    b = (Math.sin(P * arp[note]) + 0.3 * Math.sin(P * arp[note] * 2)) * env + 0.3 * Math.sin(P * 220);
+                    a = hi * 0.4 * (0.6 + 0.4 * Math.sin(P * 10));
+                    break;
+                }
+                // the vehicles, in Vehicle.KINDS order, quieter than the jetpacks so they sit under the music
+                case 8: {   // SPRING STOMPER: a boinging A2 that bends 2.5 times a second, with clanks
+                    double clank = Math.exp(-((t * 5) % 1.0) * 25);
+                    a = hi * clank + l300 * 0.5;
+                    double ph = P * 110 + 4 * Math.sin(P * 2.5);
+                    b = Math.sin(ph) + 0.4 * Math.sin(ph * 2) + 0.2 * Math.sin(ph * 3);
+                    break;
+                }
+                case 9: {   // GRAVITY INVERTER: a hum that swaps between A2 and A3 2.5 times a second
+                    double sw = 0.5 + 0.5 * Math.sin(P * 2.5);
+                    a = l80 * 2 + l300;
+                    b = saw(P * 110, 6) * sw + saw(P * 220, 4) * (1 - sw);
+                    break;
+                }
+                case 10: {  // QUANTUM ENTANGLER: A4 and E5 trading places, eerie and airy
+                    double tr = 0.5 + 0.5 * Math.sin(P * 5);
+                    a = hi * 0.6;
+                    b = Math.sin(P * 440) * tr + Math.sin(P * 660) * (1 - tr) + 0.3 * Math.sin(P * 110);
+                    break;
+                }
+                case 11: {  // DNA HELIX: two soft triangles, A3 and E4, with a gentle vibrato
+                    double v1 = P * 220 + 0.5 * Math.sin(P * 5), v2 = P * 330 + 0.5 * Math.sin(P * 5 + 1.5);
+                    a = l1200 * 0.6;
+                    b = tri(v1) + 0.6 * tri(v2);
+                    break;
+                }
+                case 12: {  // BERNOULLI BIRD: wind over the wings and a breathy A5 flute
+                    a = l1200 * flut * 2;
+                    double breath = 0.8 + 0.2 * Math.sin(P * 2.5);
+                    b = (Math.sin(P * 880) + 0.15 * Math.sin(P * 1760)) * breath + 0.08 * w;
+                    break;
+                }
+                case 13: {  // AERIAL SCREW: a propeller whirr, A2 chopped by the blades 15 times a second
+                    double blade = 0.55 + 0.45 * Math.cos(P * 15);
+                    a = l450 * 2 * blade;
+                    b = saw(P * 110, 8) * blade;
+                    break;
+                }
+            }
             lastW = w;
-            double v = (l1 * 1.4 + l2 * 5.0) * flut + crackle;
-            f[i] = (float) v;
-            peak = Math.max(peak, Math.abs(v));
+            nz[i] = (float) a;
+            tn[i] = (float) b;
         }
+        //                   ROCKET PULSE  STEAM  ION    DARK   FUSION PLASMA PHOTON STOMP  INVERT QUANT  HELIX  BIRD   SCREW
+        float[] noiseMix = {0.36f, 0.40f, 0.30f, 0.08f, 0.18f, 0.40f, 0.33f, 0.08f, 0.10f, 0.12f, 0.06f, 0.06f, 0.16f, 0.16f};
+        float[] toneMix  = {0.20f, 0.20f, 0.16f, 0.38f, 0.28f, 0.26f, 0.30f, 0.42f, 0.24f, 0.22f, 0.24f, 0.26f, 0.20f, 0.20f};
+        int k = Math.max(0, Math.min(noiseMix.length - 1, type));
+        double pn = 1e-9, pt = 1e-9;
+        for (int i = 0; i < m; i++) { pn = Math.max(pn, Math.abs(nz[i])); pt = Math.max(pt, Math.abs(tn[i])); }
         short[] d = new short[n];
-        double ph;
         for (int i = 0; i < n; i++) {
-            double v = f[i];
-            if (i < x) { double k = i / (double) x; v = v * k + f[n + i] * (1 - k); }
-            // the hum: a buzzy tone on A2 (110 Hz, 132 whole cycles in 1.2 s), harmonics up to 550 Hz
-            // so a phone speaker can still hear the note
-            ph = 2 * Math.PI * 110 * i / RATE;
-            double hum = 0;
-            for (int k = 1; k <= 5; k++) hum += Math.sin(ph * k) / k;
-            d[i] = (short) ((v / peak * 0.36 + hum * 0.11) * 32767);
+            double v = nz[i];
+            if (i < x) { double c = i / (double) x; v = v * c + nz[n + i] * (1 - c); }
+            d[i] = (short) ((v / pn * noiseMix[k] + tn[i] / pt * toneMix[k]) * 32767);
         }
         return d;
+    }
+
+    /** one-pole low-pass coefficient for a cutoff in Hz */
+    static double lp(double hz) { return 1 - Math.exp(-2 * Math.PI * hz / RATE); }
+
+    /** a triangle wave, ph in radians */
+    static double tri(double ph) {
+        double p = (ph / (2 * Math.PI)) % 1.0;
+        return p < 0.5 ? p * 4 - 1 : 3 - p * 4;
+    }
+
+    /** a sawtooth-ish tone from its first h harmonics, ph in radians */
+    static double saw(double ph, int h) {
+        double s = 0;
+        for (int k = 1; k <= h; k++) s += Math.sin(ph * k) / k;
+        return s;
     }
 
     /**
@@ -223,13 +333,20 @@ final class Sfx {
         public void run() {
             float vol = 0, cur = 1f;
             boolean playing = false;
+            int built = -1;
             try {
-                short[] d = name.equals("jet") ? jet() : shimmer();
-                t = mk(d);
-                t.setLoopPoints(0, d.length, -1);
-                t.setVolume(0);
                 while (alive) {
-                    float target = wanted ? 1f : 0f;
+                    // the jet rebuilds its loop when the worn jetpack changes, once it has faded out
+                    int type = this == jetLoop ? jetType : 0;
+                    if (t == null || (built != type && vol == 0)) {
+                        if (t != null) { t.release(); t = null; }
+                        short[] d = this == jetLoop ? jet(type) : shimmer();
+                        t = mk(d);
+                        t.setLoopPoints(0, d.length, -1);
+                        t.setVolume(0);
+                        built = type; playing = false; cur = 1f;
+                    }
+                    float target = wanted && built == type ? 1f : 0f;
                     if (target > 0 && !playing) { t.play(); playing = true; }
                     if (vol != target) {
                         vol = target > vol ? Math.min(target, vol + 0.25f) : Math.max(target, vol - 0.12f);   // in over ~40 ms, out over ~80 ms
@@ -266,8 +383,10 @@ final class Sfx {
         } catch (Throwable e) { return 1f; }
     }
 
-    /** turn the jetpack roar on or off */
-    void setJet(boolean on) { jetLoop.set(on, 1f); }
+    volatile int jetType;
+
+    /** turn the jetpack sound on or off; type is the worn jetpack, which picks the sound */
+    void setJet(boolean on, int type) { jetType = type; jetLoop.set(on, 1f); }
 
     /** the rising scratch tone; rate 1 at the start of a card up to 2 (an octave) when it reveals */
     void setScratch(boolean on, float rate) { scratchLoop.set(on, rate); }
@@ -319,6 +438,9 @@ final class Sfx {
                         if (a == null) return;
                         a.stop();
                         a.reloadStaticData();
+                        // the jump and vehicle sounds are tuned to A, so they play on the music's chord
+                        if (id == Game.S_JUMP || id == Game.S_STOMP || id == Game.S_FLIP || id == Game.S_TELE)
+                            a.setPlaybackRate((int) (RATE * musicPitch()));
                         a.play();
                     } catch (Throwable t) { }
                 }

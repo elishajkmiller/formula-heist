@@ -15,6 +15,8 @@ abstract class Vehicle {
     static final Maker[] KINDS = {Stomper::new, Inverter::new, Quantum::new, Helix::new, Bird::new, Screw::new};
 
     final Game g;
+    /** its index in KINDS, which also picks its engine sound */
+    int kind;
 
     Vehicle(Game g) { this.g = g; }
 

@@ -142,7 +142,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     // clothes store
     int bank, storeFrom, storeTab, sbx, sby, sbw, sbh;       // bank: electrons kept across runs
     final int[] inv = {1, 1, 1}, worn = {0, 0, 0};           // per tab: owned items (bit mask) and the item being worn
-    float storeMsgT;
+    float storeMsgT, jetPreview;
     String storeMsg = "";
 
     // formula archive
@@ -630,10 +630,12 @@ final class Game extends View implements Choreographer.FrameCallback {
             if ((inv[tab] >> i & 1) != 0) {
                 worn[tab] = i; applyOutfit(); saveStore();
                 sfx(S_COIN);
+                if (tab == 2) jetPreview = 1.0f;
             } else if (bank >= ICOST[tab][i]) {
                 bank -= ICOST[tab][i]; inv[tab] |= 1 << i; worn[tab] = i; applyOutfit(); saveStore();
                 flash = 0.15f; sfx(S_DONE); buzz(30);
                 for (int k = 0; k < 30; k++) confetti(r[0] + r[2] / 2f, r[1] + 20);
+                if (tab == 2) jetPreview = 1.0f;
             } else {
                 storeMsg = "NEED " + (ICOST[tab][i] - bank) + " MORE E-"; storeMsgT = 1.6f;
                 shake = 2f; sfx(S_WARN);
@@ -1122,8 +1124,13 @@ final class Game extends View implements Choreographer.FrameCallback {
         lastNanos = nanos;
         if (dt > 0.033f) dt = 0.033f;
         if (w > 0) update(dt);
-        // the jetpack roar plays exactly while the flame is drawn
-        if (sfx != null) sfx.setJet(soundOn && hitstop <= 0 && thrusting && state == PLAY && jumpDelay <= 0 && veh == null);
+        // the jetpack sound plays exactly while the flame is drawn, a vehicle hums the whole ride,
+        // and a jetpack picked in the store plays a short sample
+        if (jetPreview > 0) jetPreview -= dt;
+        boolean flame = hitstop <= 0 && thrusting && state == PLAY && jumpDelay <= 0 && veh == null;
+        boolean riding = hitstop <= 0 && state == PLAY && veh != null;
+        boolean sample = state == STORE && jetPreview > 0;
+        if (sfx != null) sfx.setJet(soundOn && (flame || riding || sample), riding ? 8 + veh.kind : worn[2]);
         // the scratch tone climbs an octave as the foil comes off (the card reveals at 60 percent)
         if (sfx != null) sfx.setScratch(soundOn && state == SCRATCH && dragging && !selScratched,
                 1f + Math.min(1f, cleared / Math.max(1f, mcols * mrows * 0.6f)));
@@ -1329,6 +1336,7 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     void startBuild(int type) {
         building = Vehicle.KINDS[type].make(this);
+        building.kind = type;
         state = BUILD;
         buildT = 0;
         invuln = BUILD_TIME + 1f;
@@ -2323,25 +2331,77 @@ final class Game extends View implements Choreographer.FrameCallback {
         boolean thr = thrusting && state == PLAY && jumpDelay <= 0;
         int left = Math.round(playerX) - 8, top = Math.round(y) - SH_TOP;
 
-        if (thr) {
-            int ground = Math.round(floorY), fy = top + 16, room = ground - fy;
-            if (room > 0) {
-                // the flame stops at the ground instead of running through it
-                int fl = Math.min(room, 7 + rnd.nextInt(6));
-                rectPx(c, left, fy, 6, fl, Color.rgb(255, 150, 50));
-                rectPx(c, left + 1, fy, 4, Math.max(1, fl - 2), Color.rgb(255, 215, 90));
-                rectPx(c, left + 2, fy, 2, Math.max(1, fl - 5), Color.rgb(255, 250, 220));
-                if (fl == room) {
-                    // it splashes out along the ground and kicks up sparks
-                    rectPx(c, left - 4, ground - 1, 14, 1, Color.rgb(255, 190, 80));
-                    rectPx(c, left - 2, ground - 2, 10, 1, Color.rgb(255, 240, 170));
-                    if (rnd.nextInt(2) == 0) dust(left + 3, ground - 2);
-                } else {
-                    rectPx(c, left + 1 + rnd.nextInt(4), fy + fl, 1, 2, Color.rgb(255, 150, 50));
-                }
+        if (thr) drawFlame(c, left, top + 16, Math.round(floorY), worn[2]);
+        scientist(c, left, top, ph, onFloor && state == PLAY);
+    }
+
+    /** outer, middle and core colours of each jetpack's exhaust (PHOTON, 7, is a rainbow made each frame) */
+    static final int[][] FLAME = {
+        {Color.rgb(255, 150, 50), Color.rgb(255, 215, 90), Color.rgb(255, 250, 220)},     // ROCKET
+        {Color.rgb(230, 110, 40), Color.rgb(255, 180, 70), Color.rgb(255, 235, 170)},     // PULSE JET
+        {Color.rgb(200, 205, 215), Color.rgb(235, 240, 245), Color.rgb(255, 255, 255)},   // STEAM
+        {Color.rgb(60, 140, 255), Color.rgb(140, 220, 255), Color.rgb(235, 250, 255)},    // ION
+        {Color.rgb(120, 50, 180), Color.rgb(50, 15, 80), Color.rgb(0, 0, 0)},             // DARK MATTER
+        {Color.rgb(255, 220, 90), Color.rgb(255, 250, 200), Color.rgb(255, 255, 255)},    // FUSION
+        {Color.rgb(230, 70, 200), Color.rgb(255, 140, 235), Color.rgb(255, 245, 255)},    // PLASMA
+        null                                                                              // PHOTON
+    };
+
+    /** the exhaust of jetpack type under the pack at (left, fy); it stops at the ground instead of running through it */
+    void drawFlame(Canvas c, int left, int fy, int ground, int type) {
+        int room = ground - fy;
+        if (room <= 0) return;
+        int[] col = type == 7 ? null : FLAME[Math.max(0, Math.min(6, type))];
+        if (type == 7) {
+            float hue = (clock * 360f) % 360f;
+            col = new int[] {Color.HSVToColor(new float[] {hue, 0.9f, 1f}), Color.HSVToColor(new float[] {(hue + 60) % 360, 0.7f, 1f}), Color.WHITE};
+        }
+        int fl;
+        switch (type) {
+            case 1:     // PULSE JET: puffs 15 times a second, a small ember between them
+                if (((int) (clock * 15) & 1) == 0) fl = Math.min(room, 5 + rnd.nextInt(4));
+                else { rectPx(c, left + 2, fy, 2, Math.min(room, 2), col[0]); if (rnd.nextInt(4) == 0) dust(left + 3, fy + 3); return; }
+                break;
+            case 2:     // STEAM: a wide white cloud that leaves puffs behind
+                fl = Math.min(room, 8 + rnd.nextInt(6));
+                rectPx(c, left - 1, fy + 2, 8, Math.max(1, fl - 2), col[0]);
+                if (rnd.nextInt(2) == 0) dust(left + 3, fy + fl);
+                break;
+            case 3: {   // ION: a thin steady beam with a faint glow
+                fl = Math.min(room, 12 + rnd.nextInt(2));
+                rectPx(c, left, fy, 6, fl, Color.argb(60, 60, 140, 255));
+                rectPx(c, left + 1, fy, 4, fl, col[0]);
+                rectPx(c, left + 2, fy, 2, fl, col[1]);
+                rectPx(c, left + 2, fy, 2, Math.max(1, fl - 3), col[2]);
+                break;
+            }
+            case 5:     // FUSION: long and bright with a glow round it
+                fl = Math.min(room, 11 + rnd.nextInt(6));
+                rectPx(c, left - 1, fy, 8, fl + 1, Color.argb(70, 255, 230, 120));
+                break;
+            default:
+                fl = Math.min(room, 7 + rnd.nextInt(6));
+        }
+        if (type != 3) {
+            rectPx(c, left, fy, 6, fl, col[0]);
+            rectPx(c, left + 1, fy, 4, Math.max(1, fl - 2), col[1]);
+            rectPx(c, left + 2, fy, 2, Math.max(1, fl - 5), col[2]);
+        }
+        if (type == 6) {        // PLASMA: little arcs crackle off the sides
+            for (int k = 0; k < 2; k++) {
+                int ay = fy + rnd.nextInt(Math.max(1, fl)), side = rnd.nextBoolean() ? -1 - rnd.nextInt(3) : 6 + rnd.nextInt(3);
+                rectPx(c, left + side, ay, 1, 1, Color.rgb(255, 200, 255));
+                rectPx(c, left + side + (side < 0 ? 1 : -1), ay + 1, 1, 1, Color.rgb(255, 200, 255));
             }
         }
-        scientist(c, left, top, ph, onFloor && state == PLAY);
+        if (fl == room) {
+            // it splashes out along the ground and kicks up sparks
+            rectPx(c, left - 4, ground - 1, 14, 1, col[0]);
+            rectPx(c, left - 2, ground - 2, 10, 1, col[1]);
+            if (rnd.nextInt(2) == 0) dust(left + 3, ground - 2);
+        } else {
+            rectPx(c, left + 1 + rnd.nextInt(4), fy + fl, 1, 2, col[0]);
+        }
     }
 
     void ring(Canvas c, float cx, float cy, float t) {

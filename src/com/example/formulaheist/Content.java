@@ -33,7 +33,7 @@ final class Content {
     static final String[][] INAME = {
         {"LAB COAT", "FIRE RED", "OCEAN BLUE", "NIGHT SHIFT", "GOLD RUSH", "PINK STORM", "HAZMAT", "STEALTH"},
         {"DEFAULT", "BLACK", "KHAKI", "LIGHT JEANS", "RED", "GREEN", "PURPLE", "GOLD"},
-        {"RED ORANGE", "OLIVE", "SILVER", "CYAN GLOW", "BLACK", "GOLD", "PINK", "RAINBOW"}
+        {"ROCKET", "PULSE JET", "STEAM", "ION", "DARK MATTER", "FUSION", "PLASMA", "PHOTON"}
     };
     static final int[][] ICOST = {      // electrons
         {0, 25, 25, 40, 40, 60, 60, 100},
