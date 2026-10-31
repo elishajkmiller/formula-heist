@@ -384,33 +384,43 @@ final class Sprites {
         return h;
     }
 
+    // the bouncy lunar module: an ascent cabin with the head in its window and four RCS thruster quads (the K nozzles),
+    // a gold foil descent stage and four sprung legs
     static final String[] BODY_STOMP = {
         "....mmmmmmmmmmmm....",
         "...mMMMMMMMMMMMMm...",
+        "KNmMggggggggggggMmNK",
+        "KNmMggggggggggggMmNK",
+        ".NmMggggggggggggMmN.",
         "..mMggggggggggggMm..",
         "..mMggggggggggggMm..",
         "..mMggggggggggggMm..",
         "..mMggggggggggggMm..",
-        "..mMggggggggggggMm..",
-        "..mMggggggggggggMm..",
-        "..mMggggggggggggMm..",
-        "..mMggggggggggggMm..",
-        "..mMggggggggggggMm..",
-        "..mMggggggggggggMm..",
+        ".NmMggggggggggggMmN.",
+        "KNmMggggggggggggMmNK",
+        "KNmMggggggggggggMmNK",
         "..mMMMMMMMMMMMMMMm..",
-        "..mRRRRRRRRRRRRRRm..",
-        "..mRYRRRRRRRRRRYRm..",
-        "..mRRRRRRRRRRRRRRm..",
+        "..mPYPYPYPYPYPYPYm..",
+        "..mYPyPYPYPYPYPyPm..",
+        "..mPYPYPYPYPYPYPYm..",
         "...mmmmmmmmmmmmmm..."
     };
 
     static final String[] LEGS_STOMP = {
-        "......MM......MM....", ".....MM......MM.....", "......MM......MM....", ".....MM......MM.....",
-        "......MM......MM....", "....KKKK....KKKK....", "...KKKKK....KKKKK..."
+        "..MM.....KK.....MM..",
+        ".MM.....KKKK.....MM.",
+        "..MM............MM..",
+        ".MM..............MM.",
+        "..MM............MM..",
+        ".KKKK..........KKKK.",
+        "KKKKKK........KKKKKK"
     };
 
     static final String[] LEGS_STOMP_C = {
-        "....MMMM....MMMM....", "...KKKKK....KKKKK...", "...KKKKK....KKKKK...", "...KKKKKK..KKKKKK..."
+        "..MMMM...KK...MMMM..",
+        ".KKKKK........KKKKK.",
+        "KKKKKKK......KKKKKKK",
+        "KKKKKKKK....KKKKKKKK"
     };
 
     static final String[] POD = {

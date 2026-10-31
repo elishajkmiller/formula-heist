@@ -1,18 +1,20 @@
 package com.elishajkmiller.formulaheist;
 
 import android.graphics.Canvas;
+import android.graphics.Color;
 
 import java.util.Arrays;
 
 import static com.elishajkmiller.formulaheist.Game.*;
 import static com.elishajkmiller.formulaheist.Sprites.*;
 
-/** Spring Stomper: bounces by itself; a tap in the air dives down for a big stomp bounce. */
+/** The bouncy lunar module: bounces by itself on its sprung legs; a tap in the air fires the RCS thrusters and dives for a big stomp bounce. */
 final class Stomper extends Vehicle {
     static final String[] ROWS = rowsOf();
 
     float squash;          // seconds left squashed flat after a landing
     boolean diving;
+    float rcsT;            // seconds the RCS thrusters keep firing
 
     Stomper(Game g) { super(g); }
 
@@ -22,8 +24,8 @@ final class Stomper extends Vehicle {
         return out;
     }
 
-    String name() { return "SPRING STOMPER"; }
-    String hint() { return "BOUNCES BY ITSELF. TAP IN THE AIR TO STOMP."; }
+    String name() { return "BOUNCY LEM"; }
+    String hint() { return "BOUNCES BY ITSELF. TAP IN THE AIR FOR RCS DIVE."; }
     String[] rows() { return ROWS; }
     int hTop() { return 12; }
     float radius() { return 8f; }
@@ -31,15 +33,17 @@ final class Stomper extends Vehicle {
     boolean bounces() { return true; }
 
     void press() {
-        if (!g.onFloor && squash <= 0) { g.vy = VFALL; diving = true; g.sfx(S_FLIP); }
+        if (!g.onFloor && squash <= 0) { g.vy = VFALL; diving = true; g.sfx(S_FLIP); rcsT = 0.3f; rcsPuffs(); }
     }
 
     void tick(float dt) {
         if (squash > 0) squash -= dt;
+        if (rcsT > 0) { rcsT -= dt; if (((int) (rcsT * 40) & 1) == 0) rcsPuffs(); }
     }
 
     void bounce(float impact) {
         squash = 0.14f;
+        rcsT = 0.12f;
         if (diving) {
             diving = false; g.vy = -11f; g.shake = 5f;
             g.sfx(S_STOMP); g.buzz(20);
@@ -47,6 +51,16 @@ final class Stomper extends Vehicle {
         } else {
             g.vy = -(g.thrusting ? 12.5f : 9.5f);
             if (impact > 6f) { g.shake = Math.max(g.shake, 1.5f); g.sfx(S_STOMP); }
+        }
+    }
+
+    /** a puff of cold gas out of each of the four thruster quads, sideways like the real ones */
+    void rcsPuffs() {
+        float left = g.playerX - 10, top = g.y - hTop();
+        int[] rows = {2, 3, 10, 11};
+        for (int i = 0; i < rows.length; i++) {
+            g.puff(left - 1, top + rows[i] + 0.5f, -3f - g.rnd.nextFloat() * 2f, (rows[i] < 6 ? -0.8f : 0.8f), Color.rgb(225, 238, 255));
+            g.puff(left + 21, top + rows[i] + 0.5f, 3f + g.rnd.nextFloat() * 2f, (rows[i] < 6 ? -0.8f : 0.8f), Color.rgb(225, 238, 255));
         }
     }
 
