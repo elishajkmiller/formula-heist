@@ -258,6 +258,7 @@ public class Main extends Activity {
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
         static final int NF = 20;                // formulas to recover
+        static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
         static final float BUILD_TIME = 1.5f;    // seconds a vehicle takes to assemble
         static final int ENTANGLER_USES = 5;     // teleports before the Quantum Entangler burns out
         static final int S_JUMP = 0, S_COIN = 1, S_HIT = 2, S_STOMP = 3, S_BUILD = 4, S_FLIP = 5, S_WARN = 6, S_DONE = 7, S_TELE = 8, S_SCRATCH = 9;
@@ -784,7 +785,7 @@ public class Main extends Activity {
         // ---------- settings: haptics, sounds, music and a guarded reset ----------
 
         boolean settingsButtonHit(float gx, float gy) {
-            if (!(state == START || (state == DEAD && stateTime > 0.3f))) return false;
+            if (!(state == START || (state == DEAD && stateTime > CARD_DELAY))) return false;
             return gx >= gbx && gx < gbx + gbw && gy >= gby && gy < gby + gbh;
         }
 
@@ -875,7 +876,7 @@ public class Main extends Activity {
         }
 
         boolean storeButtonHit(float gx, float gy) {
-            if (!(state == START || (state == DEAD && stateTime > 0.3f))) return false;
+            if (!(state == START || (state == DEAD && stateTime > CARD_DELAY))) return false;
             return gx >= sbx && gx < sbx + sbw && gy >= sby && gy < sby + sbh;
         }
 
@@ -964,7 +965,7 @@ public class Main extends Activity {
         // ---------- archive: the recovered formulas, scratch off to reveal ----------
 
         boolean archiveButtonHit(float gx, float gy) {
-            if (!(state == START || (state == DEAD && stateTime > 0.3f))) return false;
+            if (!(state == START || (state == DEAD && stateTime > CARD_DELAY))) return false;
             return gx >= abx && gx < abx + abw && gy >= aby && gy < aby + abh;
         }
 
@@ -2480,7 +2481,7 @@ public class Main extends Activity {
             if (flash > 0) rectPx(c, 0, 0, w, h, Color.argb((int) Math.min(200, flash * 520), 255, 255, 255));
             if (state == START) drawTitle(c);
             if (state == DEAD) drawDead(c);
-            if (state == START || state == DEAD) { drawArchiveButton(c); drawStoreButton(c); drawSettingsButton(c); }
+            if (state == START || (state == DEAD && stateTime > CARD_DELAY)) { drawArchiveButton(c); drawStoreButton(c); drawSettingsButton(c); }
             out.save();
             if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
             out.drawBitmap(buf, null, dst, blit);
@@ -3316,7 +3317,7 @@ public class Main extends Activity {
             p.setStyle(Paint.Style.FILL);
             p.setColor(Color.argb((int) (170 * fade), 8, 12, 24));
             c.drawRect(0, 0, w, h, p);
-            if (stateTime < 1.5f) return;
+            if (stateTime < CARD_DELAY) return;
             text(c, (int) finalDist + " M", w / 2f, h * 0.18f, 4, Color.WHITE, 1);
             text(c, electrons + " ELECTRONS   " + Integer.bitCount(ownedMask) + "/" + NF + " FORMULAS   BEST " + best + " M", w / 2f, h * 0.18f + 30, 1, Color.rgb(120, 235, 255), 1);
             wrapText(c, fact, w / 2f, h * 0.18f + 50, 1, Color.rgb(210, 220, 235), (int) (w * 0.7f));
