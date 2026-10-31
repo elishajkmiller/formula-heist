@@ -275,7 +275,7 @@ public class Main extends Activity {
         static final int START = 0, PLAY = 1, DEAD = 2, BUILD = 3, ARCHIVE = 4, SCRATCH = 5, STORE = 6, SETTINGS = 7;
         static final int STOMPER = 1, INVERTER = 2, QUANTUM = 3, HELIX = 4;
         static final int SPIKE_FLOOR = 0, SPIKE_CEIL = 1, SAW = 2, LASER = 3;
-        static final float GUARD_RUN = 150f;     // how fast the guards run away, in pixels per second
+        static final float GUARD_RUN = 100f;     // how fast the guards run away, in pixels per second
         static final int GUARD = 4;              // Npc mode of the guards
         static final int NF = 40;                // formulas to recover
         static final float CARD_DELAY = 1.5f;    // seconds after a crash before the score card and its buttons appear
@@ -705,6 +705,8 @@ public class Main extends Activity {
             if (!n.falling) {
                 // inside the building they ride the world's scroll, and run away to the right when you run
                 n.x += (n.running ? GUARD_RUN - speed * ppm : -speed * ppm) * dt;
+                if (n.running && rnd.nextInt(3) == 0) puff(n.x - 2, floorY - 1);       // dust kicked up by their feet
+                if (n.running && rnd.nextInt(8) == 0) sweat(n.x, floorY - 16);
                 if (n.x > w + 30) n.x = w + 1000;      // out of sight, removed by the caller below
                 return;
             }
@@ -1791,6 +1793,27 @@ public class Main extends Activity {
             // ragdoll: popped up, tumbling forward
             vehicle = 0; gravDir = 1; thrusting = false;
             vy = -6f; ang = 0; angV = 640f; bounces = 0; settled = false; settleT = 0;
+        }
+
+        /** a small pale puff of dust that drifts back and fades */
+        void puff(float bx, float by) {
+            int k = pNext++ % NP;
+            px[k] = bx; py[k] = by;
+            pvx[k] = (-10f - rnd.nextFloat() * 14f);
+            pvy[k] = -(4f + rnd.nextFloat() * 10f);
+            pl[k] = 0.35f + rnd.nextFloat() * 0.25f;
+            int g = 170 + rnd.nextInt(50);
+            pcol[k] = Color.rgb(g, g - 8, g - 20);
+        }
+
+        /** a drop of sweat flung up and back off a running guard */
+        void sweat(float bx, float by) {
+            int k = pNext++ % NP;
+            px[k] = bx; py[k] = by;
+            pvx[k] = -(8f + rnd.nextFloat() * 18f);
+            pvy[k] = -(14f + rnd.nextFloat() * 16f);
+            pl[k] = 0.4f;
+            pcol[k] = Color.rgb(150, 220, 255);
         }
 
         /** a spark kicked up where he drags along the floor */
