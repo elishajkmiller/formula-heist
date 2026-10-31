@@ -282,7 +282,7 @@ public class Main extends Activity {
             floorY = h - 11;
             ceilY = 11;
             playerX = w * 0.22f;
-            if (state == START) y = floorY - 0.62f * ppm;
+            if (state == START) y = floorY - SH;
             npcs.clear();
             for (float nx = 30; nx < w + 20; nx += 45 + rnd.nextInt(80)) addNpc(nx);
         }
@@ -300,16 +300,18 @@ public class Main extends Activity {
             for (int i = 0; i < NP; i++) pl[i] = 0;
             vehicle = 0; gravDir = 1; invuln = 0; flash = 0; shake = 0; hitstop = 0; squash = 0; hintT = 0;
             diving = false; nextCrate = 80;
-            y = floorY - 0.62f * ppm;
+            y = floorY - SH;
             vy = 0; dist = 0; electrons = 0; spawnLeft = w * 0.6f;
             state = PLAY; stateTime = 0;
         }
 
-        float hTop() { return vehicle == 0 ? 0.72f * ppm : hhVeh(vehicle); }
+        static final int SH = 12;     // half the scientist sprite height
 
-        float hBot() { return vehicle == 0 ? 0.62f * ppm : hhVeh(vehicle); }
+        float hTop() { return vehicle == 0 ? SH : hhVeh(vehicle); }
 
-        static int hhVeh(int v) { return v == STOMPER ? 10 : v == QUANTUM ? 12 : 6; }
+        float hBot() { return vehicle == 0 ? SH : hhVeh(vehicle); }
+
+        static int hhVeh(int v) { return v == STOMPER ? 10 : v == QUANTUM ? 14 : 6; }
 
         /** vehicles that stick to a surface and switch which one gravity points at */
         boolean flips() { return vehicle == INVERTER || vehicle == QUANTUM; }
@@ -623,7 +625,7 @@ public class Main extends Activity {
         void emitExhaust() {
             for (int n = 0; n < 2; n++) {
                 int k = pNext++ % NP;
-                px[k] = playerX - 0.33f * ppm; py[k] = y + 0.25f * ppm;
+                px[k] = playerX - 5; py[k] = y + 6;
                 pvx[k] = (-speed * 0.6f + (rnd.nextFloat() - 0.5f) * 2f) * ppm;
                 pvy[k] = (4f + rnd.nextFloat() * 4f) * ppm;
                 pl[k] = 0.35f + rnd.nextFloat() * 0.3f;
@@ -718,36 +720,65 @@ public class Main extends Activity {
         };
 
         static final String[] SPR_HEAD = {
-            ".......BBBBB....",
-            "......BBBBBBBS..",
-            "......BSSGCCSS..",
-            "......SSSSSSSSs.",
-            ".......SSSSSs...",
-            "........SSss....",
-            ".OOOOwwWWWVVW...",
-            ".OooOwwWWWVTW...",
-            ".OooOwwwwSSTW...",
-            ".OooOwwwwwWTW...",
-            ".OOOOWWWWWWTW...",
-            ".OooOWWWWWWWW...",
-            ".NNNNWWWWWWWW...",
-            "..NN.wwwwwwww..."
+            ".......bbBBB....",
+            "......BBBBBBBB..",
+            "......BBBSSSSSs.",
+            "......BBSGCCSSs.",
+            ".......BSSSSSs..",
+            "........sSSSs...",
+            ".hOOowWWWVVW....",
+            ".hOOowxWWWVT....",
+            ".OOOowxxWYVT....",
+            ".OOoowxxxxSS....",
+            ".OOoowWWWWWW....",
+            ".hOOowWWWWWW....",
+            ".hOOowWWWWWW....",
+            ".NNNNwwwwwww....",
+            "..NN.wwwwwww...."
         };
         static final String[] LEGS_A = {
-            "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...", "....DDDD.DDDD...",
-            "....KKKK.KKKKK..", "...KKKKK.KKKKKK."
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....DDd.DDd....",
+            ".....KKKK.KKKK..",
+            "....LKKKK.LKKKK."
         };
         static final String[] LEGS_M = {
-            "....DDDDDDDD....", "....DDDDDDDD....", "....DDDDDDDD....", "....DDDDDDDD....", "....DDDDDDDD....",
-            "....KKKKKKKK....", "...KKKKKKKKKK..."
+            ".....DDDDDDd....",
+            ".....DDDDDDd....",
+            ".....DDDDDDd....",
+            ".....DDDDDDd....",
+            ".....DDDDDDd....",
+            ".....DDDDDDd....",
+            ".....DDDDDDd....",
+            ".....KKKKKKK....",
+            "....LKKKKKKKK..."
         };
         static final String[] LEGS_B = {
-            "....DDDDDDDD....", "...DDD....DDD...", "..DDD......DDD..", "..DDD......DDD..", "..DDD......DDD..",
-            "..KKKK.....KKKK.", ".KKKKK.....KKKKK"
+            ".....DDDDDDd....",
+            "....DDDd.DDDd...",
+            "...DDDd...DDDd..",
+            "...DDd.....DDd..",
+            "..DDDd.....DDDd.",
+            "..DDd.......DDd.",
+            "..DDd.......DDd.",
+            "..KKKK......KKKK",
+            ".LKKKK.....LKKKK"
         };
         static final String[] LEGS_AIR = {
-            "....DDDD.DDDD...", "...DDD...DDDD...", "..DDD....DDDD...", ".DDD.....DDDD...", ".KKK.....KKKK...",
-            "................", "................"
+            "....DDDd.DDDd...",
+            "...DDDd..DDDd...",
+            "..DDDd...DDDd...",
+            ".DDDd....DDDd...",
+            ".DDd.....DDd....",
+            ".KKK.....KKKK...",
+            "................",
+            "................",
+            "................"
         };
 
         static final String[] HEAD_ONLY = Arrays.copyOfRange(SPR_HEAD, 0, 6);
@@ -792,7 +823,8 @@ public class Main extends Activity {
         static final String[] BOARD = {
             "..mMMMMMMMMMMMMMMm..",
             "...mmmmmmmmmmmmmm...",
-            "..UU............UU.."
+            "..UU............UU..",
+            "...UUUUUUUUUUUUUU..."
         };
         /** the scientist standing on a board with two linked orbs, padded to the vehicle width */
         static final String[] QUANT = quant();
@@ -1329,12 +1361,12 @@ public class Main extends Activity {
             int ph = ((int) (cyc * 4)) & 3;
             boolean thr = thrusting && state == PLAY && jumpDelay <= 0;
             int bob = (onFloor && state == PLAY && (ph & 1) == 1) ? -1 : 0;
-            int left = Math.round(playerX) - 8, top = Math.round(y) - 11 + bob;
+            int left = Math.round(playerX) - 8, top = Math.round(y) - SH + bob;
 
             if (thr) {
                 int fl = 4 + rnd.nextInt(5);
-                rectPx(c, left + 1, top + 14, 4, fl, Color.rgb(255, 170, 40));
-                rectPx(c, left + 2, top + 14, 2, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
+                rectPx(c, left + 1, top + 15, 4, fl, Color.rgb(255, 170, 40));
+                rectPx(c, left + 2, top + 15, 2, Math.max(1, fl - 3), Color.rgb(255, 240, 150));
             }
             outlined(c, SPR_HEAD, left, top);
             String[] legs = !onFloor ? LEGS_AIR : (ph == 0 ? LEGS_A : ph == 2 ? LEGS_B : LEGS_M);
@@ -1342,7 +1374,7 @@ public class Main extends Activity {
         }
 
         void quantumBody(Canvas c, int cy, boolean flip) {
-            int left = Math.round(playerX) - 10, top = cy - 12;
+            int left = Math.round(playerX) - 10, top = cy - 14;
             if (flip) { c.save(); c.scale(1, -1, playerX, cy); }
             int ph = ((int) (runPhase * 0.28f * 4)) & 3;
             String[] legs = ph == 0 ? LEGS_A : ph == 2 ? LEGS_B : LEGS_M;
