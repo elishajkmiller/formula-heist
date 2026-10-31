@@ -131,46 +131,87 @@ final class Sfx {
         return d;
     }
 
-    AudioTrack jetTrack;
-    volatile boolean jetWanted, alive = true;
-    Thread jetThread;
+    /**
+     * The scratch tone: a soft shimmer (a triangle at 330 Hz with an octave and a 12 Hz tremolo).
+     * Every part fits a whole number of cycles in 0.5 s, so it loops with no seam.
+     * Its pitch is raised by playback rate as the foil comes off.
+     */
+    static short[] shimmer() {
+        int n = RATE / 2;
+        short[] d = new short[n];
+        for (int i = 0; i < n; i++) {
+            double t = i / (double) RATE;
+            double p1 = (t * 330) % 1.0, p2 = (t * 660) % 1.0;
+            double tri1 = p1 < 0.5 ? p1 * 4 - 1 : 3 - p1 * 4, tri2 = p2 < 0.5 ? p2 * 4 - 1 : 3 - p2 * 4;
+            double trem = 0.75 + 0.25 * Math.sin(2 * Math.PI * 12 * t);
+            d[i] = (short) ((tri1 * 0.6 + tri2 * 0.3) * trem * 32767 * 0.4);
+        }
+        return d;
+    }
 
-    /** turn the jetpack roar on or off; a small thread fades it in and out so it never clicks */
-    void setJet(boolean on) {
-        if (on == jetWanted) return;
-        jetWanted = on;
-        if (on && jetThread == null) {
-            jetThread = new Thread(new Runnable() {
-                @Override
-                public void run() { jetLoop(); }
-            }, "jet");
-            jetThread.setDaemon(true);
-            jetThread.start();
+    /**
+     * A looping sound that is switched on and off from the game thread. A small thread of its own
+     * fades it in and out so it never clicks, and glides its pitch toward the wanted rate.
+     */
+    final class Loop implements Runnable {
+        final String name;
+        final float gain;
+        volatile boolean wanted;
+        volatile float rate = 1f;           // playback speed, 1 = as made, 2 = an octave up
+        Thread th;
+        AudioTrack t;
+
+        Loop(String name, float gain) { this.name = name; this.gain = gain; }
+
+        void set(boolean on, float r) {
+            rate = r;
+            if (on == wanted) return;
+            wanted = on;
+            if (on && th == null) {
+                th = new Thread(this, name);
+                th.setDaemon(true);
+                th.start();
+            }
+        }
+
+        @Override
+        public void run() {
+            float vol = 0, cur = 1f;
+            boolean playing = false;
+            try {
+                short[] d = name.equals("jet") ? jet() : shimmer();
+                t = mk(d);
+                t.setLoopPoints(0, d.length, -1);
+                t.setVolume(0);
+                while (alive) {
+                    float target = wanted ? 1f : 0f;
+                    if (target > 0 && !playing) { t.play(); playing = true; }
+                    if (vol != target) {
+                        vol = target > vol ? Math.min(target, vol + 0.25f) : Math.max(target, vol - 0.12f);   // in over ~40 ms, out over ~80 ms
+                        t.setVolume(vol * gain);
+                    }
+                    float want = Math.max(0.5f, Math.min(2f, rate));
+                    if (Math.abs(want - cur) > 0.002f) {
+                        cur += (want - cur) * 0.3f;
+                        t.setPlaybackRate((int) (RATE * cur));
+                    }
+                    if (vol == 0 && playing) { t.pause(); playing = false; }
+                    Thread.sleep(10);
+                }
+            } catch (Throwable e) { }
+            try { if (t != null) t.release(); } catch (Throwable e) { }
+            t = null;
         }
     }
 
-    void jetLoop() {
-        float vol = 0;
-        boolean playing = false;
-        try {
-            short[] d = jet();
-            jetTrack = mk(d);
-            jetTrack.setLoopPoints(0, d.length, -1);
-            jetTrack.setVolume(0);
-            while (alive) {
-                float target = jetWanted ? 1f : 0f;
-                if (target > 0 && !playing) { jetTrack.play(); playing = true; }
-                if (vol != target) {
-                    vol = target > vol ? Math.min(target, vol + 0.25f) : Math.max(target, vol - 0.12f);   // in over ~40 ms, out over ~80 ms
-                    jetTrack.setVolume(vol * 0.5f);
-                }
-                if (vol == 0 && playing) { jetTrack.pause(); playing = false; }
-                Thread.sleep(10);
-            }
-        } catch (Throwable t) { }
-        try { if (jetTrack != null) jetTrack.release(); } catch (Throwable t) { }
-        jetTrack = null;
-    }
+    volatile boolean alive = true;
+    final Loop jetLoop = new Loop("jet", 0.5f), scratchLoop = new Loop("scratch", 0.35f);
+
+    /** turn the jetpack roar on or off */
+    void setJet(boolean on) { jetLoop.set(on, 1f); }
+
+    /** the rising scratch tone; rate 1 at the start of a card up to 2 (an octave) when it reveals */
+    void setScratch(boolean on, float rate) { scratchLoop.set(on, rate); }
 
     AudioTrack music;
     boolean musicWanted;

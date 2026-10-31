@@ -9,6 +9,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.view.Choreographer;
@@ -77,7 +78,8 @@ final class Game extends View implements Choreographer.FrameCallback {
     final Paint p = new Paint();                 // pixel paint, no smoothing
     final Paint blit = new Paint();              // scales the small bitmap up
     final Path path = new Path();
-    final RectF dst = new RectF();
+    final RectF dst = new RectF(), zdst = new RectF();
+    final Rect zsrc = new Rect();
     Bitmap buf;
     Canvas bc;
     int w, h;                                    // game size in pixels, h is always 144
@@ -149,6 +151,8 @@ final class Game extends View implements Choreographer.FrameCallback {
     static final int DUPLICATE_PAY = 10;
     int archFrom, selCard, mcols, mrows, cleared;
     boolean selScratched, dragging;
+    float cardZoom = 1f;                          // the card leans in a little while you scratch it
+    static final float SCRATCH_ZOOM = 1.08f;
     final boolean[] mask = new boolean[2000];    // scratched-off cells of the open card
     float bannerT;
     int abx, aby, abw, abh, cbx, cby, cbw, cbh, scx, scy, scw, sch;   // buttons and the big card
@@ -724,6 +728,10 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     void scratchAt(float gx, float gy) {
         if (selScratched) return;
+        // the card is drawn zoomed around its centre, so undo that to find the spot under the finger
+        float zcx = scx + scw / 2f, zcy = scy + sch / 2f;
+        gx = zcx + (gx - zcx) / cardZoom;
+        gy = zcy + (gy - zcy) / cardZoom;
         int rad = 7;
         int c0 = (int) ((gx - rad - scx) / 4), c1 = (int) ((gx + rad - scx) / 4);
         int r0 = (int) ((gy - rad - scy) / 4), r1 = (int) ((gy + rad - scy) / 4);
@@ -976,6 +984,9 @@ final class Game extends View implements Choreographer.FrameCallback {
         if (w > 0) update(dt);
         // the jetpack roar plays exactly while the flame is drawn
         if (sfx != null) sfx.setJet(soundOn && hitstop <= 0 && thrusting && state == PLAY && jumpDelay <= 0 && veh == null);
+        // the scratch tone climbs an octave as the foil comes off (the card reveals at 60 percent)
+        if (sfx != null) sfx.setScratch(soundOn && state == SCRATCH && dragging && !selScratched,
+                1f + Math.min(1f, cleared / Math.max(1f, mcols * mrows * 0.6f)));
         invalidate();
         Choreographer.getInstance().postFrameCallback(this);
     }
@@ -1013,6 +1024,8 @@ final class Game extends View implements Choreographer.FrameCallback {
         if (state == DEAD) { updateDead(dt); return; }
         if (state == ARCHIVE || state == SCRATCH || state == STORE || state == SETTINGS) {
             if (storeMsgT > 0) storeMsgT -= dt;
+            float zt = state == SCRATCH && dragging && !selScratched ? SCRATCH_ZOOM : 1f;
+            cardZoom += (zt - cardZoom) * Math.min(1f, dt * 12f);     // eases in and back out in about a quarter second
             for (int i = 0; i < NP; i++) {
                 if (pl[i] > 0) {
                     pl[i] -= dt;
@@ -1625,6 +1638,17 @@ final class Game extends View implements Choreographer.FrameCallback {
         out.save();
         if (shake > 0) out.translate((rnd.nextFloat() - 0.5f) * 2f * shake * unit, (rnd.nextFloat() - 0.5f) * 2f * shake * unit);
         out.drawBitmap(buf, null, dst, blit);
+        boolean zoomed = state == SCRATCH && cardZoom > 1.001f;
+        if (zoomed) {
+            // draw the card part of the picture again, a little bigger, over itself; the formula text below gets the same scale
+            float zcx = (scx + scw / 2f) * unit, zcy = (scy + sch / 2f) * unit;
+            zsrc.set(scx - 2, scy - 2, scx + scw + 2, scy + sch + 2);
+            zdst.set(zcx + ((scx - 2) * unit - zcx) * cardZoom, zcy + ((scy - 2) * unit - zcy) * cardZoom,
+                    zcx + ((scx + scw + 2) * unit - zcx) * cardZoom, zcy + ((scy + sch + 2) * unit - zcy) * cardZoom);
+            out.drawBitmap(buf, zsrc, zdst, blit);
+            out.save();
+            out.scale(cardZoom, cardZoom, zcx, zcy);
+        }
         for (Ov o : ovs) {
             boolean clipped = false;
             if (o.clip) {
@@ -1650,6 +1674,7 @@ final class Game extends View implements Choreographer.FrameCallback {
                 out.drawText(o.t, o.x * unit, o.y * unit + o.size * unit * 0.34f, ovp);
             if (clipped) out.restore();
         }
+        if (zoomed) out.restore();
         out.restore();
     }
 
