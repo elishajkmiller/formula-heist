@@ -3501,6 +3501,8 @@ public class Main extends Activity {
         /** a NULLCORP guard in a red coat: shouts and points at the start, runs in step with you, then tumbles and slides */
         void drawGuard(Canvas c, Npc n) {
             int nx = Math.round(n.x), base = Math.round(floorY - n.fy);
+            // lying on the floor the body is thinner than it is tall, so lower it until it touches the ground
+            if (n.falling && n.settled) base += Math.round(5f * Math.min(1f, Math.abs((float) Math.sin(Math.toRadians(n.ang)))));
             boolean run = n.running && !n.falling;
             boolean point = n.pointT > 0 && !run && !n.falling;
             int f = run || n.falling ? 1 : -1;                                // facing you, then facing away
