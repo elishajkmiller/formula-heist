@@ -29,14 +29,14 @@ final class Helix extends Vehicle {
         b.x = g.playerX + 12; b.y = g.y; b.kind = g.bolts.size() & 1;
         g.bolts.add(b);
         boltCd = 0.3f;
-        dna -= 0.05f;                                 // every base pair fired uses some
+        dna -= 0.05f / 3f;                                 // every base pair fired uses some
         g.sfx(S_TELE);
     }
 
     void tick(float dt) {
         if (boltCd > 0) boltCd -= dt;
         if (g.state != PLAY) return;
-        dna -= (g.thrusting ? 0.14f : 0.07f) * dt;    // it burns DNA just by flying, faster while rising
+        dna -= (g.thrusting ? 0.14f : 0.07f) / 3f * dt;    // it burns DNA just by flying, faster while rising
         if (dna <= 0) { dna = 0; g.breakVehicle(); }
     }
 
