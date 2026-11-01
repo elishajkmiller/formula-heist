@@ -13,11 +13,12 @@ final class Helix extends Vehicle {
     final float[] yHist = new float[64];   // where the head has been, so the body can follow it
     int yh;
     float boltCd, tilt;                    // tilt: degrees, nose up is negative
+    float dna = 1f;                        // 1 full, 0 gone: the strand eats away from the tail forward, then the vehicle breaks
 
     Helix(Game g) { super(g); }
 
     String name() { return "DNA HELIX"; }
-    String hint() { return "HOLD TO RISE. TAP TO FIRE BASE PAIRS."; }
+    String hint() { return "HOLD TO RISE. TAP TO FIRE. IT RUNS OUT OF DNA AND BREAKS."; }
     String[] rows() { return HELIX_HEAD; }
 
     void start() { Arrays.fill(yHist, g.y); }
@@ -28,11 +29,15 @@ final class Helix extends Vehicle {
         b.x = g.playerX + 12; b.y = g.y; b.kind = g.bolts.size() & 1;
         g.bolts.add(b);
         boltCd = 0.3f;
+        dna -= 0.05f;                                 // every base pair fired uses some
         g.sfx(S_TELE);
     }
 
     void tick(float dt) {
         if (boltCd > 0) boltCd -= dt;
+        if (g.state != PLAY) return;
+        dna -= (g.thrusting ? 0.14f : 0.07f) * dt;    // it burns DNA just by flying, faster while rising
+        if (dna <= 0) { dna = 0; g.breakVehicle(); }
     }
 
     /** light gravity, and holding pushes up */
@@ -54,7 +59,10 @@ final class Helix extends Vehicle {
         int segs = 18;
         float phase = g.clock * 7f;
         float pax = 0, pay = 0, pbx = 0, pby = 0;
-        for (int i = 0; i < segs; i++) {
+        int shown = (int) Math.ceil(dna * segs);            // the tail goes first, so the strand shrinks toward the head
+        boolean flicker = dna < 0.25f && ((int) (g.clock * 12) & 1) == 0;
+        for (int i = 0; i < segs && !flicker; i++) {
+            if (i >= shown) break;
             float sx = px - 12 - i * 5f;
             float sy = yHist[(yh - i * 2) & 63] + (float) Math.sin(phase + i * 0.55f) * 2f * Math.min(1f, i / 4f);
             float tw = (float) Math.sin(phase * 1.3f + i * 0.9f);             // the twist
