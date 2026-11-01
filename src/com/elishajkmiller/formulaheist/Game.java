@@ -2093,7 +2093,16 @@ final class Game extends View implements Choreographer.FrameCallback {
         drawMissiles(c);
         drawBolts(c);
         drawParticles(c);
-        drawPlayer(c);
+        if (wormT > 0) {
+            // spaghettification: pulled long and thin toward the hole, worst in the middle of the wormhole and normal again at both ends
+            float s = (float) Math.sin(Math.PI * (WORM_TIME - wormT) / WORM_TIME);
+            c.save();
+            c.scale(1f + 2.4f * s, 1f - 0.4f * s, playerX - 6f, y);
+            drawPlayer(c);
+            c.restore();
+        } else {
+            drawPlayer(c);
+        }
         if (telePulse > 0) {
             ring(c, playerX, teleFromY, telePulse / 0.25f);
             ring(c, playerX, y, telePulse / 0.25f);
