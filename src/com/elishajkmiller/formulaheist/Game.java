@@ -1662,7 +1662,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     void collectPiece(int idx) {
         holeMask |= 1 << idx;
         sfx(S_DONE); buzz(30);
-        flash = Math.max(flash, 0.12f);
+        if ((holeMask & 15) != 15) flash = Math.max(flash, 0.12f);     // no flash for the last piece, the wormhole fades in softly
         for (int i = 0; i < 12; i++) puff(playerX, y, (rnd.nextFloat() - 0.5f) * 8f, (rnd.nextFloat() - 0.5f) * 8f, Color.rgb(190, 120, 255));
         if (holeMask == 15) startWorm();
     }
@@ -1672,7 +1672,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         wormT = WORM_TIME;
         zappers.clear(); hazards.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); pieces.clear();
         spawnLeft = 0;
-        flash = 0.4f; shake = 6f; invuln = WORM_TIME + 1f;
+        shake = 2f; invuln = WORM_TIME + 1f;
         sfx(S_BUILD); buzz(80);
     }
 
@@ -1682,7 +1682,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         zappers.clear(); hazards.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); pieces.clear();
         spawnLeft = w * 0.9f; nextPiece = dist + 250; nextCrate = Math.max(nextCrate, dist + 40); nextParch = Math.max(nextParch, dist + 40);
         nextSection = Math.max(nextSection, dist + 40);
-        invuln = 1.5f; flash = 0.5f; shake = 5f;
+        invuln = 1.5f; shake = 2f;
         sfx(S_TELE); buzz(60);
         for (int i = 0; i < 30; i++) puff(playerX, y, (rnd.nextFloat() - 0.2f) * 10f, (rnd.nextFloat() - 0.5f) * 10f, Color.rgb(200, 230, 255));
     }
@@ -1743,15 +1743,15 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     /** the tunnel: square rings rushing out from a point ahead, speed streaks and a purple wash */
     void drawWorm(Canvas c) {
-        float k = Math.min(1f, Math.min((WORM_TIME - wormT) / 0.6f, wormT / 0.6f));
+        float k = Math.min(1f, Math.min((WORM_TIME - wormT) / 1.4f, wormT / 1.4f));     // fades in and out slowly, never a flash
         if (k <= 0) return;
-        rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb((int) (215 * k), 10, 4, 30));
+        rectPx(c, 0, ceilY, w, floorY - ceilY, Color.argb((int) (170 * k), 10, 4, 30));
         float cx = w * 0.72f, cy = (floorY + ceilY) / 2f;
         for (int i = 0; i < 9; i++) {
-            float t = (clock * 0.9f + i / 9f) % 1f;
+            float t = (clock * 0.45f + i / 9f) % 1f;
             float rr = t * t * w * 0.9f + 3f;
             float hue = (260f + t * 80f) % 360f;
-            int col = Color.HSVToColor((int) (200 * k * Math.min(1f, t * 4f)), new float[] {hue, 0.7f, 1f});
+            int col = Color.HSVToColor((int) (130 * k * Math.min(1f, t * 4f)), new float[] {hue, 0.7f, 1f});
             float hh = Math.min(rr, (floorY - ceilY) / 2f - 2f);
             rectPx(c, cx - rr, cy - hh, rr * 2, 1, col);
             rectPx(c, cx - rr, cy + hh, rr * 2, 1, col);
@@ -1759,9 +1759,9 @@ final class Game extends View implements Choreographer.FrameCallback {
             rectPx(c, cx + rr, cy - hh, 1, hh * 2 + 1, col);
         }
         for (int i = 0; i < 26; i++) {
-            float sx = w - ((clock * 360f + i * 47f) % (w + 80f));
+            float sx = w - ((clock * 220f + i * 47f) % (w + 80f));
             float sy = ceilY + 4 + (i * 37) % (int) (floorY - ceilY - 8);
-            rectPx(c, sx, sy, 14 + (i % 4) * 8, 1, Color.argb((int) (150 * k), 220, 230, 255));
+            rectPx(c, sx, sy, 14 + (i % 4) * 8, 1, Color.argb((int) (70 * k), 220, 230, 255));
         }
         if (WORM_TIME - wormT < 1.6f) text(c, "WORMHOLE", w / 2f, ceilY + 16, 2, Color.argb((int) (255 * k), 220, 190, 255), 1);
     }
