@@ -96,7 +96,7 @@ final class Game extends View implements Choreographer.FrameCallback {
     final ArrayList<Crate> crates = new ArrayList<>();
     final ArrayList<Piece> pieces = new ArrayList<>();       // loose pieces of the black hole
     int holeMask;                                            // pieces collected this run, one bit each; all four opens the wormhole
-    float nextPiece, wormT, wormSpeed, wormPhase;            // wormT: seconds of wormhole left
+    float nextPiece, wormT, wormSpeed, wormPhase, wormGrace;            // wormT: seconds of wormhole left
     static final float WORM_TIME = 7f;
     final ArrayList<Scroll> scrolls = new ArrayList<>();
     final ArrayList<Bolt> bolts = new ArrayList<>();
@@ -1219,6 +1219,7 @@ final class Game extends View implements Choreographer.FrameCallback {
             if (buildT >= BUILD_TIME) finishBuild();
         }
         if (invuln > 0) invuln -= rdt;
+        if (wormGrace > 0) wormGrace -= rdt;
         if (wormT > 0 && state == PLAY) {
             wormT -= rdt;
             invuln = Math.max(invuln, 0.3f);
@@ -1682,7 +1683,7 @@ final class Game extends View implements Choreographer.FrameCallback {
         zappers.clear(); hazards.clear(); missiles.clear(); crates.clear(); scrolls.clear(); bolts.clear(); pieces.clear();
         spawnLeft = w * 0.9f; nextPiece = dist + 250; nextCrate = Math.max(nextCrate, dist + 40); nextParch = Math.max(nextParch, dist + 40);
         nextSection = Math.max(nextSection, dist + 40);
-        invuln = 1.5f; shake = 2f;
+        invuln = 1.5f; wormGrace = 1.5f; shake = 2f;
         sfx(S_TELE); buzz(60);
         for (int i = 0; i < 30; i++) puff(playerX, y, (rnd.nextFloat() - 0.2f) * 10f, (rnd.nextFloat() - 0.5f) * 10f, Color.rgb(200, 230, 255));
     }
@@ -2598,7 +2599,7 @@ final class Game extends View implements Choreographer.FrameCallback {
 
     void drawPlayer(Canvas c) {
         if (state == DEAD) { drawRagdoll(c); return; }
-        if (state == PLAY && invuln > 0 && ((int) (clock * 14) & 1) == 0) return;
+        if (state == PLAY && invuln > 0 && wormT <= 0 && wormGrace <= 0 && ((int) (clock * 14) & 1) == 0) return;   // no blinking in or just after the wormhole
         if (veh != null && state == PLAY) { veh.draw(c); return; }
         if (state == BUILD && buildT > BUILD_TIME * 0.9f) return;
 
